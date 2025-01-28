@@ -1,0 +1,5 @@
+https://qutip.org/qutip-tutorials/
+https://qutip-qip.readthedocs.io/en/latest/qip-processor.html
+https://docs.pytest.org/en/stable/how-to/index.html
+https://docs.pydantic.dev/latest/concepts/models/
+https://sklearn-evaluation.ploomber.io/en/latest/classification/SQLiteTracker_classification.html
