@@ -1,3 +1,7 @@
+"""
+    The main entry point for the Quantum Simulation and Analysis Tool. It sets up the Streamlit app and handles the overall layout, styling, and user interface.
+"""
+
 import streamlit as st
 
 # Apply dark theme styling
