@@ -36,7 +36,7 @@ def braid_b1_2d():
 def braid_b2_2d():
     R_diag = np.array([[R_1,0],[0,R_tau]], dtype=complex)
     R_op = Qobj(R_diag, dims=[[2],[2]])
-    return F_inv_2x2*R_op*F_2x2
+    return F_inv_2x2 @ R_op @ F_2x2
 
 # Mock 3D for 4 anyons
 def mock_F_3x3():
@@ -56,11 +56,11 @@ def braid_b1_3d():
 
 def braid_b2_3d():
     Rop = R_3x3()
-    return F_inv_3x3 * Rop * F_3x3
+    return F_inv_3x3 @ Rop @ F_3x3
 
 def braid_b3_3d():
     Rop = R_3x3()
-    return F_3x3 * Rop * F_inv_3x3
+    return F_3x3 @ Rop @ F_inv_3x3
 
 def dynamic_braid_3d(psi, measure_outcome):
     B1 = braid_b1_3d()
@@ -74,8 +74,8 @@ def dynamic_braid_3d(psi, measure_outcome):
 
     op = Qobj(np.eye(3, dtype=complex))
     for b in seq:
-        op = b*op
-    return op*psi
+        op = b @ op
+    return op @ psi
 
 def approximate_phi_op(theta_degrees):
     B1_2 = braid_b1_2d()
@@ -89,7 +89,7 @@ def approximate_phi_op(theta_degrees):
     braids = approx_lib[best_angle]
     total_op = Qobj(np.eye(2, dtype=complex))
     for b in braids:
-        total_op = b*total_op
+        total_op = b @ total_op
     return total_op
 
 def apply_braid_with_error(psi, braid_op, error_prob):
@@ -127,6 +127,6 @@ if __name__=="__main__":
     ket0_2d = Qobj(np.array([1,0], dtype=complex))
     psi_init_2d = (ket0_2d + Qobj(np.array([0,1],dtype=complex))).unit()
 
-    psi_after_2d = apply_braid_with_error(psi_init_2d, (braid_b1_2d()*braid_b2_2d()), 0.2)
+    psi_after_2d = apply_braid_with_error(psi_init_2d, (braid_b1_2d() @ braid_b2_2d()), 0.2)
     psi_corr_2d  = measure_and_correct(psi_after_2d)
     print("3 anyons => final state:", psi_corr_2d)

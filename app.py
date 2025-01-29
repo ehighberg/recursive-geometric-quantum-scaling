@@ -134,7 +134,7 @@ with tabs[0]:
 
     # Minimal handling: We'll map "fock" => |0>, "ghz" => GHZ, etc.
     from simulations.quantum_state import (
-        state_zero, state_plus, state_ghz, state_w
+        state_zero, state_one, state_plus, state_ghz, state_w
     )
 
     def get_initial_state(chosen_state, num_qubits):
@@ -145,7 +145,9 @@ with tabs[0]:
             # If 2 qubits => a minimal GHZ-like approach, or you define a real bell state
             if num_qubits == 2:
                 # For demonstration: same as GHZ(2)
-                return (state_zero(2) + state_zero(2).proj(1)).unit()  # Placeholder
+                from qutip import ket2dm
+                # Create a proper Bell state (|00> + |11>)/sqrt(2)
+                return (state_zero(2) + state_one(2))/np.sqrt(2)
             else:
                 return state_zero(num_qubits)
         elif chosen_state == "ghz":

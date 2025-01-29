@@ -43,7 +43,9 @@ def state_w(num_qubits=3):
             else:
                 ket_list.append(basis(2,0))
         states.append(tensor(*ket_list))
-    psi = sum(states)
+    # Use reduce to maintain Qobj type during summation
+    from functools import reduce
+    psi = reduce(lambda x, y: x + y, states)
     return psi.unit()
 
 def positivity_projection(rho):
@@ -54,7 +56,7 @@ def positivity_projection(rho):
     evals_clipped = [max(ev,0) for ev in evals]
     rho_fixed = 0*rho
     for val, vec in zip(evals_clipped, evecs):
-        rho_fixed += val*vec*vec.dag()
+        rho_fixed += val * (vec @ vec.dag())
     tr = rho_fixed.tr()
     if tr>1e-15:
         rho_fixed /= tr

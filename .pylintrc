@@ -249,7 +249,6 @@ property-classes=abc.abstractproperty
 
 # Naming style matching correct variable names.
 variable-naming-style=snake_case
-
 # Regular expression matching correct variable names. Overrides variable-
 # naming-style. If left empty, variable names will be checked with the set
 # naming style.

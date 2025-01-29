@@ -50,16 +50,18 @@ class StandardCircuit:
                 rho = rho + E_op
             all_states.append(rho)
 
-        result = Result()
-        result.states = all_states
-        result.times = [self.dt*(i+1) for i in range(self.n_steps)]
+        from qutip import sesolve
+        tlist = [self.dt*(i+1) for i in range(self.n_steps)]
+        # Use sesolve for closed system evolution
+        result = sesolve(H=self.H0, psi0=initial_state, tlist=tlist,
+                        e_ops=[], options=Options(store_states=True))
         return result
 
-    def evolve_open(self, initial_state):
+    def evolve_open(self, initial_state: Qobj) -> Result:
         """
         Open-system approach using mesolve with c_ops.
         """
-        from qutip import mesolve, Options
+        from qutip import mesolve, Options, Result
         import numpy as np
         if initial_state.isket:
             rho0 = ket2dm(initial_state)
@@ -67,8 +69,14 @@ class StandardCircuit:
             rho0 = initial_state
 
         tlist = np.linspace(0, self.total_time, self.n_steps+1)
-        result = mesolve(self.H0, rho0, tlist, self.c_ops, e_ops=[],
-                         options=Options(store_states=True))
+        result: Result = mesolve(
+            H=self.H0,
+            rho0=rho0,
+            tlist=tlist,
+            c_ops=self.c_ops,
+            e_ops=[],
+            options=Options(store_states=True)
+        )
         # For a more advanced approach, you might do piecewise intervals
         return result
 
@@ -118,8 +126,14 @@ class PhiScaledCircuit:
         if self.lindblad_ops and (tlist is not None):
             # open system
             H_eff = self.build_approx_total_hamiltonian(n_steps)
-            result = mesolve(H_eff, rho0, tlist, self.lindblad_ops, e_ops=[],
-                             options=Options(store_states=True))
+            result = mesolve(
+                H=H_eff,
+                rho0=rho0,
+                tlist=tlist,
+                c_ops=self.lindblad_ops,
+                e_ops=[],
+                options=Options(store_states=True)
+            )
             if self.apply_positivity or self.noise_strength>0:
                 for i, st in enumerate(result.states):
                     if self.apply_positivity:
@@ -133,34 +147,42 @@ class PhiScaledCircuit:
                 all_states = []
                 rho = rho0.copy()
                 for n in range(n_steps):
-                    U_n = self.phi_scaled_unitary(n)
-                    rho = U_n * rho * U_n.dag()
+                    U_n: Qobj = self.phi_scaled_unitary(n)
+                    rho: Qobj = U_n @ rho @ U_n.dag()
                     if self.apply_positivity:
                         rho = positivity_projection(rho)
                     if self.noise_strength>0:
                         rho = self.apply_noise(rho)
                     all_states.append(rho)
-                res = Result()
-                res.states = all_states
-                res.times = list(range(n_steps))
-                return res
+                from qutip import sesolve
+                tlist = list(range(n_steps))
+                # Create time-dependent Hamiltonian list for each step
+                h_list = []
+                for n in range(n_steps):
+                    U_n = self.phi_scaled_unitary(n)
+                    h_list.append([U_n, lambda t, args: 1.0 if t == n else 0.0])
+                result = sesolve(H=h_list, psi0=initial_state, tlist=tlist,
+                               e_ops=[], options=Options(store_states=True))
+                return result
             else:
                 circuit = self.build_circuit(n_steps)
                 all_states = []
                 for _t in tlist:
-                    rho_t = circuit * rho0 * circuit.dag()
+                    rho_t: Qobj = circuit @ rho0 @ circuit.dag()
                     if self.apply_positivity:
                         rho_t = positivity_projection(rho_t)
                     if self.noise_strength>0:
                         rho_t = self.apply_noise(rho_t)
                     all_states.append(rho_t)
-                res = Result()
-                res.states = all_states
-                res.times = tlist
-                return res
+                from qutip import sesolve
+                # Create time-dependent Hamiltonian for the full circuit
+                h_list = [[circuit, lambda t, args: 1.0]]
+                result = sesolve(H=h_list, psi0=initial_state, tlist=tlist,
+                               e_ops=[], options=Options(store_states=True))
+                return result
 
     def build_approx_total_hamiltonian(self, n_steps: int) -> Qobj:
-        H_eff = 0*self.base_hamiltonian
+        H_eff = Qobj(np.zeros_like(self.base_hamiltonian), dims=self.base_hamiltonian.dims)
         for n in range(n_steps):
             U_n = self.phi_scaled_unitary(n)
             scale = (self.alpha**n)*np.exp(-self.beta*n)
@@ -176,7 +198,7 @@ class PhiScaledCircuit:
     def enable_positivity_projection(self, enable=True):
         self.apply_positivity = enable
 
-    def apply_noise(self, rho):
+    def apply_noise(self, rho: Qobj) -> Qobj:
         """
         Simple toy noise injection. For real usage, define physically
         meaningful noise models.
