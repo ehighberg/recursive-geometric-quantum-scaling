@@ -1,6 +1,4 @@
-"""
-    The main entry point for the Quantum Simulation and Analysis Tool. It sets up the Streamlit app and handles the overall layout, styling, and user interface.
-"""
+"""The main entry point for the Quantum Simulation and Analysis Tool. It sets up the Streamlit app and handles the overall layout, styling, and user interface."""
 
 import streamlit as st
 
@@ -98,7 +96,7 @@ def on_tab_change():
     try:
         # Get current tab index
         current_tab = st.session_state['active_tab']
-        
+
         # Validate state requirements for analysis tab
         if current_tab == 1:
             if 'simulation_results' not in st.session_state:
@@ -106,10 +104,10 @@ def on_tab_change():
                 st.session_state['active_tab'] = 0  # Return to state creation
     except Exception as e:
         add_log_message('error', f"Error handling tab change: {str(e)}")
-        
+
 with tabs[0]:
     st.header("Quantum state creation, quantum circuit setup, experiment definition")
-    
+
     # State creation
     initial_states = {
         'standard': ['fock', 'coherent', 'squeezed', 'cat', 'bell', 'ghz', 'cluster'],
