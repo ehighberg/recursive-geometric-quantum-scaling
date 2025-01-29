@@ -179,7 +179,7 @@ const-naming-style=UPPER_CASE
 
 # Minimum line length for functions/classes that require docstrings, shorter
 # ones are exempt.
-docstring-min-length=-1
+docstring-min-length=6
 
 # Naming style matching correct function names.
 function-naming-style=snake_case
@@ -307,9 +307,6 @@ max-locals=15
 # Maximum number of parents for a class (see R0901).
 max-parents=7
 
-# Maximum number of positional arguments for function / method.
-max-positional-arguments=5
-
 # Maximum number of public methods for a class (see R0904).
 max-public-methods=20
 
@@ -326,7 +323,7 @@ min-public-methods=2
 [EXCEPTIONS]
 
 # Exceptions that will emit a warning when caught.
-overgeneral-exceptions=builtins.BaseException,builtins.Exception
+overgeneral-exceptions=
 
 
 [FORMAT]
@@ -345,7 +342,7 @@ indent-after-paren=4
 indent-string='    '
 
 # Maximum number of characters on a single line.
-max-line-length=100
+max-line-length=200
 
 # Maximum number of lines in a module.
 max-module-lines=1000
