@@ -1,0 +1,8 @@
+base_hamiltonian: "path/to/hamiltonian.npy"
+total_time: 1.0
+n_steps: 10
+c_ops: []
+alpha: 1.0
+beta: 0.1
+positivity: false
+dimensionality: 2

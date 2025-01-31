@@ -1,6 +1,5 @@
 """Global constants and configuration parameters for Quantum Core."""
 
-# Fractal analysis parameters
 import numpy as np
 
 # Phase space grid parameters
@@ -22,8 +21,6 @@ FRAMEWORK_WEIGHTS = {
 ERROR_THRESHOLDS = {
     'numerical': 0.001,  # Numerical precision threshold
 }
-
-# Additional constants can be added below
 
 # Phi-based recursion parameters
 PHI = (1 + np.sqrt(5)) / 2  # Golden ratio
