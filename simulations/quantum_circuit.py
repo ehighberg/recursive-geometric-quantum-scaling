@@ -1,8 +1,7 @@
 import numpy as np
-from qutip import Qobj, ket2dm, mesolve, Result, Options
+from qutip import Qobj, ket2dm, mesolve, Options
 from .quantum_state import positivity_projection
 from .config import load_config  # Corrected relative import
-
 
 class ClosedResult:
     """
@@ -62,11 +61,11 @@ class StandardCircuit:
 
         tlist = np.linspace(0, self.total_time, self.n_steps + 1)
         result = mesolve(
-            self.base_hamiltonian,    # H as positional argument
-            rho0,                     # rho0 as positional argument
-            tlist,                    # tlist as positional argument
-            self.c_ops,               # c_ops as positional argument
-            e_ops=[],                 # Provided as keyword argument with empty list
+            self.base_hamiltonian,  # H as positional argument
+            rho0,                   # rho0 as positional argument
+            tlist,                  # tlist as positional argument
+            self.c_ops,             # c_ops as positional argument
+            e_ops=[],               # Provided as keyword argument with empty list
             options=Options(store_states=True)  # Provided as keyword argument
         )
         return result
@@ -78,9 +77,9 @@ class StandardCircuit:
 class PhiScaledCircuit:
     """
     φ-based expansions:
-      scale_n = alpha^n exp(-beta n).
-    closed: discrete repeated steps
-    open: approximate H_eff by summing log(U_n).
+      scale_n = (α^n * exp(-βn)) / (φ^n).
+    Closed evolution: discrete repeated steps.
+    Open evolution: approximate H_eff by summing log(U_n).
     """
     def __init__(self, base_hamiltonian, alpha=None, beta=None, c_ops=None, positivity=None):
         self.base_hamiltonian = base_hamiltonian
@@ -89,9 +88,17 @@ class PhiScaledCircuit:
         self.beta = self.config.get('beta', beta if beta is not None else 0.1)
         self.c_ops = self.config.get('c_ops', c_ops if c_ops is not None else [])
         self.positivity = self.config.get('positivity', positivity if positivity is not None else False)
-
+        
+        # Check contraction condition: assume Lipschitz constant L = 1 for simplicity.
+        L = 1.0
+        if self.alpha * np.exp(-self.beta) >= 1.0 / (L + 1):
+            raise ValueError("Chosen parameters (alpha, beta) may violate contraction conditions.")
+            
     def phi_scaled_unitary(self, step_idx):
-        scale = (self.alpha ** step_idx) * np.exp(-self.beta * step_idx)
+        from constants import PHI  # Import PHI from constants module
+        # Incorporate the φ-scaling explicitly:
+        # scale = (alpha^n * exp(-βn)) / (PHI^n)
+        scale = (self.alpha ** step_idx) * np.exp(-self.beta * step_idx) / (PHI ** step_idx)
         return (-1j * scale * self.base_hamiltonian).expm()
 
     def evolve_closed(self, initial_state, n_steps=None):
@@ -114,7 +121,7 @@ class PhiScaledCircuit:
     def evolve_open(self, initial_state, n_steps=None, tlist=None):
         """
         Approximate H_eff = Σ (i/scale_n) * log(U_n).
-        Then do mesolve(H_eff).
+        Then perform mesolve on H_eff.
         """
         if initial_state.isket:
             rho0 = ket2dm(initial_state)
@@ -139,12 +146,13 @@ class PhiScaledCircuit:
     def build_approx_total_hamiltonian(self, n_steps=None):
         from qutip import Qobj
         import numpy as np
+        from constants import PHI  # Import PHI constant
         n_steps = self.config.get('n_steps', n_steps if n_steps is not None else 10)
         dim = self.base_hamiltonian.shape[0]
         H_eff = Qobj(np.zeros((dim, dim), dtype=complex), dims=self.base_hamiltonian.dims)
         for idx in range(n_steps):
             U_n = self.phi_scaled_unitary(idx)
-            scale = (self.alpha ** idx) * np.exp(-self.beta * idx)
+            scale = (self.alpha ** idx) * np.exp(-self.beta * idx) / (PHI ** idx)
             logU = U_n.logm()
             H_eff += (1.0j / scale) * logU
         return H_eff

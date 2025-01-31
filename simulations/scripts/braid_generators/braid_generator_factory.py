@@ -1,5 +1,5 @@
 from .braid_generator_2d import BraidGenerator2D
-# Future implementations can be added here, e.g., BraidGenerator3D
+# Future implementations can include a 3D braid generator (e.g., BraidGenerator3D)
 
 class BraidGeneratorFactory:
     @staticmethod
@@ -9,4 +9,4 @@ class BraidGeneratorFactory:
         # elif dimensionality == 3:
         #     return BraidGenerator3D(dimensionality)
         else:
-            raise ValueError(f"Unsupported dimensionality: {dimensionality}")
+            raise ValueError(f"Unsupported dimensionality: {dimensionality}.")

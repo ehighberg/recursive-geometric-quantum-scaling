@@ -17,8 +17,8 @@ def state_one(num_qubits=1):
 
 def state_plus(num_qubits=1):
     """All-|+> = (|0>+|1>)/√2 (tensored for multiple qubits)."""
-    single_plus = (basis(2,0) + basis(2,1)).unit()
-    if num_qubits==1:
+    single_plus = (basis(2, 0) + basis(2, 1)).unit()
+    if num_qubits == 1:
         return single_plus
     return tensor(*[single_plus for _ in range(num_qubits)])
 
@@ -26,10 +26,10 @@ def state_ghz(num_qubits=3):
     """
     GHZ = (|000...> + |111...>)/√2, for >=2 qubits.
     """
-    if num_qubits<2:
+    if num_qubits < 2:
         raise ValueError("GHZ requires >=2 qubits.")
-    zero_ket = tensor(*[basis(2,0) for _ in range(num_qubits)])
-    one_ket = tensor(*[basis(2,1) for _ in range(num_qubits)])
+    zero_ket = tensor(*[basis(2, 0) for _ in range(num_qubits)])
+    one_ket = tensor(*[basis(2, 1) for _ in range(num_qubits)])
     return (zero_ket + one_ket).unit()
 
 def state_w(num_qubits=3):
@@ -44,7 +44,7 @@ def state_w(num_qubits=3):
     for i in range(num_qubits):
         ket_list = []
         for j in range(num_qubits):
-            ket_list.append(basis(2,1) if j==i else basis(2,0))
+            ket_list.append(basis(2, 1) if j == i else basis(2, 0))
         states.append(tensor(*ket_list))
     psi = sum(states)
     if isinstance(psi, Qobj):
@@ -58,14 +58,14 @@ def positivity_projection(rho):
     """
     evals, evecs = rho.eigenstates()
     evals_clipped = [max(ev, 0.0) for ev in evals]
-    rho_fixed = 0*rho
+    rho_fixed = 0 * rho
     for val, vec in zip(evals_clipped, evecs):
-        rho_fixed += val*vec*vec.dag()
+        rho_fixed += val * vec * vec.dag()
 
     if rho_fixed.norm() < 1e-15:
         return rho_fixed
     tr_val = rho_fixed.tr()
-    if tr_val>1e-15:
+    if tr_val > 1e-15:
         rho_fixed /= tr_val
     return rho_fixed
 
