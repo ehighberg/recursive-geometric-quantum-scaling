@@ -8,7 +8,7 @@ Examples:
  - partial trace usage to get bipartite entanglement measures
 """
 
-from qutip import partial_transpose, ptrace, negativity, log_negativity
+from qutip import partial_transpose, ptrace, negativity, logarithmic_negativity
 from qutip import Qobj
 
 def compute_negativity(rho, sysA_dims=None):
@@ -35,9 +35,9 @@ def compute_log_negativity(rho, sysA_dims=None):
     If sysA_dims is None, assume 2-qubit partition (2,2).
     """
     if sysA_dims is None:
-        ln_val = log_negativity(rho, [2,2])
+        ln_val = logarithmic_negativity(rho, [2,2])
     else:
-        ln_val = log_negativity(rho, sysA_dims)
+        ln_val = logarithmic_negativity(rho, sysA_dims)
     return ln_val
 
 def bipartite_partial_trace(rho, keep=0, dims=[2,2]):
