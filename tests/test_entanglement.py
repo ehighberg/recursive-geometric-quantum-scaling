@@ -8,6 +8,7 @@ from analyses.entanglement import (
     compute_negativity, compute_log_negativity, bipartite_partial_trace
 )
 
+
 def test_negativity_bell_state():
     """
     A standard Bell state: (|00> + |11>)/sqrt(2).
@@ -20,6 +21,7 @@ def test_negativity_bell_state():
     # negativity is 0.5 for a maximally entangled 2-qubit pure state
     neg = compute_negativity(rho_bell)  # default dims=(2,2)
     assert abs(neg - 0.5) < 1e-5, f"Negativity of Bell state ~ 0.5, got {neg}"
+
 
 def test_log_negativity_bell_state():
     """
@@ -34,6 +36,7 @@ def test_log_negativity_bell_state():
 
     # With natural log, LN(2) ~ 0.693147
     assert abs(ln_val - 0.693147) < 1e-3, f"Log-neg of Bell ~ ln(2), got {ln_val}"
+
 
 def test_bipartite_partial_trace():
     """
@@ -51,7 +54,6 @@ def test_bipartite_partial_trace():
     assert abs(arrA[0,0] - 0.5) < 1e-6
     assert abs(arrA[1,1] - 0.5) < 1e-6
     assert abs(arrA[0,1]) < 1e-7
-
 
 
 def test_negativity_werner_state():

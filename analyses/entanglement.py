@@ -21,14 +21,14 @@ def compute_negativity(rho, sysA_dims=None):
     
     QuTiP's negativity function:
       negativity(rho, sys A dimension)
-    if not isinstance(rho, Qobj) or not rho.isoper or not rho.isherm:
+    if not isinstance(rho, Qobj) or not rho.isoperator or not rho.isherm:
         raise ValueError("Input must be a density matrix (Qobj operator).")
 
     """
     if sysA_dims is None:
         # default: 2-qubit => first qubit is sysA => dims=(2,2)
         # Calculate negativity for bipartite system
-        neg_val = negativity(rho, [2,2])
+        neg_val = negativity(rho, [0])
     else:
         # For multi-qubit systems
         neg_val = negativity(rho, sysA_dims)

@@ -1,5 +1,18 @@
-# app.py
+"""
+Quantum Simulation and Analysis Tool - A Streamlit web application for running quantum simulations
+and analyzing their results. Supports various quantum evolution modes including standard state
+evolution, phi-scaled evolution, and Fibonacci anyon braiding circuits.
+"""
+# pylint: disable=wrong-import-position
+# Add the project root to Python path
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
+
+# Third-party imports
 import streamlit as st
+
+# Local imports
 from simulations.scripts.evolve_state import (
     run_standard_state_evolution,
     run_phi_scaled_state_evolution
