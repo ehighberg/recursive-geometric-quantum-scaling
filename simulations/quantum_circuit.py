@@ -30,12 +30,12 @@ class StandardCircuit:
         self.n_steps = self.config.get('n_steps', n_steps if n_steps is not None else 10)
         self.c_ops = self.config.get('c_ops', c_ops if c_ops is not None else [])
 
-    def evolve_closed(self, initial_state):
+    def evolve_closed(self, initial_state, n_steps=None):
         """
         Trotter approach: dt = total_time / n_steps, 
         U_dt = exp(-i dt H0).
         """
-        dt = self.total_time / self.n_steps
+        dt = self.total_time / (n_steps if n_steps is not None else self.n_steps)
         U_dt = (-1j * dt * self.base_hamiltonian).expm()
 
         if initial_state.isket:
@@ -44,10 +44,10 @@ class StandardCircuit:
             rho = initial_state
 
         all_states = []
-        for _ in range(self.n_steps):
+        for _ in range(n_steps if n_steps is not None else self.n_steps):
             rho = U_dt * rho * U_dt.dag()
             all_states.append(rho)
-        result = ClosedResult(states=all_states, times=[dt * (i + 1) for i in range(self.n_steps)])
+        result = ClosedResult(states=all_states, times=[dt * (i + 1) for i in range(n_steps if n_steps is not None else self.n_steps)])
         return result
 
     def evolve_open(self, initial_state):
@@ -84,8 +84,8 @@ class PhiScaledCircuit:
     def __init__(self, base_hamiltonian, alpha=None, beta=None, c_ops=None, positivity=None):
         self.base_hamiltonian = base_hamiltonian
         self.config = load_config()
-        self.alpha = self.config.get('alpha', alpha if alpha is not None else 1.0)
-        self.beta = self.config.get('beta', beta if beta is not None else 0.1)
+        self.alpha = alpha if alpha is not None else self.config.get('alpha', 1.0)
+        self.beta = beta if beta is not None else self.config.get('beta', 0.1)
         self.c_ops = self.config.get('c_ops', c_ops if c_ops is not None else [])
         self.positivity = self.config.get('positivity', positivity if positivity is not None else False)
         
@@ -102,7 +102,7 @@ class PhiScaledCircuit:
         return (-1j * scale * self.base_hamiltonian).expm()
 
     def evolve_closed(self, initial_state, n_steps=None):
-        n_steps = self.config.get('n_steps', n_steps if n_steps is not None else 10)
+        n_steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
         if initial_state.isket:
             rho = ket2dm(initial_state)
         else:
@@ -128,7 +128,7 @@ class PhiScaledCircuit:
         else:
             rho0 = initial_state
 
-        n_steps = self.config.get('n_steps', n_steps if n_steps is not None else 10)
+        n_steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
         if tlist is None:
             tlist = np.linspace(0, self.config.get('total_time', 1.0), n_steps + 1)
         
@@ -147,7 +147,7 @@ class PhiScaledCircuit:
         from qutip import Qobj
         import numpy as np
         from constants import PHI  # Import PHI constant
-        n_steps = self.config.get('n_steps', n_steps if n_steps is not None else 10)
+        n_steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
         dim = self.base_hamiltonian.shape[0]
         H_eff = Qobj(np.zeros((dim, dim), dtype=complex), dims=self.base_hamiltonian.dims)
         for idx in range(n_steps):

@@ -44,7 +44,7 @@ def compute_log_negativity(rho, sysA_dims=None):
     else:
         neg = compute_negativity(rho, sysA_dims)
     # Logarithmic negativity formula: log2(2*negativity + 1)
-    ln_val = np.log2(2 * neg + 1)
+    ln_val = np.log(2 * neg + 1)
     return ln_val
 
 def bipartite_partial_trace(rho, keep=0, dims=[2,2]):
