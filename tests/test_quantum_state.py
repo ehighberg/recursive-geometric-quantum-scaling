@@ -8,15 +8,15 @@ from qutip import Qobj
 
 def test_state_zero():
     psi = state_zero(num_qubits=2)
-    assert psi.shape == (4,), "2-qubit => 4 dimension."
+    assert psi.shape == (4, 1), "2-qubit => 4 dimension."
 
 def test_state_plus():
     psi = state_plus(num_qubits=1)
-    assert psi.shape == (2,)
+    assert psi.shape == (2, 1)
 
 def test_state_ghz():
     psi = state_ghz(3)
-    assert psi.shape == (8,)
+    assert psi.shape == (8, 1)
 
 def test_positivity_projection():
     import numpy as np
@@ -28,4 +28,4 @@ def test_positivity_projection():
 
 def test_fib_anyon_state_2d():
     psi = fib_anyon_state_2d()
-    assert psi.shape == (2,)
+    assert psi.shape == (2, 1)
