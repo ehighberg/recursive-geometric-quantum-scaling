@@ -26,16 +26,19 @@ class StandardCircuit:
     def __init__(self, base_hamiltonian, total_time=None, n_steps=None, c_ops=None):
         self.base_hamiltonian = base_hamiltonian
         self.config = load_config()
-        self.total_time = self.config.get('total_time', total_time if total_time is not None else 1.0)
-        self.n_steps = self.config.get('n_steps', n_steps if n_steps is not None else 10)
-        self.c_ops = self.config.get('c_ops', c_ops if c_ops is not None else [])
+        # Give precedence to passed parameters over config values
+        self.total_time = total_time if total_time is not None else self.config.get('total_time', 1.0)
+        self.n_steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
+        self.c_ops = c_ops if c_ops is not None else self.config.get('c_ops', [])
 
     def evolve_closed(self, initial_state, n_steps=None):
         """
         Trotter approach: dt = total_time / n_steps, 
         U_dt = exp(-i dt H0).
         """
-        dt = self.total_time / (n_steps if n_steps is not None else self.n_steps)
+        # Use passed n_steps first, then instance n_steps
+        steps = n_steps if n_steps is not None else self.n_steps
+        dt = self.total_time / steps
         U_dt = (-1j * dt * self.base_hamiltonian).expm()
 
         if initial_state.isket:
@@ -44,10 +47,10 @@ class StandardCircuit:
             rho = initial_state
 
         all_states = []
-        for _ in range(n_steps if n_steps is not None else self.n_steps):
+        for _ in range(steps):
             rho = U_dt * rho * U_dt.dag()
             all_states.append(rho)
-        result = ClosedResult(states=all_states, times=[dt * (i + 1) for i in range(n_steps if n_steps is not None else self.n_steps)])
+        result = ClosedResult(states=all_states, times=[dt * (i + 1) for i in range(steps)])
         return result
 
     def evolve_open(self, initial_state):
@@ -86,8 +89,8 @@ class PhiScaledCircuit:
         self.config = load_config()
         self.alpha = alpha if alpha is not None else self.config.get('alpha', 1.0)
         self.beta = beta if beta is not None else self.config.get('beta', 0.1)
-        self.c_ops = self.config.get('c_ops', c_ops if c_ops is not None else [])
-        self.positivity = self.config.get('positivity', positivity if positivity is not None else False)
+        self.c_ops = c_ops if c_ops is not None else self.config.get('c_ops', [])
+        self.positivity = positivity if positivity is not None else self.config.get('positivity', False)
         
         # Check contraction condition: assume Lipschitz constant L = 1 for simplicity.
         L = 1.0
@@ -102,20 +105,21 @@ class PhiScaledCircuit:
         return (-1j * scale * self.base_hamiltonian).expm()
 
     def evolve_closed(self, initial_state, n_steps=None):
-        n_steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
+        # Give precedence to passed parameter over config
+        steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
         if initial_state.isket:
             rho = ket2dm(initial_state)
         else:
             rho = initial_state
 
         all_states = []
-        for idx in range(n_steps):
+        for idx in range(steps):
             U_n = self.phi_scaled_unitary(idx)
             rho = U_n * rho * U_n.dag()
             if self.positivity:
                 rho = positivity_projection(rho)
             all_states.append(rho)
-        result = ClosedResult(states=all_states, times=list(range(n_steps)))
+        result = ClosedResult(states=all_states, times=list(range(steps)))
         return result
 
     def evolve_open(self, initial_state, n_steps=None, tlist=None):
@@ -128,11 +132,11 @@ class PhiScaledCircuit:
         else:
             rho0 = initial_state
 
-        n_steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
+        steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
         if tlist is None:
-            tlist = np.linspace(0, self.config.get('total_time', 1.0), n_steps + 1)
+            tlist = np.linspace(0, self.config.get('total_time', 1.0), steps + 1)
         
-        H_eff = self.build_approx_total_hamiltonian(n_steps)
+        H_eff = self.build_approx_total_hamiltonian(steps)
         result = mesolve(
             H_eff,                            # H_eff as positional argument
             rho0,                             # rho0 as positional argument
@@ -147,10 +151,10 @@ class PhiScaledCircuit:
         from qutip import Qobj
         import numpy as np
         from constants import PHI  # Import PHI constant
-        n_steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
+        steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
         dim = self.base_hamiltonian.shape[0]
         H_eff = Qobj(np.zeros((dim, dim), dtype=complex), dims=self.base_hamiltonian.dims)
-        for idx in range(n_steps):
+        for idx in range(steps):
             U_n = self.phi_scaled_unitary(idx)
             scale = (self.alpha ** idx) * np.exp(-self.beta * idx) / (PHI ** idx)
             logU = U_n.logm()
