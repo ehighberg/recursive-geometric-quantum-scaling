@@ -26,7 +26,7 @@ def run_phi_scaled_twoqubit_circuit():
     alpha=1, beta=0.2 => steps=5
     """
     H0 = tensor(sigmaz(), qeye(2)) + 0.5 * tensor(qeye(2), sigmax())
-    pcirc = PhiScaledCircuit(H0, alpha=1.0, beta=0.2)
+    pcirc = PhiScaledCircuit(H0, alpha=0.5, beta=0.5)
     psi_init = state_zero(num_qubits=2)
     result = pcirc.evolve_closed(psi_init, n_steps=5)
     return result

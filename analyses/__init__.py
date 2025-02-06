@@ -1,6 +1,6 @@
-from analyses.entanglement import compute_negativity
-from analyses.entropy import compute_vn_entropy
-from analyses.coherence import l1_coherence
+from .entanglement import compute_negativity, compute_log_negativity, bipartite_partial_trace
+from .entropy import compute_vn_entropy, compute_linear_entropy, compute_mutual_information
+from .coherence import l1_coherence, relative_entropy_coherence
 
 def run_analyses(rho):
     """

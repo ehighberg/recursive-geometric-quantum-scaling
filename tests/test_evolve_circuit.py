@@ -17,4 +17,4 @@ def test_run_phi_scaled_twoqubit_circuit():
 
 def test_run_fibonacci_braiding_circuit():
     fib_final = run_fibonacci_braiding_circuit()
-    assert fib_final.shape == (2,)
+    assert fib_final.shape == (2, 1)

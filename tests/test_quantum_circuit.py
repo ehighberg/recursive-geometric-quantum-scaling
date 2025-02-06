@@ -12,7 +12,7 @@ def test_standard_circuit_init():
 
 def test_phi_scaled_unitary():
     H0 = sigmaz()
-    pcirc = PhiScaledCircuit(H0, alpha=1.2, beta=0.05)
+    pcirc = PhiScaledCircuit(H0, alpha=0.5, beta=0.5)
     U_3 = pcirc.phi_scaled_unitary(3)
     assert U_3.shape == (2,2)
 
