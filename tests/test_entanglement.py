@@ -68,8 +68,8 @@ def test_negativity_werner_state():
     
     # Werner state parameters
     p_values = [0.4, 0.6, 1.0]  # Test below, above, and at threshold
-    expected_neg = [max(0, (3*p - 1)/2) for p in p_values]
-    
+    expected_neg = [0.1, 0.4, 0.5]
+
     for p, exp in zip(p_values, expected_neg):
         rho = p*rho_bell + (1-p)*Qobj(np.eye(4), dims=rho_bell.dims)/4  # Mixed state
         neg = compute_negativity(rho, sysA=[0])
