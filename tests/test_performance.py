@@ -111,7 +111,7 @@ class TestPerformance(unittest.TestCase):
         """Benchmark the performance of export_circuit_diagram."""
         def task():
             fig = plot_circuit_diagram(self.components, self.connections, title="Performance Test")
-            export_circuit_diagram(fig, "test_circuit_diagram", format="png")
+            export_circuit_diagram(fig, "tests/test_circuit_diagram", format="png")
             plt.close(fig)
         
         execution_time = timeit.timeit(task, number=100)

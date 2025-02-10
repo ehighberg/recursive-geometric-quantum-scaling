@@ -1,4 +1,5 @@
 import numpy as np
+from constants import PHI
 from qutip import Qobj, ket2dm, mesolve, Options
 from .quantum_state import positivity_projection
 from .config import load_config  # Corrected relative import
@@ -80,28 +81,19 @@ class StandardCircuit:
 class PhiScaledCircuit:
     """
     φ-based expansions:
-      scale_n = (α^n * exp(-βn)) / (φ^n).
+      scale_n = (scaling_factor^n).
     Closed evolution: discrete repeated steps.
     Open evolution: approximate H_eff by summing log(U_n).
     """
-    def __init__(self, base_hamiltonian, alpha=None, beta=None, c_ops=None, positivity=None):
+    def __init__(self, base_hamiltonian, scaling_factor=None, c_ops=None, positivity=None):
         self.base_hamiltonian = base_hamiltonian
         self.config = load_config()
-        self.alpha = alpha if alpha is not None else self.config.get('alpha', 1.0)
-        self.beta = beta if beta is not None else self.config.get('beta', 0.1)
+        self.scaling_factor = scaling_factor if scaling_factor is not None else self.config.get('scaling_factor', 1/PHI)
         self.c_ops = c_ops if c_ops is not None else self.config.get('c_ops', [])
         self.positivity = positivity if positivity is not None else self.config.get('positivity', False)
-        
-        # Check contraction condition: assume Lipschitz constant L = 1 for simplicity.
-        L = 1.0
-        if self.alpha * np.exp(-self.beta) >= 1.0 / (L + 1):
-            raise ValueError("Chosen parameters (alpha, beta) may violate contraction conditions.")
             
     def phi_scaled_unitary(self, step_idx):
-        from constants import PHI  # Import PHI from constants module
-        # Incorporate the φ-scaling explicitly:
-        # scale = (alpha^n * exp(-βn)) / (PHI^n)
-        scale = (self.alpha ** step_idx) * np.exp(-self.beta * step_idx) / (PHI ** step_idx)
+        scale = (self.scaling_factor ** step_idx)
         return (-1j * scale * self.base_hamiltonian).expm()
 
     def evolve_closed(self, initial_state, n_steps=None):
@@ -156,7 +148,7 @@ class PhiScaledCircuit:
         H_eff = Qobj(np.zeros((dim, dim), dtype=complex), dims=self.base_hamiltonian.dims)
         for idx in range(steps):
             U_n = self.phi_scaled_unitary(idx)
-            scale = (self.alpha ** idx) * np.exp(-self.beta * idx) / (PHI ** idx)
+            scale = (self.scaling_factor ** idx)
             logU = U_n.logm()
             H_eff += (1.0j / scale) * logU
         return H_eff

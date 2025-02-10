@@ -5,6 +5,7 @@
 Circuit-based approach: multi-qubit or braiding example.
 """
 
+from constants import PHI
 from qutip import sigmaz, sigmax, qeye, tensor
 from simulations.quantum_state import state_zero, fib_anyon_state_2d
 from simulations.quantum_circuit import StandardCircuit, PhiScaledCircuit, FibonacciBraidingCircuit
@@ -22,11 +23,10 @@ def run_standard_twoqubit_circuit():
 
 def run_phi_scaled_twoqubit_circuit():
     """
-    2-qubit fractal approach. H0= sigma_z(1) + 0.5 sigma_x(2).
-    alpha=1, beta=0.2 => steps=5
+    2-qubit fractal approach. H0= sigma_z(1) + 0.5 sigma_x(2). => steps=5
     """
     H0 = tensor(sigmaz(), qeye(2)) + 0.5 * tensor(qeye(2), sigmax())
-    pcirc = PhiScaledCircuit(H0, alpha=0.5, beta=0.5)
+    pcirc = PhiScaledCircuit(H0, scaling_factor=1/PHI)
     psi_init = state_zero(num_qubits=2)
     result = pcirc.evolve_closed(psi_init, n_steps=5)
     return result
