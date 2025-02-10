@@ -7,6 +7,7 @@ evolution, phi-scaled evolution, and Fibonacci anyon braiding circuits.
 # Add the project root to Python path
 import sys
 from pathlib import Path
+from constants import PHI
 sys.path.insert(0, str(Path(__file__).parent))
 
 # Third-party imports
@@ -61,8 +62,7 @@ def main():
                 params['total_time'] = st.slider("Total Time", 0.1, 10.0, 5.0)
                 params['n_steps'] = st.slider("Steps", 1, 100, 50)
             else:  # Phi-Scaled
-                params['alpha'] = st.slider("Alpha", 0.1, 2.0, 1.0)
-                params['beta'] = st.slider("Beta", 0.0, 1.0, 0.1)
+                params['scaling_factor'] = st.slider("Scaling Factor", 0.01, 1.0, 1/PHI)
                 params['phi_steps'] = st.slider("Phi Steps", 1, 20, 5)
     
     # Main content area
@@ -85,8 +85,7 @@ def main():
                         num_qubits=params['num_qubits'],
                         state_label=params['state_label'],
                         phi_steps=params['phi_steps'],
-                        alpha=params['alpha'],
-                        beta=params['beta']
+                        scaling_factor=params['scaling_factor']
                     )
                 elif mode == "Circuit -> Standard 2Q":
                     result = run_standard_twoqubit_circuit()

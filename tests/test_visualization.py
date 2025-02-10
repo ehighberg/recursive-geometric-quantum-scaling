@@ -95,7 +95,7 @@ class TestVisualizationComponents(unittest.TestCase):
     def test_export_circuit_diagram(self):
         try:
             fig = plot_circuit_diagram(self.components, self.connections, title="Test Export Circuit Diagram")
-            export_circuit_diagram(fig, "test_circuit_diagram", format="png")
+            export_circuit_diagram(fig, "tests/test_circuit_diagram", format="png")
             # Check if file exists (requires filesystem access; skipped here)
             plt.close(fig)
         except Exception as e:

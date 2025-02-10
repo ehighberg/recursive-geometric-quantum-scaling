@@ -1,6 +1,7 @@
 # tests/test_quantum_circuit.py
 
 import pytest
+from constants import PHI
 import numpy as np
 from qutip import sigmaz, Qobj
 from simulations.quantum_circuit import StandardCircuit, PhiScaledCircuit, FibonacciBraidingCircuit
@@ -12,7 +13,7 @@ def test_standard_circuit_init():
 
 def test_phi_scaled_unitary():
     H0 = sigmaz()
-    pcirc = PhiScaledCircuit(H0, alpha=0.5, beta=0.5)
+    pcirc = PhiScaledCircuit(H0, scaling_factor=1/PHI)
     U_3 = pcirc.phi_scaled_unitary(3)
     assert U_3.shape == (2,2)
 
