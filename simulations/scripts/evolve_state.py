@@ -13,7 +13,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from simulations.quantum_state import state_plus
-from simulations.quantum_circuit import StandardCircuit, PhiScaledCircuit
+from simulations.quantum_circuit import StandardCircuit, ScaledCircuit
 from qutip import sigmaz, tensor, qeye
 
 def construct_nqubit_hamiltonian(num_qubits):
@@ -34,7 +34,25 @@ def construct_nqubit_hamiltonian(num_qubits):
 
 # Removed run_standard_state_evolution as per refactor plan
 
-def run_state_evolution(num_qubits, state_label, phi_steps, scaling_factor=1):
+from typing import Optional, Callable
+import matplotlib.pyplot as plt
+from analyses.visualization.state_plots import (
+    animate_state_evolution,
+    animate_bloch_sphere,
+    plot_state_evolution,
+    plot_bloch_sphere
+)
+
+def run_state_evolution(
+    num_qubits: int,
+    state_label: str,
+    n_steps: int,
+    scaling_factor: float = 1,
+    noise_config: Optional[dict] = None,
+    visualize: bool = False,
+    animation_interval: int = 50,
+    callback: Optional[Callable] = None
+):
     """
     N-qubit evolution under H = Σi σzi with scale_factor.
     Returns qutip.Result
@@ -44,11 +62,74 @@ def run_state_evolution(num_qubits, state_label, phi_steps, scaling_factor=1):
     # Construct appropriate n-qubit Hamiltonian
     H0 = construct_nqubit_hamiltonian(num_qubits)
     
-    pcirc = PhiScaledCircuit(H0, scaling_factor=scaling_factor)
+    pcirc = ScaledCircuit(H0, scaling_factor=scaling_factor, noise_config=noise_config)
     psi_init = eval(f"state_{state_label}")(num_qubits=num_qubits)
-    result = pcirc.evolve_closed(psi_init, n_steps=phi_steps)
+    # Run evolution
+    result = pcirc.evolve_closed(psi_init, n_steps=n_steps)
+    
+    if visualize:
+        # Create animations
+        times = list(range(n_steps))
+        state_anim = animate_state_evolution(
+            result.states,
+            times,
+            title=f"{num_qubits}-Qubit State Evolution (scale={scaling_factor})",
+            interval=animation_interval
+        )
+        
+        # For single-qubit states, also show Bloch sphere animation
+        bloch_anim = None
+        if num_qubits == 1:
+            bloch_anim = animate_bloch_sphere(
+                result.states,
+                title=f"Bloch Sphere Evolution (scale={scaling_factor})",
+                interval=animation_interval
+            )
+        
+        # Create static plots for comparison
+        static_fig = plot_state_evolution(
+            result.states,
+            times,
+            title=f"{num_qubits}-Qubit State Evolution (scale={scaling_factor})"
+        )
+        
+        if callback:
+            callback(result.states, times)
+        
+        plt.show()
+        
+        return result, state_anim, bloch_anim, static_fig
+    
     return result
 
 if __name__=="__main__":
-    res_state = run_state_evolution(num_qubits=1, state_label="plus", phi_steps=5, scaling_factor=1)
-    print("State final:", res_state.states[-1])
+    # Example: Evolution with visualization
+    result, state_anim, bloch_anim, static_fig = run_state_evolution(
+        num_qubits=1,
+        state_label="plus",
+        n_steps=50,
+        scaling_factor=1,
+        visualize=True,
+        animation_interval=50
+    )
+    print("Final state:", result.states[-1])
+    
+    # Example: Evolution with noise and visualization
+    noise_config = {
+        'noise': {
+            'dephasing': {
+                'enabled': True,
+                'rate': 0.1
+            }
+        }
+    }
+    result_noisy, state_anim_noisy, bloch_anim_noisy, static_fig_noisy = run_state_evolution(
+        num_qubits=1,
+        state_label="plus",
+        n_steps=50,
+        scaling_factor=1,
+        noise_config=noise_config,
+        visualize=True,
+        animation_interval=50
+    )
+    print("Final state (with noise):", result_noisy.states[-1])

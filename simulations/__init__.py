@@ -1,3 +1,3 @@
-from .quantum_circuit import StandardCircuit, PhiScaledCircuit, FibonacciBraidingCircuit
+from .quantum_circuit import StandardCircuit, ScaledCircuit, FibonacciBraidingCircuit
 
-__all__ = ['StandardCircuit', 'PhiScaledCircuit', 'FibonacciBraidingCircuit']
+__all__ = ['StandardCircuit', 'ScaledCircuit', 'FibonacciBraidingCircuit']

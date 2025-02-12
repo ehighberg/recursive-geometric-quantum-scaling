@@ -4,3 +4,26 @@ n_steps: 20
 c_ops: []
 positivity: false
 dimensionality: 2
+
+# Noise configuration
+noise:
+  # Depolarizing noise parameters
+  depolarizing:
+    enabled: false
+    rate: 0.01  # Depolarizing rate (0 to 1)
+  
+  # Dephasing noise parameters
+  dephasing:
+    enabled: false
+    rate: 0.01  # Dephasing rate (0 to 1)
+  
+  # Amplitude damping parameters
+  amplitude_damping:
+    enabled: false
+    rate: 0.01  # Damping rate (0 to 1)
+  
+  # Thermal noise parameters
+  thermal:
+    enabled: false
+    nth: 0.1  # Average thermal photon number
+    rate: 0.01  # Coupling rate
