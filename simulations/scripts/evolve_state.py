@@ -3,11 +3,15 @@
 
 """
 State-based approach. 
-We define example functions that demonstrate standard or φ-scaled evolution
+We define example functions that demonstrate standard or scale_factor-scaled evolution
 on a single or multi-qubit state.
 """
 
-from constants import PHI
+import sys
+import os
+# Add the project root to the Python path to ensure modules can be found
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from simulations.quantum_state import state_plus
 from simulations.quantum_circuit import StandardCircuit, PhiScaledCircuit
 from qutip import sigmaz, tensor, qeye
@@ -28,24 +32,12 @@ def construct_nqubit_hamiltonian(num_qubits):
         H0 += tensor(op_list)
     return H0
 
-def run_standard_state_evolution(num_qubits, state_label, total_time, n_steps):
-    """
-    N-qubit evolution under H = Σi σzi.
-    Returns qutip.Result
-    """
-    from simulations.quantum_state import state_zero, state_one, state_plus, state_ghz, state_w
-    
-    # Construct appropriate n-qubit Hamiltonian
-    H0 = construct_nqubit_hamiltonian(num_qubits)
-    
-    circuit = StandardCircuit(H0, total_time=total_time, n_steps=n_steps)
-    psi_init = eval(f"state_{state_label}")(num_qubits=num_qubits)
-    result = circuit.evolve_closed(psi_init)
-    return result
+# Removed run_standard_state_evolution as per refactor plan
 
-def run_phi_scaled_state_evolution(num_qubits, state_label, phi_steps, scaling_factor):
+def run_state_evolution(num_qubits, state_label, phi_steps, scaling_factor=1):
     """
-    N-qubit evolution under H = Σi σzi with φ-scaling.
+    N-qubit evolution under H = Σi σzi with scale_factor.
+    Returns qutip.Result
     """
     from simulations.quantum_state import state_zero, state_one, state_plus, state_ghz, state_w
     
@@ -58,7 +50,5 @@ def run_phi_scaled_state_evolution(num_qubits, state_label, phi_steps, scaling_f
     return result
 
 if __name__=="__main__":
-    res_std = run_standard_state_evolution(num_qubits=1, state_label="plus", total_time=5.0, n_steps=50)
-    print("Standard final state:", res_std.states[-1])
-    res_phi = run_phi_scaled_state_evolution(num_qubits=1, state_label="plus", phi_steps=5, scaling_factor=1/PHI)
-    print("φ-scaled final state:", res_phi.states[-1])
+    res_state = run_state_evolution(num_qubits=1, state_label="plus", phi_steps=5, scaling_factor=1)
+    print("State final:", res_state.states[-1])

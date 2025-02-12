@@ -5,7 +5,12 @@
 Circuit-based approach: multi-qubit or braiding example.
 """
 
-from constants import PHI
+import sys
+import os
+# Add the project root to the Python path to ensure modules can be found
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+# from constants import PHI
 from qutip import sigmaz, sigmax, qeye, tensor
 from simulations.quantum_state import state_zero, fib_anyon_state_2d
 from simulations.quantum_circuit import StandardCircuit, PhiScaledCircuit, FibonacciBraidingCircuit
@@ -21,12 +26,12 @@ def run_standard_twoqubit_circuit():
     result = circ.evolve_closed(psi_init)
     return result
 
-def run_phi_scaled_twoqubit_circuit():
+def run_state_evolution_twoqubit_circuit():
     """
     2-qubit fractal approach. H0= sigma_z(1) + 0.5 sigma_x(2). => steps=5
     """
     H0 = tensor(sigmaz(), qeye(2)) + 0.5 * tensor(qeye(2), sigmax())
-    pcirc = PhiScaledCircuit(H0, scaling_factor=1/PHI)
+    pcirc = PhiScaledCircuit(H0, scaling_factor=1)
     psi_init = state_zero(num_qubits=2)
     result = pcirc.evolve_closed(psi_init, n_steps=5)
     return result
@@ -51,8 +56,8 @@ if __name__ == "__main__":
     res_std = run_standard_twoqubit_circuit()
     print("Standard 2Q final:", res_std.states[-1])
 
-    res_phi = run_phi_scaled_twoqubit_circuit()
-    print("φ-Scaled 2Q final:", res_phi.states[-1])
+    res_phi = run_state_evolution_twoqubit_circuit()
+    print("Scaled 2Q final:", res_phi.states[-1])
 
     fib_final = run_fibonacci_braiding_circuit()
     print("Fibonacci braiding final:", fib_final)

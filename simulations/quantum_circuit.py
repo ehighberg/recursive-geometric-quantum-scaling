@@ -80,20 +80,20 @@ class StandardCircuit:
 #################################################
 class PhiScaledCircuit:
     """
-    φ-based expansions:
-      scale_n = (scaling_factor^n).
+    scale_factor-based expansions:
+      scale_n = (scale_factor^n).
     Closed evolution: discrete repeated steps.
     Open evolution: approximate H_eff by summing log(U_n).
     """
     def __init__(self, base_hamiltonian, scaling_factor=None, c_ops=None, positivity=None):
         self.base_hamiltonian = base_hamiltonian
         self.config = load_config()
-        self.scaling_factor = scaling_factor if scaling_factor is not None else self.config.get('scaling_factor', 1/PHI)
+        self.scale_factor = scaling_factor if scaling_factor is not None else self.config.get('scale_factor', 1)
         self.c_ops = c_ops if c_ops is not None else self.config.get('c_ops', [])
         self.positivity = positivity if positivity is not None else self.config.get('positivity', False)
             
-    def phi_scaled_unitary(self, step_idx):
-        scale = (self.scaling_factor ** step_idx)
+    def scale_unitary(self, step_idx):
+        scale = (self.scale_factor ** step_idx)
         return (-1j * scale * self.base_hamiltonian).expm()
 
     def evolve_closed(self, initial_state, n_steps=None):
@@ -106,7 +106,7 @@ class PhiScaledCircuit:
 
         all_states = []
         for idx in range(steps):
-            U_n = self.phi_scaled_unitary(idx)
+            U_n = self.scale_unitary(idx)
             rho = U_n * rho * U_n.dag()
             if self.positivity:
                 rho = positivity_projection(rho)
@@ -142,13 +142,13 @@ class PhiScaledCircuit:
     def build_approx_total_hamiltonian(self, n_steps=None):
         from qutip import Qobj
         import numpy as np
-        from constants import PHI  # Import PHI constant
+        # from constants import PHI  # Import PHI constant (no longer needed)
         steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
         dim = self.base_hamiltonian.shape[0]
         H_eff = Qobj(np.zeros((dim, dim), dtype=complex), dims=self.base_hamiltonian.dims)
         for idx in range(steps):
-            U_n = self.phi_scaled_unitary(idx)
-            scale = (self.scaling_factor ** idx)
+            U_n = self.scale_unitary(idx)
+            scale = (self.scale_factor ** idx)
             logU = U_n.logm()
             H_eff += (1.0j / scale) * logU
         return H_eff
