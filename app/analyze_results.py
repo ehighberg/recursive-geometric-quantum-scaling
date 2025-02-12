@@ -93,36 +93,74 @@ def analyze_simulation_results(result, mode: str):
             )
             st.pyplot(fig_metrics)
             
-            # Metric comparisons
-            st.subheader("Metric Correlations")
-            fig_comparison = plot_metric_comparison(
-                states,
-                metric_pairs=[
-                    ('vn_entropy', 'l1_coherence'),
-                    ('vn_entropy', 'negativity'),
-                    ('l1_coherence', 'negativity')
-                ],
-                title="Metric Correlations"
-            )
-            st.pyplot(fig_comparison)
+            # Calculate metrics for each state
+            all_metrics = [run_analyses(state) for state in states]
+            
+            # Basic metrics for all states
+            metrics = {
+                'Entropy': [m['vn_entropy'] for m in all_metrics],
+                'Coherence': [m['l1_coherence'] for m in all_metrics]
+            }
+            
+            # Add appropriate entanglement metrics based on number of qubits
+            num_qubits = len(states[0].dims[0])
+            if num_qubits == 2:
+                metrics['Concurrence'] = [m['concurrence'] for m in all_metrics]
+                # Metric comparisons
+                st.subheader("Metric Correlations")
+                fig_comparison = plot_metric_comparison(
+                    metrics,
+                    metric_pairs=[
+                        ('Entropy', 'Coherence'),
+                        ('Entropy', 'Concurrence'),
+                        ('Coherence', 'Concurrence')
+                    ],
+                    title="Metric Correlations"
+                )
+                st.pyplot(fig_comparison)
+            elif num_qubits > 2:
+                metrics['Negativity'] = [m['negativity'] for m in all_metrics]
+                metrics['Log Negativity'] = [m['log_negativity'] for m in all_metrics]
+                # Metric comparisons
+                st.subheader("Metric Correlations")
+                fig_comparison = plot_metric_comparison(
+                    metrics,
+                    metric_pairs=[
+                        ('Entropy', 'Coherence'),
+                        ('Entropy', 'Negativity'),
+                        ('Coherence', 'Negativity')
+                    ],
+                    title="Metric Correlations"
+                )
+                st.pyplot(fig_comparison)
             
             # Metric distributions
             st.subheader("Metric Distributions")
             fig_dist = plot_metric_distribution(
-                states,
+                metrics,
                 title="Metric Distributions"
             )
             st.pyplot(fig_dist)
         else:
             # For single-state results, show metrics as cards
             analysis_results = run_analyses(final_state)
-            col1, col2, col3 = st.columns(3)
-            with col1:
+            # Display available metrics
+            cols = st.columns(3)
+            with cols[0]:
                 st.metric("von Neumann Entropy", f"{analysis_results['vn_entropy']:.4f}")
-            with col2:
+            with cols[1]:
                 st.metric("L1 Coherence", f"{analysis_results['l1_coherence']:.4f}")
-            with col3:
-                st.metric("Negativity", f"{analysis_results['negativity']:.4f}")
+            
+            # Show appropriate entanglement measures based on number of qubits
+            num_qubits = len(final_state.dims[0])
+            if num_qubits == 2:
+                with cols[2]:
+                    st.metric("Concurrence", f"{analysis_results['concurrence']:.4f}")
+            elif num_qubits > 2:
+                with cols[2]:
+                    st.metric("Negativity", f"{analysis_results['negativity']:.4f}")
+                with st.columns(3)[0]:  # Create new row of columns
+                    st.metric("Log Negativity", f"{analysis_results['log_negativity']:.4f}")
     
     with tab3:
         st.subheader("State Analysis")
@@ -146,13 +184,22 @@ def analyze_simulation_results(result, mode: str):
         analysis_results = run_analyses(selected_state)
         
         # Display metrics
-        col1, col2, col3 = st.columns(3)
-        with col1:
+        cols = st.columns(3)
+        with cols[0]:
             st.metric("von Neumann Entropy", f"{analysis_results['vn_entropy']:.4f}")
-        with col2:
+        with cols[1]:
             st.metric("L1 Coherence", f"{analysis_results['l1_coherence']:.4f}")
-        with col3:
-            st.metric("Negativity", f"{analysis_results['negativity']:.4f}")
+        
+        # Show appropriate entanglement measures based on number of qubits
+        num_qubits = len(selected_state.dims[0])
+        if num_qubits == 2:
+            with cols[2]:
+                st.metric("Concurrence", f"{analysis_results['concurrence']:.4f}")
+        elif num_qubits > 2:
+            with cols[2]:
+                st.metric("Negativity", f"{analysis_results['negativity']:.4f}")
+            with st.columns(3)[0]:  # Create new row of columns
+                st.metric("Log Negativity", f"{analysis_results['log_negativity']:.4f}")
         
         # Show state visualization
         fig_state = plot_state_matrix(

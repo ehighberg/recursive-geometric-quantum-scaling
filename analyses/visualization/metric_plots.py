@@ -34,9 +34,9 @@ def animate_metric_evolution(
     
     # Initialize lines
     lines = []
-    colors = get_color_cycle()
-    for metric, color in zip(metrics.keys(), colors):
-        line, = ax.plot([], [], label=metric.replace('_', ' ').title(), color=color)
+    colors = iter(get_color_cycle())
+    for metric in metrics.keys():
+        line, = ax.plot([], [], label=metric.replace('_', ' ').title(), color=next(colors))
         lines.append(line)
     
     configure_axis(ax,
@@ -70,7 +70,7 @@ def animate_metric_evolution(
     return anim
 
 def plot_metric_evolution(
-    metrics: Dict[str, List[float]],
+    states: List[Qobj],
     times: List[float],
     title: Optional[str] = None,
     figsize: Tuple[int, int] = (10, 6)
@@ -79,7 +79,7 @@ def plot_metric_evolution(
     Plot the evolution of quantum metrics over time.
     
     Parameters:
-        metrics: Dictionary of metric names to lists of values
+        states: List of quantum states
         times: List of time points
         title: Optional plot title
         figsize: Figure size tuple
@@ -87,15 +87,36 @@ def plot_metric_evolution(
     Returns:
         matplotlib Figure object
     """
+    from analyses.coherence import coherence_metric
+    from analyses.entropy import von_neumann_entropy
+    from analyses.entanglement import concurrence
+    
     set_style()
     fig, ax = plt.subplots(figsize=figsize)
     
+    # Calculate metrics
+    metrics = {
+        'Coherence': [coherence_metric(state) for state in states],
+        'Entropy': [von_neumann_entropy(state) for state in states]
+    }
+    
+    # Add appropriate entanglement measures based on number of qubits
+    num_qubits = len(states[0].dims[0])
+    if num_qubits == 2:
+        # For two-qubit states, use concurrence
+        metrics['Concurrence'] = [concurrence(state) for state in states]
+    elif num_qubits > 2:
+        # For multi-qubit states, use negativity and log_negativity
+        from analyses.entanglement import negativity, log_negativity
+        metrics['Negativity'] = [negativity(state) for state in states]
+        metrics['Log Negativity'] = [log_negativity(state) for state in states]
+    
     # Plot each metric
-    colors = get_color_cycle()
-    for (metric, values), color in zip(metrics.items(), colors):
+    colors = iter(get_color_cycle())  # Convert list to iterator
+    for metric_name, values in metrics.items():
         ax.plot(times, values, 
-                label=metric.replace('_', ' ').title(),
-                color=color)
+                label=metric_name,
+                color=next(colors))
     
     configure_axis(ax,
                   title=title or 'Quantum Metrics Evolution',
@@ -169,9 +190,15 @@ def plot_metric_distribution(
         axes = [axes]
     
     # Create distribution plots
-    colors = get_color_cycle()
-    for ax, ((metric, values), color) in zip(axes, zip(metrics.items(), colors)):
-        ax.hist(values, bins='auto', color=color, alpha=0.7)
+    colors = iter(get_color_cycle())
+    for ax, (metric, values) in zip(axes, metrics.items()):
+        # For small datasets, use fewer bins
+        n_points = len(values)
+        if n_points < 10:
+            bins = min(n_points, 3)  # Use at most 3 bins for small datasets
+        else:
+            bins = 'auto'
+        ax.hist(values, bins=bins, color=next(colors), alpha=0.7)
         
         configure_axis(ax,
                       title=metric.replace('_', ' ').title(),
@@ -204,7 +231,14 @@ def calculate_metrics(states: List[Qobj]) -> Dict[str, List[float]]:
         'entropy': [von_neumann_entropy(state) for state in states]
     }
     
-    # Only calculate entanglement for multi-qubit states
-    if len(states[0].dims[0]) > 1:  # Check if multi-qubit
-        metrics['entanglement'] = [concurrence(state) for state in states]
+    # Calculate appropriate entanglement measures based on number of qubits
+    num_qubits = len(states[0].dims[0])
+    if num_qubits == 2:
+        # For two-qubit states, use concurrence
+        metrics['concurrence'] = [concurrence(state) for state in states]
+    elif num_qubits > 2:
+        # For multi-qubit states, use negativity and log_negativity
+        from analyses.entanglement import negativity, log_negativity
+        metrics['negativity'] = [negativity(state) for state in states]
+        metrics['log_negativity'] = [log_negativity(state) for state in states]
     return metrics

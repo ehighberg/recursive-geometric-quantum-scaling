@@ -28,8 +28,8 @@ def concurrence(state: Union[Qobj, List[Qobj]]) -> float:
     else:
         rho = state
     
-    # Check dimensions
-    if rho.dims != [[2, 2], [2, 2]]:
+    # Check dimensions for two-qubit states
+    if not (len(rho.dims[0]) == 2 and all(d == 2 for d in rho.dims[0])):
         raise ValueError("Concurrence is only defined for two-qubit states")
     
     # For pure states, use simpler formula
@@ -72,7 +72,34 @@ def negativity(state: Union[Qobj, List[Qobj]]) -> float:
         rho = state
     
     # Calculate partial transpose
-    rho_pt = partial_transpose(rho, [0])
+    # For single-qubit states, return 0 since there's no entanglement
+    if len(rho.dims[0]) == 1:
+        return 0.0
+        
+    # Handle different dimensional cases systematically
+    system_dims = rho.dims[0]
+    num_qubits = len(system_dims)
+    
+    if num_qubits == 1:
+        return 0.0  # No entanglement for single qubit
+    
+    # For multi-qubit systems, we'll use the first qubit as subsystem A
+    # and the rest as subsystem B
+    if not all(d == 2 for d in system_dims):
+        raise ValueError("Negativity calculation currently only supports qubit systems")
+    
+    # Create mask for partial transpose
+    # True for the first qubit (subsystem A), False for the rest
+    mask = [True] + [False] * (num_qubits - 1)
+    
+    # Perform partial transpose
+    try:
+        rho_pt = partial_transpose(rho, mask)
+    except ValueError as e:
+        # If partial transpose fails, try converting to full matrix first
+        rho_full = rho.full()
+        rho_qobj = Qobj(rho_full, dims=rho.dims)
+        rho_pt = partial_transpose(rho_qobj, mask)
     
     # Calculate trace norm
     eigs = np.linalg.eigvals(rho_pt.full())
@@ -101,8 +128,34 @@ def log_negativity(state: Union[Qobj, List[Qobj]]) -> float:
     else:
         rho = state
     
-    # Calculate partial transpose
-    rho_pt = partial_transpose(rho, [0])
+    # For single-qubit states, return 0 since there's no entanglement
+    if len(rho.dims[0]) == 1:
+        return 0.0
+        
+    # Handle different dimensional cases systematically
+    system_dims = rho.dims[0]
+    num_qubits = len(system_dims)
+    
+    if num_qubits == 1:
+        return 0.0  # No entanglement for single qubit
+    
+    # For multi-qubit systems, we'll use the first qubit as subsystem A
+    # and the rest as subsystem B
+    if not all(d == 2 for d in system_dims):
+        raise ValueError("Logarithmic negativity calculation currently only supports qubit systems")
+    
+    # Create mask for partial transpose
+    # True for the first qubit (subsystem A), False for the rest
+    mask = [True] + [False] * (num_qubits - 1)
+    
+    # Perform partial transpose
+    try:
+        rho_pt = partial_transpose(rho, mask)
+    except ValueError as e:
+        # If partial transpose fails, try converting to full matrix first
+        rho_full = rho.full()
+        rho_qobj = Qobj(rho_full, dims=rho.dims)
+        rho_pt = partial_transpose(rho_qobj, mask)
     
     # Calculate trace norm
     eigs = np.linalg.eigvals(rho_pt.full())

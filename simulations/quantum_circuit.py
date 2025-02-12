@@ -40,17 +40,18 @@ class NoiseChannel:
         sz = sigmaz()
         
         # For multi-qubit systems, apply to first qubit only
-        if not isinstance(dims, int):
-            dims = len(dims)
-            # Create identity operators for other qubits
-            id_list = [qeye(2) for _ in range(dims-1)]
-            # Tensor product with first qubit operators
-            a = tensor([a] + id_list)
-            sm = tensor([sm] + id_list)
-            sp = tensor([sp] + id_list)
-            sx = tensor([sx] + id_list)
-            sy = tensor([sy] + id_list)
-            sz = tensor([sz] + id_list)
+        if isinstance(dims, (list, tuple)):
+            n_qubits = len(dims[0]) if isinstance(dims[0], (list, tuple)) else len(dims)
+            if n_qubits > 1:
+                # Create identity operators for other qubits
+                id_list = [qeye(2) for _ in range(n_qubits-1)]
+                # Tensor product with first qubit operators
+                a = tensor([a] + id_list)
+                sm = tensor([sm] + id_list)
+                sp = tensor([sp] + id_list)
+                sx = tensor([sx] + id_list)
+                sy = tensor([sy] + id_list)
+                sz = tensor([sz] + id_list)
         
         # Depolarizing noise: equal probability of X, Y, Z errors
         if self.noise_config.get('depolarizing', {}).get('enabled', False):
