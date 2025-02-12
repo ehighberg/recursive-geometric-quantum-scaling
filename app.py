@@ -14,13 +14,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 import streamlit as st
 
 # Local imports
-from simulations.scripts.evolve_state import (
-    run_standard_state_evolution,
-    run_phi_scaled_state_evolution
-)
+from simulations.scripts.evolve_state import run_state_evolution
 from simulations.scripts.evolve_circuit import (
-    run_standard_twoqubit_circuit,
-    run_phi_scaled_twoqubit_circuit,
+    run_circuit_evolution,
     run_fibonacci_braiding_circuit
 )
 from app.analyze_results import analyze_simulation_results, display_experiment_summary
@@ -74,23 +70,33 @@ def main():
         with st.spinner("Running simulation..."):
             try:
                 if mode == "State -> Standard":
-                    result = run_standard_state_evolution(
+                    result = run_state_evolution(
                         num_qubits=params['num_qubits'],
                         state_label=params['state_label'],
-                        total_time=params['total_time'],
-                        n_steps=params['n_steps']
+                        n_steps=params['n_steps'],
+                        scaling_factor=1.0
                     )
                 elif mode == "State -> Phi-Scaled":
-                    result = run_phi_scaled_state_evolution(
+                    result = run_state_evolution(
                         num_qubits=params['num_qubits'],
                         state_label=params['state_label'],
-                        phi_steps=params['phi_steps'],
+                        n_steps=params['phi_steps'],
                         scaling_factor=params['scaling_factor']
                     )
                 elif mode == "Circuit -> Standard 2Q":
-                    result = run_standard_twoqubit_circuit()
+                    result = run_circuit_evolution(
+                        num_qubits=2,
+                        scale_factor=1.0,
+                        n_steps=50,
+                        total_time=5.0
+                    )
                 elif mode == "Circuit -> Phi-Scaled 2Q":
-                    result = run_phi_scaled_twoqubit_circuit()
+                    result = run_circuit_evolution(
+                        num_qubits=2,
+                        scale_factor=1/PHI,
+                        n_steps=50,
+                        total_time=5.0
+                    )
                 else:  # Fibonacci Braiding
                     result = run_fibonacci_braiding_circuit()
                 

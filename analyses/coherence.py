@@ -1,53 +1,96 @@
-# analyses/coherence.py
-
 """
-Coherence analysis measures:
- - L1 norm of coherence
- - Relative entropy of coherence
-for a chosen "computational" basis. We'll illustrate a simple approach.
+Functions for calculating quantum coherence measures.
 """
 
 import numpy as np
 from qutip import Qobj
+from typing import Union, List
 
-def l1_coherence(rho, dim=None):
+def coherence_metric(state: Union[Qobj, List[Qobj]]) -> float:
     """
-    L1 measure of coherence in computational basis:
-      C_L1(ρ) = sum_{i != j} |ρ_{i,j}|
-    If dim is None, assume the dimension from rho.shape.
+    Calculate the l1-norm of coherence for a quantum state.
+    For a density matrix ρ, this is the sum of absolute values of off-diagonal elements.
+    
+    Parameters:
+        state: Quantum state (Qobj) or list of states
+        
+    Returns:
+        float: Coherence measure in [0,1]
     """
-    if rho.isket or rho.isoper == False:
-        raise ValueError("rho must be a density matrix (operator) for coherence measure.")
-    arr = rho.full()
-    if dim is None:
-        dim = arr.shape[0]
-    # sum off-diagonal absolute values
-    off_diag_sum = 0.0
-    for i in range(dim):
-        for j in range(dim):
+    if isinstance(state, list):
+        return [coherence_metric(s) for s in state]
+    
+    # Convert to density matrix if needed
+    if state.isket:
+        rho = state * state.dag()
+    else:
+        rho = state
+    
+    # Get matrix representation
+    matrix = rho.full()
+    n = matrix.shape[0]
+    
+    # Sum absolute values of off-diagonal elements
+    coherence = 0
+    for i in range(n):
+        for j in range(n):
             if i != j:
-                off_diag_sum += abs(arr[i,j])
-    return off_diag_sum
+                coherence += abs(matrix[i,j])
+    
+    # Normalize by maximum possible coherence (n(n-1) for n-dimensional system)
+    max_coherence = n * (n-1)
+    return coherence / max_coherence if max_coherence > 0 else 0.0
 
-def relative_entropy_coherence(rho, dim=None):
+def relative_entropy_coherence(state: Qobj) -> float:
     """
-    Relative entropy of coherence:
-      C_{rel}(ρ) = S(diag(ρ)) - S(ρ),
-    where S is von Neumann entropy, diag(ρ) is ρ with off-diagonal set to 0 in the chosen basis.
+    Calculate the relative entropy of coherence.
+    This is the difference between von Neumann entropy of the dephased state
+    and the original state.
+    
+    Parameters:
+        state: Quantum state (Qobj)
+        
+    Returns:
+        float: Relative entropy coherence measure
     """
-    from qutip import Qobj, entropy_vn
-    arr = rho.full()
-    if dim is None:
-        dim = arr.shape[0]
+    from .entropy import von_neumann_entropy
+    
+    # Convert to density matrix if needed
+    if state.isket:
+        rho = state * state.dag()
+    else:
+        rho = state
+    
+    # Get diagonal state (dephased)
+    diag_elements = np.diag(rho.full())
+    diag_state = Qobj(np.diag(diag_elements))
+    
+    # Calculate relative entropy
+    return von_neumann_entropy(diag_state) - von_neumann_entropy(rho)
 
-    # diag(ρ) => zero out off-diagonals
-    diag_rho = np.zeros((dim, dim), dtype=complex)
-    for i in range(dim):
-        diag_rho[i,i] = arr[i,i]
-
-    from qutip import Qobj
-    diag_rho_q = Qobj(diag_rho, dims=rho.dims)
-    # S(diag(rho)) - S(rho)
-    S_diag = entropy_vn(diag_rho_q)
-    S_rho  = entropy_vn(rho)
-    return S_diag - S_rho
+def robustness_coherence(state: Qobj) -> float:
+    """
+    Calculate the robustness of coherence.
+    This quantifies how much mixing with another state is needed to destroy coherence.
+    
+    Parameters:
+        state: Quantum state (Qobj)
+        
+    Returns:
+        float: Robustness of coherence measure in [0,1]
+    """
+    # Convert to density matrix if needed
+    if state.isket:
+        rho = state * state.dag()
+    else:
+        rho = state
+    
+    # Get matrix representation
+    matrix = rho.full()
+    
+    # Calculate sum of absolute values of off-diagonal elements
+    off_diag_sum = np.sum(np.abs(matrix)) - np.sum(np.abs(np.diag(matrix)))
+    
+    # Normalize by dimension
+    dim = matrix.shape[0]
+    return off_diag_sum / (2 * (dim - 1)) if dim > 1 else 0.0
