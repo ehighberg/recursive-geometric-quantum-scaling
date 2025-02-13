@@ -2,9 +2,11 @@
 Analysis and visualization of quantum simulation results in Streamlit.
 """
 
+import numpy as np
+import matplotlib.pyplot as plt
 import streamlit as st
 from typing import List, Optional
-from qutip import Qobj
+from qutip import Qobj, fidelity
 
 from analyses.visualization.state_plots import (
     plot_state_evolution,
@@ -34,18 +36,21 @@ def analyze_simulation_results(result, mode: str):
     st.header("Simulation Analysis")
     
     # Handle both time evolution results and single-state results
-    if hasattr(result, 'states'):
+    if hasattr(result, 'states') and result.states:
         states = result.states
         times = getattr(result, 'times', list(range(len(states))))
         final_state = states[-1]
-    else:
+    elif isinstance(result, Qobj):
         # For Fibonacci braiding, we get a single state
         states = [result]
         times = [0]
         final_state = result
+    else:
+        st.warning("No valid quantum states found in the results.")
+        return
     
     # Create tabs for different visualizations
-    tab1, tab2, tab3 = st.tabs(["State Evolution", "Quantum Metrics", "State Visualization"])
+    tab1, tab2, tab3, tab4 = st.tabs(["State Evolution", "Quantum Metrics", "Noise Analysis", "State Visualization"])
     
     with tab1:
         st.subheader("State Evolution")
@@ -100,7 +105,8 @@ def analyze_simulation_results(result, mode: str):
                 metric_pairs=[
                     ('vn_entropy', 'l1_coherence'),
                     ('vn_entropy', 'negativity'),
-                    ('l1_coherence', 'negativity')
+                    ('l1_coherence', 'negativity'),
+                    ('purity', 'fidelity')
                 ],
                 title="Metric Correlations"
             )
@@ -115,16 +121,120 @@ def analyze_simulation_results(result, mode: str):
             st.pyplot(fig_dist)
         else:
             # For single-state results, show metrics as cards
-            analysis_results = run_analyses(final_state)
-            col1, col2, col3 = st.columns(3)
+            analysis_results = run_analyses(states[0], final_state)
+            col1, col2, col3, col4, col5 = st.columns(5)
             with col1:
                 st.metric("von Neumann Entropy", f"{analysis_results['vn_entropy']:.4f}")
             with col2:
                 st.metric("L1 Coherence", f"{analysis_results['l1_coherence']:.4f}")
             with col3:
                 st.metric("Negativity", f"{analysis_results['negativity']:.4f}")
+            with col4:
+                st.metric("Purity", f"{analysis_results['purity']:.4f}")
+            with col5:
+                st.metric("Fidelity", f"{analysis_results['fidelity']:.4f}")
     
     with tab3:
+        st.subheader("Noise Analysis")
+        
+        if len(states) > 1:
+            # Calculate noise metrics
+            initial_state = states[0]
+            if initial_state.isket:
+                initial_state = initial_state * initial_state.dag()
+            
+            # Display noise metrics over time
+            st.subheader("Noise Effects")
+            
+            # Create three columns for different noise metrics
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.markdown("**Decoherence Rate**")
+                # Calculate decoherence rate from coherence decay
+                coherences = []
+                for state in states:
+                    if state.isket:
+                        state = state * state.dag()
+                    # Calculate coherence as mean of off-diagonal elements
+                    state_mat = state.full()
+                    n = state_mat.shape[0]
+                    coh = []
+                    for i in range(n):
+                        for j in range(i+1, n):
+                            coh.append(abs(state_mat[i,j]))
+                    coherences.append(np.mean(coh) if coh else 0)
+                
+                # Plot decoherence
+                fig_decoh = plt.figure(figsize=(8, 4))
+                plt.plot(times, coherences)
+                plt.title("Coherence Decay")
+                plt.xlabel("Time")
+                plt.ylabel("Coherence")
+                st.pyplot(fig_decoh)
+            
+            with col2:
+                st.markdown("**State Purity**")
+                # Calculate purity over time
+                purities = []
+                for state in states:
+                    if state.isket:
+                        state = state * state.dag()
+                    purities.append((state * state).tr().real)
+                
+                # Plot purity
+                fig_purity = plt.figure(figsize=(8, 4))
+                plt.plot(times, purities)
+                plt.title("State Purity")
+                plt.xlabel("Time")
+                plt.ylabel("Tr(ρ2)")
+                plt.ylim(0, 1.1)
+                st.pyplot(fig_purity)
+            
+            with col3:
+                st.markdown("**Fidelity with Initial State**")
+                # Calculate fidelity with initial state
+                fidelities = []
+                for state in states:
+                    if state.isket:
+                        state = state * state.dag()
+                    fidelities.append(fidelity(initial_state, state))
+                
+                # Plot fidelity
+                fig_fidelity = plt.figure(figsize=(8, 4))
+                plt.plot(times, fidelities)
+                plt.title("State Fidelity")
+                plt.xlabel("Time")
+                plt.ylabel("F(ρ0,ρ(t))")
+                plt.ylim(0, 1.1)
+                st.pyplot(fig_fidelity)
+            
+            with col4: # Added column for Fidelity Summary
+                st.markdown("**Fidelity Summary**")
+                # Add noise summary
+                st.subheader("Noise Summary")
+                final_coherence = coherences[-1]
+                final_purity = purities[-1]
+                final_fidelity = fidelities[-1]
+                
+                st.write(f"""
+                - Final Coherence: {final_coherence:.4f}
+                - Final Purity: {final_purity:.4f}
+                - Final Fidelity with Initial State: {final_fidelity:.4f}
+                """)
+                
+                # Estimate decoherence time
+                if len(coherences) > 1:
+                    decay_threshold = np.exp(-1)  # 1/e threshold
+                    for i, coh in enumerate(coherences):
+                        if coh <= decay_threshold * coherences[0]:
+                            t1_estimate = times[i]
+                            st.write(f"- Estimated T1 time: {t1_estimate:.4f}")
+                            break
+        else:
+            st.info("Noise analysis requires time evolution data. Run a time-dependent simulation to see noise effects.")
+    
+    with tab4:
         st.subheader("State Analysis")
         
         if len(states) > 1:
@@ -143,16 +253,18 @@ def analyze_simulation_results(result, mode: str):
             time_label = ""
         
         # Run quantum analyses
-        analysis_results = run_analyses(selected_state)
+        analysis_results = run_analyses(states[0], selected_state)
         
         # Display metrics
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4) # Adjusted columns to include Fidelity
         with col1:
             st.metric("von Neumann Entropy", f"{analysis_results['vn_entropy']:.4f}")
         with col2:
             st.metric("L1 Coherence", f"{analysis_results['l1_coherence']:.4f}")
         with col3:
             st.metric("Negativity", f"{analysis_results['negativity']:.4f}")
+        with col4:
+            st.metric("Fidelity", f"{analysis_results['fidelity']:.4f}")
         
         # Show state visualization
         fig_state = plot_state_matrix(

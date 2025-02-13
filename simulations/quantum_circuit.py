@@ -1,178 +1,209 @@
+"""
+Quantum circuit implementations using qutip and qutip-qip.
+"""
+
 import numpy as np
 from constants import PHI
-from qutip import Qobj, ket2dm, mesolve, Options
-from .quantum_state import positivity_projection
-from .config import load_config  # Corrected relative import
+from qutip import Qobj, ket2dm, mesolve, Options, basis, sigmax, sigmay, sigmaz
+from qutip_qip.circuit import QubitCircuit
+from qutip_qip.operations import Gate
+from .config import load_config
 
-class ClosedResult:
+class QuantumCircuit:
     """
-    Custom class to store results from evolve_closed method.
+    Base class for quantum circuits using qutip-qip's circuit building features.
     """
-    def __init__(self, states, times):
-        self.states = states
-        self.times = times
+    def __init__(self, num_qubits, base_hamiltonian=None):
+        self.num_qubits = num_qubits
+        self.base_hamiltonian = base_hamiltonian
+        self.circuit = QubitCircuit(num_qubits)
+        self.config = load_config()
+        
+    def add_gate(self, gate_name, targets, controls=None, arg_value=None):
+        """Add a gate to the circuit."""
+        self.circuit.add_gate(gate_name, targets=targets, controls=controls, arg_value=arg_value)
+    
+    def get_unitary(self):
+        """Get the unitary matrix for the entire circuit."""
+        return self.circuit.compute_unitary()
+    
+    def run(self, initial_state):
+        """Run the circuit on an initial state."""
+        U = self.get_unitary()
+        if initial_state.isket:
+            return U * initial_state
+        else:
+            return U * initial_state * U.dag()
 
-
-#################################################
-# StandardCircuit
-#################################################
-class StandardCircuit:
+class StandardCircuit(QuantumCircuit):
     """
-    Uniform approach over total_time with n_steps.
-    - base_hamiltonian
-    - c_ops for open system
-    - 'evolve_closed' => Trotter steps
-    - 'evolve_open' => QuTiP mesolve
+    Standard circuit evolution using qutip's solvers.
     """
     def __init__(self, base_hamiltonian, total_time=None, n_steps=None, c_ops=None):
+        super().__init__(base_hamiltonian.dims[0][0] if isinstance(base_hamiltonian.dims[0], list) else 2)
         self.base_hamiltonian = base_hamiltonian
         self.config = load_config()
-        # Give precedence to passed parameters over config values
         self.total_time = total_time if total_time is not None else self.config.get('total_time', 1.0)
         self.n_steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
         self.c_ops = c_ops if c_ops is not None else self.config.get('c_ops', [])
 
     def evolve_closed(self, initial_state, n_steps=None):
         """
-        Trotter approach: dt = total_time / n_steps, 
-        U_dt = exp(-i dt H0).
+        Evolution using qutip's sesolve for closed systems.
         """
-        # Use passed n_steps first, then instance n_steps
         steps = n_steps if n_steps is not None else self.n_steps
-        dt = self.total_time / steps
-        U_dt = (-1j * dt * self.base_hamiltonian).expm()
-
+        tlist = np.linspace(0, self.total_time, steps + 1)
+        
         if initial_state.isket:
-            rho = ket2dm(initial_state)
+            rho0 = ket2dm(initial_state)
         else:
-            rho = initial_state
-
-        all_states = []
-        for _ in range(steps):
-            rho = U_dt * rho * U_dt.dag()
-            all_states.append(rho)
-        result = ClosedResult(states=all_states, times=[dt * (i + 1) for i in range(steps)])
+            rho0 = initial_state
+        
+        result = mesolve(
+            self.base_hamiltonian,
+            rho0,
+            tlist,
+            c_ops=[],  # No collapse operators for closed evolution
+            options=Options(store_states=True)
+        )
         return result
 
     def evolve_open(self, initial_state):
         """
-        mesolve from t=0..total_time with n_steps+1 points.
+        Evolution using qutip's mesolve for open systems.
         """
+        tlist = np.linspace(0, self.total_time, self.n_steps + 1)
+        
         if initial_state.isket:
             rho0 = ket2dm(initial_state)
         else:
             rho0 = initial_state
-
-        tlist = np.linspace(0, self.total_time, self.n_steps + 1)
+        
         result = mesolve(
-            self.base_hamiltonian,  # H as positional argument
-            rho0,                   # rho0 as positional argument
-            tlist,                  # tlist as positional argument
-            self.c_ops,             # c_ops as positional argument
-            e_ops=[],               # Provided as keyword argument with empty list
-            options=Options(store_states=True)  # Provided as keyword argument
+            self.base_hamiltonian,
+            rho0,
+            tlist,
+            self.c_ops,
+            options=Options(store_states=True)
         )
         return result
 
-
-#################################################
-# PhiScaledCircuit
-#################################################
-class PhiScaledCircuit:
+class PhiScaledCircuit(QuantumCircuit):
     """
-    scale_factor-based expansions:
-      scale_n = (scale_factor^n).
-    Closed evolution: discrete repeated steps.
-    Open evolution: approximate H_eff by summing log(U_n).
+    Phi-scaled circuit evolution using qutip's features.
     """
-    def __init__(self, base_hamiltonian, scaling_factor=None, c_ops=None, positivity=None):
+    def __init__(self, base_hamiltonian, scaling_factor=None, c_ops=None):
+        super().__init__(base_hamiltonian.dims[0][0] if isinstance(base_hamiltonian.dims[0], list) else 2)
         self.base_hamiltonian = base_hamiltonian
         self.config = load_config()
         self.scale_factor = scaling_factor if scaling_factor is not None else self.config.get('scale_factor', 1)
         self.c_ops = c_ops if c_ops is not None else self.config.get('c_ops', [])
-        self.positivity = positivity if positivity is not None else self.config.get('positivity', False)
-            
-    def scale_unitary(self, step_idx):
+    
+    def get_scaled_hamiltonian(self, step_idx):
+        """Get Hamiltonian scaled by phi^step_idx."""
         scale = (self.scale_factor ** step_idx)
-        return (-1j * scale * self.base_hamiltonian).expm()
-
+        return scale * self.base_hamiltonian
+    
     def evolve_closed(self, initial_state, n_steps=None):
-        # Give precedence to passed parameter over config
+        """
+        Phi-scaled evolution for closed systems.
+        """
         steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
+        
         if initial_state.isket:
-            rho = ket2dm(initial_state)
+            state = initial_state
         else:
-            rho = initial_state
-
-        all_states = []
+            # If density matrix provided, we'll evolve it directly
+            state = initial_state
+        
+        states = []
+        times = []
+        current_time = 0
+        
         for idx in range(steps):
-            U_n = self.scale_unitary(idx)
-            rho = U_n * rho * U_n.dag()
-            if self.positivity:
-                rho = positivity_projection(rho)
-            all_states.append(rho)
-        result = ClosedResult(states=all_states, times=list(range(steps)))
+            H_scaled = self.get_scaled_hamiltonian(idx)
+            dt = 1.0  # Unit time step
+            
+            # Evolve for unit time with scaled Hamiltonian
+            U = (-1j * dt * H_scaled).expm()
+            if state.isket:
+                state = U * state
+            else:
+                state = U * state * U.dag()
+            
+            states.append(state)
+            current_time += dt
+            times.append(current_time)
+        
+        result = type('EvolutionResult', (), {})()
+        result.states = states
+        result.times = times
         return result
 
-    def evolve_open(self, initial_state, n_steps=None, tlist=None):
+    def evolve_open(self, initial_state, n_steps=None):
         """
-        Approximate H_eff = Σ (i/scale_n) * log(U_n).
-        Then perform mesolve on H_eff.
+        Phi-scaled evolution for open systems using qutip's master equation solver.
         """
+        steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
+        tlist = np.linspace(0, steps, steps + 1)
+        
         if initial_state.isket:
             rho0 = ket2dm(initial_state)
         else:
             rho0 = initial_state
-
-        steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
-        if tlist is None:
-            tlist = np.linspace(0, self.config.get('total_time', 1.0), steps + 1)
         
-        H_eff = self.build_approx_total_hamiltonian(steps)
+        # Build effective Hamiltonian
+        H_eff = sum(self.get_scaled_hamiltonian(idx) for idx in range(steps))
+        
         result = mesolve(
-            H_eff,                            # H_eff as positional argument
-            rho0,                             # rho0 as positional argument
-            tlist,                            # tlist as positional argument
-            self.c_ops,                       # c_ops as positional argument
-            e_ops=[],                         # Provided as keyword argument with empty list
-            options=Options(store_states=True) # Provided as keyword argument
+            H_eff,
+            rho0,
+            tlist,
+            self.c_ops,
+            options=Options(store_states=True)
         )
         return result
 
-    def build_approx_total_hamiltonian(self, n_steps=None):
-        from qutip import Qobj
-        import numpy as np
-        # from constants import PHI  # Import PHI constant (no longer needed)
-        steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
-        dim = self.base_hamiltonian.shape[0]
-        H_eff = Qobj(np.zeros((dim, dim), dtype=complex), dims=self.base_hamiltonian.dims)
-        for idx in range(steps):
-            U_n = self.scale_unitary(idx)
-            scale = (self.scale_factor ** idx)
-            logU = U_n.logm()
-            H_eff += (1.0j / scale) * logU
-        return H_eff
-
-
-#################################################
-# FibonacciBraidingCircuit
-#################################################
-class FibonacciBraidingCircuit:
+class FibonacciBraidingCircuit(QuantumCircuit):
     """
-    For topological anyons (Fibonacci).
-    We store braids (2D or 3D Qobjs) and apply them in order to a state.
+    Circuit implementation for Fibonacci anyon braiding using qutip's features.
     """
-    def __init__(self, braids=None):
-        self.braids = braids if braids else []
-
-    def add_braid(self, Bop):
-        self.braids.append(Bop)
-
+    def __init__(self, num_qubits=2):
+        super().__init__(num_qubits)
+        self.braids = []
+    
+    def add_braid(self, braid_operator):
+        """Add a braid operation to the circuit."""
+        # Create a custom gate from the braid operator
+        gate = Gate(name=f"braid_{len(self.braids)}", targets=[0,1], arg_value=0)
+        gate.matrix = braid_operator
+        self.circuit.add_gate(gate)
+        self.braids.append(braid_operator)
+    
     def evolve(self, initial_state):
         """
-        final_psi = (B_n ... B_1) * initial_state
+        Evolve the initial state through the braiding circuit.
+        
+        Returns:
+        - result: Evolution result containing states and times
         """
-        psi = initial_state
-        for B in self.braids:
-            psi = B * psi
-        return psi
+        # Create result object to match other evolution methods
+        result = type('EvolutionResult', (), {})()
+        
+        # Store initial state
+        states = [initial_state]
+        times = [0.0]
+        
+        # Apply each braid operation sequentially
+        current_state = initial_state
+        for i, braid in enumerate(self.braids):
+            if current_state.isket:
+                current_state = braid * current_state
+            else:
+                current_state = braid * current_state * braid.dag()
+            states.append(current_state)
+            times.append(float(i + 1))
+        
+        result.states = states
+        result.times = times
+        return result
