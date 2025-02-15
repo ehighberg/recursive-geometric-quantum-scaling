@@ -163,6 +163,63 @@ def analyze_circuit_noise_effects(circuit_type="standard", noise_rates=None):
     
     return results
 
+def run_quantum_gate_circuit(circuit_type="Single Qubit", optimization=None, noise_config=None):
+    """
+    Run quantum circuit with specified gate operations.
+    
+    Parameters:
+    - circuit_type (str): Type of circuit ("Single Qubit", "CNOT", "Toffoli", "Custom")
+    - optimization (str): Optimization method ("GRAPE", "CRAB", "None")
+    - noise_config (dict): Optional noise configuration
+    
+    Returns:
+    - result: Evolution result containing states and times
+    """
+    if circuit_type == "Single Qubit":
+        # Create base Hamiltonian for single qubit
+        H0 = sigmaz()
+        
+        # Create circuit
+        circ = StandardCircuit(H0, total_time=5.0, n_steps=50)
+        
+        # Add single qubit gates
+        qc = QubitCircuit(1)
+        qc.add_gate("RX", targets=[0], arg_value=0.5)
+        qc.add_gate("RY", targets=[0], arg_value=0.3)
+        
+        # Initialize state
+        psi_init = basis([2], 0)
+        
+    elif circuit_type == "CNOT":
+        # Use existing two-qubit circuit
+        return run_standard_twoqubit_circuit(noise_config=noise_config)
+        
+    elif circuit_type == "Toffoli":
+        raise NotImplementedError("Toffoli gate not yet implemented")
+        
+    else:  # Custom
+        raise NotImplementedError("Custom circuits not yet implemented")
+    
+    # Apply optimization if specified
+    if optimization and optimization != "None":
+        if optimization == "GRAPE":
+            # Add GRAPE optimization
+            opts = Options(max_step=1000, accuracy_factor=1e-3)
+            # ... implement GRAPE optimization ...
+            pass
+        elif optimization == "CRAB":
+            # Add CRAB optimization
+            # ... implement CRAB optimization ...
+            pass
+        
+    # Evolve with or without noise
+    if noise_config:
+        result = circ.evolve_open(psi_init)
+    else:
+        result = circ.evolve_closed(psi_init)
+    
+    return result
+
 if __name__ == "__main__":
     # Example usage
     res_std = run_standard_twoqubit_circuit()

@@ -30,7 +30,8 @@ from simulations.scripts.evolve_state import run_state_evolution
 from simulations.scripts.evolve_circuit import (
     run_standard_twoqubit_circuit,
     run_phi_scaled_twoqubit_circuit,
-    run_fibonacci_braiding_circuit
+    run_fibonacci_braiding_circuit,
+    run_quantum_gate_circuit
 )
 from app.analyze_results import analyze_simulation_results, display_experiment_summary
 
@@ -50,38 +51,65 @@ def main():
         mode = st.selectbox(
             "Select Pipeline",
             [
-                "State -> Standard",
-                "State -> Phi-Scaled",
-                "Circuit -> Standard 2Q",
-                "Circuit -> Phi-Scaled 2Q",
-                "Circuit -> Fibonacci Braiding"
+                "Pulse Sequence Evolution",  # Uses existing circuit infrastructure
+                "Amplitude-Scaled Evolution",  # Extends existing scaling functionality
+                "Quantum Gate Operations",    # Uses qutip-qip features
+                "Topological Braiding"        # Extends braiding functionality
             ]
         )
         
-        # Parameters based on mode
         params = {}
-        if mode in ["State -> Standard", "State -> Phi-Scaled"]:
+        if mode == "Pulse Sequence Evolution":
             params['num_qubits'] = st.slider("Number of Qubits", 1, 4, 2)
             params['state_label'] = st.selectbox(
                 "Initial State",
-                ["zero", "one", "plus", "ghz", "w"]
+                ["zero", "one", "plus", "ghz", "w"],
+                index=2  # "plus" as default
+            )
+            params['n_steps'] = st.slider("Steps", 1, 100, 50)
+            params['pulse_type'] = st.selectbox(
+                "Pulse Type",
+                ["Square", "Gaussian", "DRAG"]
             )
             
-            if mode == "State -> Standard":
-                params['total_time'] = st.slider("Total Time", 0.1, 10.0, 5.0)
-                params['n_steps'] = st.slider("Steps", 1, 100, 50)
-            else:  # Phi-Scaled
-                params['scaling_factor'] = st.slider("Scaling Factor", 0.01, 1.0, 1/PHI)
-                params['phi_steps'] = st.slider("Phi Steps", 1, 20, 5)
+        elif mode == "Amplitude-Scaled Evolution":
+            params['num_qubits'] = st.slider("Number of Qubits", 1, 4, 2)
+            params['scaling_factor'] = st.slider("Amplitude Scale", 0.01, 2.0, 1.0)
+            params['n_steps'] = st.slider("Steps", 1, 100, 50)
+            params['hamiltonian_type'] = st.selectbox(
+                "Hamiltonian",
+                ["Ising", "Heisenberg", "Custom"]
+            )
             
-            # Add noise configuration section
-            with st.expander("Noise Configuration"):
-                noise_config = {}
-                noise_config['relaxation'] = st.slider("T1 Relaxation Rate", 0.0, 0.1, 0.0, 0.001)
-                noise_config['dephasing'] = st.slider("T2 Dephasing Rate", 0.0, 0.1, 0.0, 0.001)
-                noise_config['thermal'] = st.slider("Thermal Noise Rate", 0.0, 0.1, 0.0, 0.001)
-                noise_config['measurement'] = st.slider("Measurement Noise Rate", 0.0, 0.1, 0.0, 0.001)
-                params['noise_config'] = noise_config
+        elif mode == "Quantum Gate Operations":
+            params['circuit_type'] = st.selectbox(
+                "Circuit Type",
+                ["Single Qubit", "CNOT", "Toffoli", "Custom"]
+            )
+            params['optimization'] = st.selectbox(
+                "Optimization Method",
+                ["GRAPE", "CRAB", "None"]
+            )
+            
+        else:  # Topological Braiding
+            params['braid_type'] = st.selectbox(
+                "Braid Type",
+                ["Fibonacci", "Ising", "Majorana"]
+            )
+            params['num_anyons'] = st.slider("Number of Anyons", 3, 8, 4)
+            params['braid_sequence'] = st.text_input(
+                "Braid Sequence",
+                "1,2,1,3"
+            )
+        
+        # Noise configuration in expandable section
+        with st.expander("Noise Configuration"):
+            noise_config = {}
+            noise_config['relaxation'] = st.slider("T1 Relaxation Rate", 0.0, 0.1, 0.0, 0.001)
+            noise_config['dephasing'] = st.slider("T2 Dephasing Rate", 0.0, 0.1, 0.0, 0.001)
+            noise_config['thermal'] = st.slider("Thermal Noise Rate", 0.0, 0.1, 0.0, 0.001)
+            noise_config['measurement'] = st.slider("Measurement Noise Rate", 0.0, 0.1, 0.0, 0.001)
+            params['noise_config'] = noise_config
     
     # Main content area
     if 'simulation_results' not in st.session_state:
@@ -91,7 +119,7 @@ def main():
     if st.button("Run Simulation", type="primary"):
         with st.spinner("Running simulation..."):
             try:
-                if mode == "State -> Standard":
+                if mode == "Pulse Sequence Evolution":
                     result = run_state_evolution(
                         num_qubits=params['num_qubits'],
                         state_label=params['state_label'],
@@ -99,20 +127,24 @@ def main():
                         scaling_factor=1.0,
                         noise_config=params.get('noise_config')
                     )
-                elif mode == "State -> Phi-Scaled":
-                    result = run_state_evolution(
-                        num_qubits=params['num_qubits'],
-                        state_label=params['state_label'],
-                        phi_steps=params['phi_steps'],
+                elif mode == "Amplitude-Scaled Evolution":
+                    result = run_phi_scaled_twoqubit_circuit(
                         scaling_factor=params['scaling_factor'],
                         noise_config=params.get('noise_config')
                     )
-                elif mode == "Circuit -> Standard 2Q":
-                    result = run_standard_twoqubit_circuit()
-                elif mode == "Circuit -> Phi-Scaled 2Q":
-                    result = run_phi_scaled_twoqubit_circuit()
-                else:  # Fibonacci Braiding
-                    result = run_fibonacci_braiding_circuit()
+                elif mode == "Quantum Gate Operations":
+                    result = run_quantum_gate_circuit(
+                        circuit_type=params['circuit_type'],
+                        optimization=params['optimization'],
+                        noise_config=params.get('noise_config')
+                    )
+                else:  # Topological Braiding
+                    result = run_fibonacci_braiding_circuit(
+                        braid_type=params['braid_type'],
+                        num_anyons=params['num_anyons'],
+                        braid_sequence=params['braid_sequence'],
+                        noise_config=params.get('noise_config')
+                    )
                 
                 st.session_state['simulation_results'] = result
                 st.success("Simulation completed successfully!")

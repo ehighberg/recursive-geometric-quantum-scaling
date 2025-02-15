@@ -37,8 +37,7 @@ def plot_metric_evolution(
             'l1_coherence',
             'negativity',
             'purity',
-            'fidelity',
-            'decoherence_rate'
+            'fidelity'
         ]
     
     set_style()
@@ -46,17 +45,42 @@ def plot_metric_evolution(
     
     # Calculate metrics for each state
     metric_values = {metric: [] for metric in metrics}
+    
+    # Calculate decoherence rate separately if needed
+    if 'decoherence_rate' in metrics:
+        metrics.remove('decoherence_rate')
+        coherences = []
+        for state in states:
+            if state.isket:
+                state = state * state.dag()
+            state_mat = state.full()
+            n = state_mat.shape[0]
+            coh = []
+            for i in range(n):
+                for j in range(i+1, n):
+                    coh.append(abs(state_mat[i,j]))
+            coherences.append(np.mean(coh) if coh else 0)
+        
+        # Calculate decoherence rate as negative log of normalized coherence
+        if len(coherences) > 1 and coherences[0] > 0:
+            decoherence_rates = [-np.log(c/coherences[0]) if c > 0 else 0 for c in coherences]
+            metric_values['decoherence_rate'] = decoherence_rates
+            metrics.append('decoherence_rate')
+    
+    # Calculate other metrics
     for state in states:
         analysis_results = run_analyses(states[0], state)
         for metric in metrics:
-            metric_values[metric].append(analysis_results[metric])
+            if metric != 'decoherence_rate':  # Skip decoherence_rate as it's handled separately
+                metric_values[metric].append(analysis_results[metric])
     
     # Plot each metric
     colors = get_color_cycle()
     for metric, color in zip(metrics, colors):
-        ax.plot(times, metric_values[metric], 
-                label=metric.replace('_', ' ').title(),
-                color=color)
+        if metric in metric_values and metric_values[metric]:  # Check if metric has values
+            ax.plot(times, metric_values[metric], 
+                    label=metric.replace('_', ' ').title(),
+                    color=color)
     
     configure_axis(ax,
                   title=title or 'Quantum Metrics Evolution',
