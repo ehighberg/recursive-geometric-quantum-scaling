@@ -139,12 +139,14 @@ def main():
                         noise_config=params.get('noise_config')
                     )
                 else:  # Topological Braiding
-                    result = run_fibonacci_braiding_circuit(
-                        braid_type=params['braid_type'],
-                        num_anyons=params['num_anyons'],
-                        braid_sequence=params['braid_sequence'],
-                        noise_config=params.get('noise_config')
-                    )
+                    # TODO: use params to configure braiding circuit
+                    result = run_fibonacci_braiding_circuit()
+                    # result = run_fibonacci_braiding_circuit(
+                    #     braid_type=params['braid_type'],
+                    #     num_anyons=params['num_anyons'],
+                    #     braid_sequence=params['braid_sequence'],
+                    #     noise_config=params.get('noise_config')
+                    # )
                 
                 st.session_state['simulation_results'] = result
                 st.success("Simulation completed successfully!")

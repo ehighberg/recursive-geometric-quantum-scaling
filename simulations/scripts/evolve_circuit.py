@@ -10,7 +10,7 @@ import os
 # Add the project root to the Python path to ensure modules can be found
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from qutip import sigmaz, sigmax, qeye, tensor, basis
+from qutip import sigmaz, sigmax, qeye, tensor, basis, Options
 from qutip_qip.circuit import QubitCircuit
 from simulations.quantum_state import state_zero, fib_anyon_state_2d
 from simulations.quantum_circuit import StandardCircuit, PhiScaledCircuit, FibonacciBraidingCircuit
@@ -87,6 +87,7 @@ def run_phi_scaled_twoqubit_circuit(scaling_factor=1.0, noise_config=None):
     return result
 
 def run_fibonacci_braiding_circuit():
+    # TODO: Implement Fibonacci braiding circuit using variable parameters from app
     """
     Fibonacci anyon braiding circuit in 2D subspace.
     Uses B1, B2 braid operators with qutip-qip gate compilation.
