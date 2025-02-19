@@ -74,7 +74,8 @@ def plot_metric_evolution(
     states: List[Qobj],
     times: List[float],
     title: Optional[str] = None,
-    figsize: Tuple[int, int] = (10, 6)
+    figsize: Tuple[int, int] = (10, 6),
+    metrics: Optional[List[str]] = None
 ) -> plt.Figure:
     """
     Plot the evolution of quantum metrics over time.
@@ -150,6 +151,7 @@ def plot_metric_evolution(
     fig.tight_layout()
     return fig
 
+# TODO: fix either this function or the ones that call it so that the parameters match. right now the calls to this function use a list of states as the first argument.
 def plot_metric_comparison(
     metrics: Dict[str, List[float]],
     metric_pairs: List[Tuple[str, str]],
@@ -176,6 +178,7 @@ def plot_metric_comparison(
     
     # Create scatter plots
     for ax, (metric1, metric2) in zip(axes, metric_pairs):
+        print(metrics)
         ax.scatter(metrics[metric1], metrics[metric2],
                   alpha=0.6)
         
