@@ -81,7 +81,7 @@ def simulate_evolution(H, psi0, times, noise_config=None, e_ops=None):
     else:
         return sesolve(H, psi0, times, e_ops=e_ops, options=Options(store_states=True))
 
-def run_state_evolution(num_qubits, state_label, phi_steps, scaling_factor=1, noise_config=None):
+def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, noise_config=None):
     """
     N-qubit evolution under H = Σi σzi with scale_factor and configurable noise.
     
@@ -107,7 +107,7 @@ def run_state_evolution(num_qubits, state_label, phi_steps, scaling_factor=1, no
     psi_init = eval(f"state_{state_label}")(num_qubits=num_qubits)
     
     # Set up evolution times
-    times = np.linspace(0.0, 10.0, phi_steps)
+    times = np.linspace(0.0, 10.0, n_steps)
     
     # Add measurement operators for observables
     e_ops = [sigmaz()] if num_qubits == 1 else [tensor([sigmaz() if i == j else qeye(2) for i in range(num_qubits)]) for j in range(num_qubits)]
@@ -122,9 +122,7 @@ if __name__=="__main__":
         num_qubits=1,
         state_label="plus",
         n_steps=50,
-        scaling_factor=1,
-        visualize=True,
-        animation_interval=50
+        scaling_factor=1
     )
     print("Final state:", result.states[-1])
     
@@ -142,8 +140,6 @@ if __name__=="__main__":
         state_label="plus",
         n_steps=50,
         scaling_factor=1,
-        noise_config=noise_config,
-        visualize=True,
-        animation_interval=50
+        noise_config=noise_config
     )
     print("Final state (with noise):", result_noisy.states[-1])
