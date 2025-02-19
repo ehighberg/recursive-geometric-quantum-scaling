@@ -125,7 +125,7 @@ def analyze_simulation_results(result, mode: str):
             col1, col2, col3, col4, col5 = st.columns(5)
             with col1:
                 st.metric("von Neumann Entropy", f"{analysis_results['vn_entropy']:.4f}")
-            with cols[1]:
+            with col2:
                 st.metric("L1 Coherence", f"{analysis_results['l1_coherence']:.4f}")
             with col3:
                 st.metric("Negativity", f"{analysis_results['negativity']:.4f}")
