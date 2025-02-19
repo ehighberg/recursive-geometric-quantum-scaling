@@ -118,5 +118,33 @@ def run_state_evolution(num_qubits, state_label, phi_steps, scaling_factor=1, no
     return result
 
 if __name__=="__main__":
-    res_state = run_state_evolution(num_qubits=1, state_label="plus", phi_steps=5, scaling_factor=1)
-    print("State final:", res_state.states[-1])
+    # Example: Evolution with visualization
+    result, state_anim, bloch_anim, static_fig = run_state_evolution(
+        num_qubits=1,
+        state_label="plus",
+        n_steps=50,
+        scaling_factor=1,
+        visualize=True,
+        animation_interval=50
+    )
+    print("Final state:", result.states[-1])
+    
+    # Example: Evolution with noise and visualization
+    noise_config = {
+        'noise': {
+            'dephasing': {
+                'enabled': True,
+                'rate': 0.1
+            }
+        }
+    }
+    result_noisy, state_anim_noisy, bloch_anim_noisy, static_fig_noisy = run_state_evolution(
+        num_qubits=1,
+        state_label="plus",
+        n_steps=50,
+        scaling_factor=1,
+        noise_config=noise_config,
+        visualize=True,
+        animation_interval=50
+    )
+    print("Final state (with noise):", result_noisy.states[-1])

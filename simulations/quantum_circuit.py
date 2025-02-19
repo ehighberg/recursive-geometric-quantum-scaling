@@ -45,7 +45,17 @@ class StandardCircuit(QuantumCircuit):
         self.config = load_config()
         self.total_time = total_time if total_time is not None else self.config.get('total_time', 1.0)
         self.n_steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
-        self.c_ops = c_ops if c_ops is not None else self.config.get('c_ops', [])
+        
+        # Initialize noise channels
+        self._noise = NoiseChannel(noise_config)
+        base_c_ops = c_ops if c_ops is not None else self.config.get('c_ops', [])
+        noise_c_ops = self._noise.get_collapse_operators(base_hamiltonian.shape[0])
+        self.c_ops = base_c_ops + noise_c_ops
+        
+    @property
+    def noise(self):
+        """Get the noise channel"""
+        return self._noise
 
     def evolve_closed(self, initial_state, n_steps=None):
         """

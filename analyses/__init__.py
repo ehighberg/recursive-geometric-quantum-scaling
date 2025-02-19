@@ -39,3 +39,29 @@ def run_analyses(initial_state, current_state):
         "purity": purity,
         "fidelity": fid
     }
+    
+    # Calculate appropriate entanglement measures based on number of qubits
+    num_qubits = len(state.dims[0])
+    if num_qubits == 2:
+        # For two-qubit states, use concurrence
+        results.update({
+            'concurrence': concurrence(state)
+        })
+    elif num_qubits > 2:
+        # For multi-qubit states, use negativity and log_negativity
+        results.update({
+            'negativity': negativity(state),
+            'log_negativity': log_negativity(state)
+        })
+    
+    return results
+
+__all__ = [
+    'coherence_metric',
+    'concurrence',
+    'negativity',
+    'log_negativity',
+    'von_neumann_entropy',
+    'renyi_entropy',
+    'run_analyses'
+]

@@ -1,44 +1,136 @@
-# analyses/entropy.py
-
 """
-Entropy-related analysis using QuTiP:
- - von Neumann entropy
- - linear entropy
- - mutual information, etc.
+Functions for calculating quantum entropy measures.
 """
 
-from qutip import entropy_vn, entropy_linear, ptrace, Qobj
+import numpy as np
+from qutip import Qobj
+from typing import Union, List
 
-def compute_vn_entropy(rho, base=2):
+def von_neumann_entropy(state: Union[Qobj, List[Qobj]]) -> float:
     """
-    von Neumann entropy S(ρ) = -Tr(ρ log ρ).
-    QuTiP: entropy_vn(rho, base=2).
+    Calculate the von Neumann entropy of a quantum state.
+    S = -Tr(ρ log_2(ρ))
+    
+    Parameters:
+        state: Quantum state (Qobj) or list of states
+        
+    Returns:
+        float: von Neumann entropy value
     """
-    return entropy_vn(rho, base=base)
+    if isinstance(state, list):
+        return [von_neumann_entropy(s) for s in state]
+    
+    # Convert to density matrix if needed
+    if state.isket:
+        rho = state * state.dag()
+    else:
+        rho = state
+    
+    # Get eigenvalues
+    eigs = np.real(np.linalg.eigvals(rho.full()))
+    
+    # Remove small negative eigenvalues (numerical artifacts)
+    eigs = eigs[eigs > 1e-15]
+    
+    # Calculate entropy
+    entropy = 0.0
+    for p in eigs:
+        if p > 0:  # Avoid log(0)
+            entropy -= p * np.log2(p)
+    
+    # Normalize by maximum entropy (log2(d) for d-dimensional system)
+    max_entropy = np.log2(len(eigs))
+    return float(entropy / max_entropy if max_entropy > 0 else 0.0)
 
-def compute_linear_entropy(rho):
+def renyi_entropy(state: Union[Qobj, List[Qobj]], alpha: float = 2.0) -> float:
     """
-    Linear entropy: S_L(ρ) = 1 - Tr(ρ^2).
-    QuTiP: entropy_linear(rho).
+    Calculate the Rényi entropy of order alpha.
+    S_α = 1/(1-α) log_2(Tr(ρ^α))
+    
+    Parameters:
+        state: Quantum state (Qobj) or list of states
+        alpha: Order of Rényi entropy (α > 0, α ≠ 1)
+        
+    Returns:
+        float: Rényi entropy value
     """
-    return entropy_linear(rho)
+    if isinstance(state, list):
+        return [renyi_entropy(s, alpha) for s in state]
+    
+    if alpha <= 0:
+        raise ValueError("Alpha must be positive")
+    if abs(alpha - 1.0) < 1e-10:
+        return von_neumann_entropy(state)
+    
+    # Convert to density matrix if needed
+    if state.isket:
+        rho = state * state.dag()
+    else:
+        rho = state
+    
+    # Get eigenvalues
+    eigs = np.real(np.linalg.eigvals(rho.full()))
+    eigs = eigs[eigs > 1e-15]  # Remove numerical noise
+    
+    # Calculate Rényi entropy
+    return float(1.0 / (1.0 - alpha) * np.log2(np.sum(eigs**alpha)))
 
-def compute_mutual_information(rho, subsysA, subsysB, dims=None):
+def linear_entropy(state: Union[Qobj, List[Qobj]]) -> float:
     """
-    Example: bipartite mutual information I(A:B) = S(A) + S(B) - S(A,B)
-    Using partial trace for each subsystem.
-    'dims' define the total dimension structure if not 2 qubits.
+    Calculate the linear entropy (special case of Rényi entropy with α=2).
+    S_L = 1 - Tr(ρ^2)
+    
+    Parameters:
+        state: Quantum state (Qobj) or list of states
+        
+    Returns:
+        float: Linear entropy value in [0,1]
     """
-    # For a 2-qubit system, default dims=(2,2).
-    if dims is None:
-        dims = [2,2]
+    if isinstance(state, list):
+        return [linear_entropy(s) for s in state]
+    
+    # Convert to density matrix if needed
+    if state.isket:
+        rho = state * state.dag()
+    else:
+        rho = state
+    
+    # Calculate purity Tr(ρ^2)
+    purity = (rho * rho).tr().real
+    
+    # Calculate linear entropy
+    d = rho.shape[0]  # dimension of Hilbert space
+    return float((1.0 - purity) * d/(d-1)) if d > 1 else 0.0
 
-    # partial trace
-    rhoA = ptrace(rho, subsysA)
-    rhoB = ptrace(rho, subsysB)
-
-    # von Neumann entropies
-    S_AB = entropy_vn(rho)
-    S_A  = entropy_vn(rhoA)
-    S_B  = entropy_vn(rhoB)
-    return (S_A + S_B - S_AB)
+def tsallis_entropy(state: Union[Qobj, List[Qobj]], q: float = 2.0) -> float:
+    """
+    Calculate the Tsallis entropy.
+    S_q = (1-Tr(ρ^q))/(q-1)
+    
+    Parameters:
+        state: Quantum state (Qobj) or list of states
+        q: Entropic index (q > 0, q ≠ 1)
+        
+    Returns:
+        float: Tsallis entropy value
+    """
+    if isinstance(state, list):
+        return [tsallis_entropy(s, q) for s in state]
+    
+    if q <= 0:
+        raise ValueError("q must be positive")
+    if abs(q - 1.0) < 1e-10:
+        return von_neumann_entropy(state)
+    
+    # Convert to density matrix if needed
+    if state.isket:
+        rho = state * state.dag()
+    else:
+        rho = state
+    
+    # Get eigenvalues
+    eigs = np.real(np.linalg.eigvals(rho.full()))
+    eigs = eigs[eigs > 1e-15]  # Remove numerical noise
+    
+    # Calculate Tsallis entropy
+    return float((1.0 - np.sum(eigs**q)) / (q - 1.0))

@@ -5,14 +5,74 @@ Visualization functions for quantum metrics including entropy, coherence, and en
 from .style_config import COLORS
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import List, Dict, Optional, Tuple, Union
+import matplotlib.animation as animation
+from typing import List, Dict, Optional, Tuple, Union, Any
 from qutip import Qobj
 from .style_config import set_style, configure_axis, get_color_cycle
+
+def animate_metric_evolution(
+    metrics: Dict[str, List[float]],
+    times: List[float],
+    title: Optional[str] = None,
+    figsize: Tuple[int, int] = (10, 6),
+    interval: int = 50  # Animation interval in milliseconds
+) -> animation.FuncAnimation:
+    """
+    Create an animated visualization of metric evolution over time.
+    
+    Parameters:
+        metrics: Dictionary of metric names to lists of values
+        times: List of time points
+        title: Optional plot title
+        figsize: Figure size tuple
+        interval: Animation interval in milliseconds
+        
+    Returns:
+        matplotlib Animation object
+    """
+    set_style()
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # Initialize lines
+    lines = []
+    colors = iter(get_color_cycle())
+    for metric in metrics.keys():
+        line, = ax.plot([], [], label=metric.replace('_', ' ').title(), color=next(colors))
+        lines.append(line)
+    
+    configure_axis(ax,
+                  title=title or 'Quantum Metrics Evolution',
+                  xlabel='Time',
+                  ylabel='Value')
+    ax.legend()
+    
+    # Set axis limits
+    ax.set_xlim(min(times), max(times))
+    ax.set_ylim(0, 1.1)  # Most quantum metrics are normalized to [0,1]
+    
+    # Animation update function
+    def update(frame):
+        # Update each metric line
+        for line, metric_values in zip(lines, metrics.values()):
+            line.set_data(times[:frame], metric_values[:frame])
+        return lines
+    
+    # Create animation
+    anim = animation.FuncAnimation(
+        fig,
+        update,
+        frames=len(times),
+        interval=interval,
+        blit=True,
+        repeat=True
+    )
+    
+    fig.tight_layout()
+    return anim
 
 def plot_metric_evolution(
     states: List[Qobj],
     times: List[float],
-    metrics: Optional[List[str]] = None,
     title: Optional[str] = None,
     figsize: Tuple[int, int] = (10, 6)
 ) -> plt.Figure:
@@ -22,13 +82,13 @@ def plot_metric_evolution(
     Parameters:
         states: List of quantum states
         times: List of time points
-        metrics: List of metrics to plot (default: ['vn_entropy', 'l1_coherence', 'negativity'])
         title: Optional plot title
         figsize: Figure size tuple
         
     Returns:
         matplotlib Figure object
     """
+<<<<<<< HEAD
     from analyses import run_analyses
     
     if metrics is None:
@@ -39,10 +99,16 @@ def plot_metric_evolution(
             'purity',
             'fidelity'
         ]
+=======
+    from analyses.coherence import coherence_metric
+    from analyses.entropy import von_neumann_entropy
+    from analyses.entanglement import concurrence
+>>>>>>> main
     
     set_style()
     fig, ax = plt.subplots(figsize=figsize)
     
+<<<<<<< HEAD
     # Calculate metrics for each state
     metric_values = {metric: [] for metric in metrics}
     
@@ -81,6 +147,31 @@ def plot_metric_evolution(
             ax.plot(times, metric_values[metric], 
                     label=metric.replace('_', ' ').title(),
                     color=color)
+=======
+    # Calculate metrics
+    metrics = {
+        'Coherence': [coherence_metric(state) for state in states],
+        'Entropy': [von_neumann_entropy(state) for state in states]
+    }
+    
+    # Add appropriate entanglement measures based on number of qubits
+    num_qubits = len(states[0].dims[0])
+    if num_qubits == 2:
+        # For two-qubit states, use concurrence
+        metrics['Concurrence'] = [concurrence(state) for state in states]
+    elif num_qubits > 2:
+        # For multi-qubit states, use negativity and log_negativity
+        from analyses.entanglement import negativity, log_negativity
+        metrics['Negativity'] = [negativity(state) for state in states]
+        metrics['Log Negativity'] = [log_negativity(state) for state in states]
+    
+    # Plot each metric
+    colors = iter(get_color_cycle())  # Convert list to iterator
+    for metric_name, values in metrics.items():
+        ax.plot(times, values, 
+                label=metric_name,
+                color=next(colors))
+>>>>>>> main
     
     configure_axis(ax,
                   title=title or 'Quantum Metrics Evolution',
@@ -92,7 +183,7 @@ def plot_metric_evolution(
     return fig
 
 def plot_metric_comparison(
-    states: List[Qobj],
+    metrics: Dict[str, List[float]],
     metric_pairs: List[Tuple[str, str]],
     title: Optional[str] = None,
     figsize: Tuple[int, int] = (12, 4)
@@ -101,7 +192,7 @@ def plot_metric_comparison(
     Create scatter plots comparing pairs of quantum metrics.
     
     Parameters:
-        states: List of quantum states
+        metrics: Dictionary of metric names to lists of values
         metric_pairs: List of metric name pairs to compare
         title: Optional plot title
         figsize: Figure size tuple
@@ -109,26 +200,15 @@ def plot_metric_comparison(
     Returns:
         matplotlib Figure object
     """
-    from analyses import run_analyses
-    
     set_style()
     n_pairs = len(metric_pairs)
     fig, axes = plt.subplots(1, n_pairs, figsize=figsize)
     if n_pairs == 1:
         axes = [axes]
     
-    # Calculate all metrics
-    metric_values = {}
-    for state in states:
-        results = run_analyses(state)
-        for metric, value in results.items():
-            if metric not in metric_values:
-                metric_values[metric] = []
-            metric_values[metric].append(value)
-    
     # Create scatter plots
     for ax, (metric1, metric2) in zip(axes, metric_pairs):
-        ax.scatter(metric_values[metric1], metric_values[metric2],
+        ax.scatter(metrics[metric1], metrics[metric2],
                   alpha=0.6)
         
         configure_axis(ax,
@@ -225,8 +305,7 @@ def plot_noise_metrics(
     return fig
 
 def plot_metric_distribution(
-    states: List[Qobj],
-    metrics: Optional[List[str]] = None,
+    metrics: Dict[str, List[float]],
     title: Optional[str] = None,
     figsize: Tuple[int, int] = (15, 5)
 ) -> plt.Figure:
@@ -234,36 +313,29 @@ def plot_metric_distribution(
     Create distribution plots (histograms) for quantum metrics.
     
     Parameters:
-        states: List of quantum states
-        metrics: List of metrics to plot
+        metrics: Dictionary of metric names to lists of values
         title: Optional plot title
         figsize: Figure size tuple
         
     Returns:
         matplotlib Figure object
     """
-    from analyses import run_analyses
-    
-    if metrics is None:
-        metrics = ['vn_entropy', 'l1_coherence', 'negativity']
-    
     set_style()
-    fig, axes = plt.subplots(1, len(metrics), figsize=figsize)
-    if len(metrics) == 1:
+    n_metrics = len(metrics)
+    fig, axes = plt.subplots(1, n_metrics, figsize=figsize)
+    if n_metrics == 1:
         axes = [axes]
     
-    # Calculate metrics
-    metric_values = {metric: [] for metric in metrics}
-    for state in states:
-        results = run_analyses(state)
-        for metric in metrics:
-            metric_values[metric].append(results[metric])
-    
     # Create distribution plots
-    colors = get_color_cycle()
-    for ax, (metric, color) in zip(axes, zip(metrics, colors)):
-        values = metric_values[metric]
-        ax.hist(values, bins='auto', color=color, alpha=0.7)
+    colors = iter(get_color_cycle())
+    for ax, (metric, values) in zip(axes, metrics.items()):
+        # For small datasets, use fewer bins
+        n_points = len(values)
+        if n_points < 10:
+            bins = min(n_points, 3)  # Use at most 3 bins for small datasets
+        else:
+            bins = 'auto'
+        ax.hist(values, bins=bins, color=next(colors), alpha=0.7)
         
         configure_axis(ax,
                       title=metric.replace('_', ' ').title(),
@@ -275,3 +347,38 @@ def plot_metric_distribution(
     
     fig.tight_layout()
     return fig
+<<<<<<< HEAD
+=======
+
+def calculate_metrics(states: List[Qobj]) -> Dict[str, List[float]]:
+    """
+    Calculate various quantum metrics for a list of states.
+    
+    Parameters:
+        states: List of quantum states
+        
+    Returns:
+        Dictionary mapping metric names to lists of values
+    """
+    from analyses.coherence import coherence_metric
+    from analyses.entanglement import concurrence
+    from analyses.entropy import von_neumann_entropy
+    
+    # Calculate metrics based on number of qubits
+    metrics = {
+        'coherence': [coherence_metric(state) for state in states],
+        'entropy': [von_neumann_entropy(state) for state in states]
+    }
+    
+    # Calculate appropriate entanglement measures based on number of qubits
+    num_qubits = len(states[0].dims[0])
+    if num_qubits == 2:
+        # For two-qubit states, use concurrence
+        metrics['concurrence'] = [concurrence(state) for state in states]
+    elif num_qubits > 2:
+        # For multi-qubit states, use negativity and log_negativity
+        from analyses.entanglement import negativity, log_negativity
+        metrics['negativity'] = [negativity(state) for state in states]
+        metrics['log_negativity'] = [log_negativity(state) for state in states]
+    return metrics
+>>>>>>> main
