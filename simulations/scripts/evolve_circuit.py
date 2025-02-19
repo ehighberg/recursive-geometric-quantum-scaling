@@ -13,7 +13,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 from qutip import sigmaz, sigmax, qeye, tensor, basis, Options
 from qutip_qip.circuit import QubitCircuit
 from simulations.quantum_state import state_zero, fib_anyon_state_2d
-from simulations.quantum_circuit import StandardCircuit, PhiScaledCircuit, FibonacciBraidingCircuit
+from simulations.quantum_circuit import StandardCircuit, ScaledCircuit, FibonacciBraidingCircuit
 from simulations.amplitude_scaling import get_pulse_sequence
 
 def run_standard_twoqubit_circuit(noise_config=None):
@@ -68,7 +68,7 @@ def run_phi_scaled_twoqubit_circuit(scaling_factor=1.0, noise_config=None):
     H0 = tensor(sigmaz(), qeye(2)) + 0.5 * tensor(qeye(2), sigmax())
     
     # Create circuit with scaling
-    pcirc = PhiScaledCircuit(H0, scaling_factor=scaling_factor)
+    pcirc = ScaledCircuit(H0, scaling_factor=scaling_factor)
     
     # Add scaled gates
     qc = QubitCircuit(2)
