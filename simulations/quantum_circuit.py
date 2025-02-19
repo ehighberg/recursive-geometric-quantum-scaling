@@ -6,6 +6,7 @@ import numpy as np
 from constants import PHI
 from qutip import Qobj, ket2dm, mesolve, Options, basis, sigmax, sigmay, sigmaz
 from qutip_qip.circuit import QubitCircuit
+from qutip_qip.noise import Noise
 from qutip_qip.operations import Gate
 from .config import load_config
 
@@ -47,10 +48,12 @@ class StandardCircuit(QuantumCircuit):
         self.n_steps = n_steps if n_steps is not None else self.config.get('n_steps', 10)
         
         # Initialize noise channels
-        self._noise = NoiseChannel(noise_config)
+        noise_config = self.config.get('noise', {})
+        self._noise = Noise(noise_config)
         base_c_ops = c_ops if c_ops is not None else self.config.get('c_ops', [])
-        noise_c_ops = self._noise.get_collapse_operators(base_hamiltonian.shape[0])
-        self.c_ops = base_c_ops + noise_c_ops
+        #TODO: Generate noise collapse operators
+        # noise_c_ops = self._noise.get_collapse_operators(base_hamiltonian.shape[0])
+        self.c_ops = base_c_ops # + noise_c_ops
         
     @property
     def noise(self):
@@ -98,9 +101,9 @@ class StandardCircuit(QuantumCircuit):
         )
         return result
 
-class PhiScaledCircuit(QuantumCircuit):
+class ScaledCircuit(QuantumCircuit):
     """
-    Phi-scaled circuit evolution using qutip's features.
+    Geometrically-scaled circuit evolution using qutip's features.
     """
     def __init__(self, base_hamiltonian, scaling_factor=None, c_ops=None):
         super().__init__(base_hamiltonian.dims[0][0] if isinstance(base_hamiltonian.dims[0], list) else 2)

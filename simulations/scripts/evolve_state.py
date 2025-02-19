@@ -14,7 +14,6 @@ import numpy as np
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from simulations.quantum_state import state_plus
-from simulations.quantum_circuit import StandardCircuit, PhiScaledCircuit
 from qutip import sigmaz, tensor, qeye, sesolve, mesolve, sigmax, Options
 
 def construct_nqubit_hamiltonian(num_qubits):
