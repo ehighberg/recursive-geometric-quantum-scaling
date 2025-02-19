@@ -88,7 +88,6 @@ def plot_metric_evolution(
     Returns:
         matplotlib Figure object
     """
-<<<<<<< HEAD
     from analyses import run_analyses
     
     if metrics is None:
@@ -99,16 +98,10 @@ def plot_metric_evolution(
             'purity',
             'fidelity'
         ]
-=======
-    from analyses.coherence import coherence_metric
-    from analyses.entropy import von_neumann_entropy
-    from analyses.entanglement import concurrence
->>>>>>> main
     
     set_style()
     fig, ax = plt.subplots(figsize=figsize)
     
-<<<<<<< HEAD
     # Calculate metrics for each state
     metric_values = {metric: [] for metric in metrics}
     
@@ -147,31 +140,6 @@ def plot_metric_evolution(
             ax.plot(times, metric_values[metric], 
                     label=metric.replace('_', ' ').title(),
                     color=color)
-=======
-    # Calculate metrics
-    metrics = {
-        'Coherence': [coherence_metric(state) for state in states],
-        'Entropy': [von_neumann_entropy(state) for state in states]
-    }
-    
-    # Add appropriate entanglement measures based on number of qubits
-    num_qubits = len(states[0].dims[0])
-    if num_qubits == 2:
-        # For two-qubit states, use concurrence
-        metrics['Concurrence'] = [concurrence(state) for state in states]
-    elif num_qubits > 2:
-        # For multi-qubit states, use negativity and log_negativity
-        from analyses.entanglement import negativity, log_negativity
-        metrics['Negativity'] = [negativity(state) for state in states]
-        metrics['Log Negativity'] = [log_negativity(state) for state in states]
-    
-    # Plot each metric
-    colors = iter(get_color_cycle())  # Convert list to iterator
-    for metric_name, values in metrics.items():
-        ax.plot(times, values, 
-                label=metric_name,
-                color=next(colors))
->>>>>>> main
     
     configure_axis(ax,
                   title=title or 'Quantum Metrics Evolution',
@@ -347,38 +315,3 @@ def plot_metric_distribution(
     
     fig.tight_layout()
     return fig
-<<<<<<< HEAD
-=======
-
-def calculate_metrics(states: List[Qobj]) -> Dict[str, List[float]]:
-    """
-    Calculate various quantum metrics for a list of states.
-    
-    Parameters:
-        states: List of quantum states
-        
-    Returns:
-        Dictionary mapping metric names to lists of values
-    """
-    from analyses.coherence import coherence_metric
-    from analyses.entanglement import concurrence
-    from analyses.entropy import von_neumann_entropy
-    
-    # Calculate metrics based on number of qubits
-    metrics = {
-        'coherence': [coherence_metric(state) for state in states],
-        'entropy': [von_neumann_entropy(state) for state in states]
-    }
-    
-    # Calculate appropriate entanglement measures based on number of qubits
-    num_qubits = len(states[0].dims[0])
-    if num_qubits == 2:
-        # For two-qubit states, use concurrence
-        metrics['concurrence'] = [concurrence(state) for state in states]
-    elif num_qubits > 2:
-        # For multi-qubit states, use negativity and log_negativity
-        from analyses.entanglement import negativity, log_negativity
-        metrics['negativity'] = [negativity(state) for state in states]
-        metrics['log_negativity'] = [log_negativity(state) for state in states]
-    return metrics
->>>>>>> main
