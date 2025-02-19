@@ -114,6 +114,9 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     
     # Run evolution with noise if configured
     result = simulate_evolution(H_scaled, psi_init, times, noise_config, e_ops)
+    
+    #TODO: add visualization here and in function params
+    
     return result
 
 if __name__=="__main__":
