@@ -123,7 +123,7 @@ def main():
                     result = run_state_evolution(
                         num_qubits=params['num_qubits'],
                         state_label=params['state_label'],
-                        phi_steps=params['n_steps'],
+                        n_steps=params['n_steps'],
                         scaling_factor=1.0,
                         noise_config=params.get('noise_config')
                     )

@@ -10,7 +10,7 @@ def test_run_state_evolution_standard():
     res = run_state_evolution(
         num_qubits=1,
         state_label="plus",
-        phi_steps=50,
+        n_steps=50,
         scaling_factor=1.0,
         noise_config=None
     )
@@ -22,7 +22,7 @@ def test_run_state_evolution_phi_scaled():
     res = run_state_evolution(
         num_qubits=1,
         state_label="plus",
-        phi_steps=5,
+        n_steps=5,
         scaling_factor=1/PHI,
         noise_config=None
     )
@@ -40,7 +40,7 @@ def test_run_state_evolution_with_noise():
     res = run_state_evolution(
         num_qubits=1,
         state_label="plus",
-        phi_steps=10,
+        n_steps=10,
         scaling_factor=1.0,
         noise_config=noise_config
     )
@@ -52,7 +52,7 @@ def test_run_state_evolution_multiqubit():
     res = run_state_evolution(
         num_qubits=2,
         state_label="ghz",
-        phi_steps=5,
+        n_steps=5,
         scaling_factor=1.0,
         noise_config=None
     )
@@ -65,7 +65,7 @@ def test_noise_effects():
     res_clean = run_state_evolution(
         num_qubits=1,
         state_label="plus",
-        phi_steps=10,
+        n_steps=10,
         scaling_factor=1.0,
         noise_config=None
     )
@@ -80,7 +80,7 @@ def test_noise_effects():
     res_noisy = run_state_evolution(
         num_qubits=1,
         state_label="plus",
-        phi_steps=10,
+        n_steps=10,
         scaling_factor=1.0,
         noise_config=noise_config
     )
