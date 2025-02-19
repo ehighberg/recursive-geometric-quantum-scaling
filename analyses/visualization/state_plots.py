@@ -159,16 +159,16 @@ def plot_state_evolution(
     states: List[Qobj],
     times: List[float],
     title: Optional[str] = None,
-    figsize: Tuple[int, int] = (12, 4)
+    figsize: Tuple[int, int] = (15, 8)
 ) -> plt.Figure:
     """
-    Plot the evolution of state properties over time.
+    Plot the evolution of state properties over time including noise effects.
     
     Parameters:
-        states: List of quantum states (Qobj)
+        states: List of quantum states
         times: List of time points
         title: Optional plot title
-        figsize: Figure size tuple (width, height)
+        figsize: Figure size tuple
         
     Returns:
         matplotlib Figure object
@@ -176,15 +176,25 @@ def plot_state_evolution(
     # Use clean default style
     plt.rcParams.update(PLOT_STYLE)
     
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+    # Handle empty or invalid input
+    if not states or not times or len(states) == 0 or len(times) == 0:
+        # Create empty figure with message
+        fig = plt.figure(figsize=figsize)
+        plt.text(0.5, 0.5, 'No data to plot',
+                horizontalalignment='center',
+                verticalalignment='center')
+        plt.axis('off')
+        return fig
     
-    # Extract diagonal elements (populations)
-    if states[0].isket:
+    # Create 2x2 subplot grid
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=figsize)
+    
+    # Plot 1: State Populations
+    if hasattr(states[0], 'isket') and states[0].isket:
         populations = [state.full().flatten() for state in states]
     else:
         populations = [state.diag() for state in states]
     
-    # Plot populations with custom colors
     colors = [COLORS['primary'], COLORS['secondary'], 
               COLORS['accent'], COLORS['highlight']]
     for i in range(len(populations[0])):
@@ -197,25 +207,65 @@ def plot_state_evolution(
                   ylabel='Population')
     ax1.legend()
     
-    # Plot coherences (off-diagonal elements) if density matrix
-    if not states[0].isket:
-        n = states[0].shape[0]
-        coherences = []
-        for state in states:
-            state_mat = state.full()
-            coh = []
-            for i in range(n):
-                for j in range(i+1, n):
-                    coh.append(abs(state_mat[i,j]))
-            coherences.append(np.mean(coh))
-        
-        ax2.plot(times, coherences, label='Mean Coherence',
-                color=COLORS['primary'])
-        configure_axis(ax2,
-                      title='Average Coherence',
-                      xlabel='Time',
-                      ylabel='Coherence')
-        ax2.legend()
+    # Plot 2: Coherences
+    n = states[0].shape[0]
+    coherences = []
+    for state in states:
+        if state.isket:
+            state = state * state.dag()  # Convert to density matrix
+        state_mat = state.full()
+        coh = []
+        for i in range(n):
+            for j in range(i+1, n):
+                coh.append(abs(state_mat[i,j]))
+        coherences.append(np.mean(coh) if coh else 0)
+    
+    ax2.plot(times, coherences, label='Mean Coherence',
+            color=COLORS['primary'])
+    configure_axis(ax2,
+                  title='Coherence',
+                  xlabel='Time',
+                  ylabel='Average Coherence')
+    ax2.legend()
+    
+    # Plot 3: Purity
+    purities = []
+    for state in states:
+        if state.isket:
+            state = state * state.dag()
+        purities.append((state * state).tr().real)
+    
+    ax3.plot(times, purities, label='Purity',
+            color=COLORS['accent'])
+    configure_axis(ax3,
+                  title='State Purity',
+                  xlabel='Time',
+                  ylabel='Tr(ρ2)')
+    ax3.set_ylim(0, 1.1)
+    ax3.legend()
+    
+    # Plot 4: Fidelity with initial state
+    initial_state = states[0]
+    if initial_state.isket:
+        initial_state = initial_state * initial_state.dag()
+    
+    fidelities = []
+    for state in states:
+        if state.isket:
+            state = state * state.dag()
+        # Calculate fidelity using sqrt(ρ1) ρ2 sqrt(ρ1)
+        sqrt_rho1 = initial_state.sqrtm()
+        fid = (sqrt_rho1 * state * sqrt_rho1).tr().real
+        fidelities.append(fid)
+    
+    ax4.plot(times, fidelities, label='Fidelity',
+            color=COLORS['highlight'])
+    configure_axis(ax4,
+                  title='Fidelity with Initial State',
+                  xlabel='Time',
+                  ylabel='F(ρ0,ρ(t))')
+    ax4.set_ylim(0, 1.1)
+    ax4.legend()
     
     if title:
         fig.suptitle(title, fontsize=14, y=1.05)

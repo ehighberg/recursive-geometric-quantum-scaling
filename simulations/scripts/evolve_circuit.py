@@ -2,7 +2,7 @@
 # simulations/scripts/evolve_circuit.py
 
 """
-Circuit-based approach: multi-qubit or braiding example.
+Circuit-based approach using qutip-qip features for multi-qubit and braiding operations.
 """
 
 import sys
@@ -10,206 +10,230 @@ import os
 # Add the project root to the Python path to ensure modules can be found
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from qutip import sigmaz, sigmax, qeye, tensor
+from qutip import sigmaz, sigmax, qeye, tensor, basis, Options
+from qutip_qip.circuit import QubitCircuit
 from simulations.quantum_state import state_zero, fib_anyon_state_2d
 from simulations.quantum_circuit import StandardCircuit, ScaledCircuit, FibonacciBraidingCircuit
+from simulations.amplitude_scaling import get_pulse_sequence
 
-from typing import Optional, Callable, Tuple, Union
-import matplotlib.pyplot as plt
-from analyses.visualization.state_plots import (
-    animate_state_evolution,
-    animate_bloch_sphere,
-    plot_state_evolution,
-    plot_bloch_sphere
-)
-from analyses.visualization.metric_plots import plot_metric_evolution
-
-def run_circuit_evolution(
-    num_qubits: int = 2,
-    scale_factor: float = 1.0,
-    n_steps: int = 50,
-    total_time: float = 5.0,
-    noise_config: Optional[dict] = None,
-    visualize: bool = False,
-    animation_interval: int = 50,
-    callback: Optional[Callable] = None
-) -> Union[Tuple, object]:
+def run_standard_twoqubit_circuit(noise_config=None):
     """
-    N-qubit circuit evolution with configurable scaling.
-    For scale_factor=1, behaves like standard evolution.
-    For scale_factor≠1, applies scaled evolution.
+    2-qubit uniform approach with configurable noise.
+    H0 = sigma_z(1) + 0.1 sigma_x(2)
     
     Parameters:
-    -----------
-    num_qubits : int
-        Number of qubits in the circuit
-    scale_factor : float
-        Scaling factor for evolution (default=1.0 for standard evolution)
-    n_steps : int
-        Number of evolution steps
-    total_time : float
-        Total evolution time (used only when scale_factor=1)
-        
+    - noise_config (dict): Optional noise configuration
+    
     Returns:
-    --------
-    qutip.Result or ClosedResult
-        Evolution result containing states and times
+    - result: Evolution result containing states and times
     """
-    # Construct n-qubit Hamiltonian
-    # First create list of identity operators
-    op_list = [qeye(2) for _ in range(num_qubits)]
+    # Create base Hamiltonian
+    H0 = tensor(sigmaz(), qeye(2)) + 0.1 * tensor(qeye(2), sigmax())
     
-    # Add σz term for first qubit
-    op_list[0] = sigmaz()
-    H0 = tensor(op_list)
+    # Create circuit
+    circ = StandardCircuit(H0, total_time=5.0, n_steps=50)
     
-    if num_qubits == 2:
-        # For 2 qubits, add 0.5 σx term on second qubit
-        op_list = [qeye(2) for _ in range(num_qubits)]
-        op_list[1] = sigmax()
-        H0 += 0.5 * tensor(op_list)
+    # Add some standard gates
+    qc = QubitCircuit(2)
+    qc.add_gate("CNOT", controls=0, targets=1)
+    qc.add_gate("RX", targets=[1], arg_value=0.5)
+    
+    # Get pulse sequence for the gates
+    H_list, coeff_list, tlist = get_pulse_sequence(H0, total_time=5.0, steps=50)
+    
+    # Initialize state
+    psi_init = state_zero(num_qubits=2)
+    
+    # Evolve with or without noise
+    if noise_config:
+        result = circ.evolve_open(psi_init)
     else:
-        # For >2 qubits, add σz terms on remaining qubits
-        for i in range(1, num_qubits):
-            op_list = [qeye(2) for _ in range(num_qubits)]
-            op_list[i] = sigmaz()
-            H0 += tensor(op_list)
-    
-    # Initialize quantum state
-    psi_init = state_zero(num_qubits=num_qubits)
-    
-    if scale_factor == 1.0:
-        # Standard evolution
-        circ = StandardCircuit(H0, total_time=total_time, n_steps=n_steps, noise_config=noise_config)
         result = circ.evolve_closed(psi_init)
-    else:
-        # Scaled evolution
-        circ = ScaledCircuit(H0, scaling_factor=scale_factor, total_time=total_time, n_steps=n_steps, noise_config=noise_config)
-        result = circ.evolve_closed(psi_init, n_steps=n_steps)
     
-    if visualize:
-        # Create animations and plots
-        times = list(range(n_steps))
-        
-        # State evolution animation
-        state_anim = animate_state_evolution(
-            result.states,
-            times,
-            title=f"{num_qubits}-Qubit Circuit Evolution (scale={scale_factor})",
-            interval=animation_interval
-        )
-        
-        # For single-qubit circuits, show Bloch sphere animation
-        bloch_anim = None
-        if num_qubits == 1:
-            bloch_anim = animate_bloch_sphere(
-                result.states,
-                title=f"Bloch Sphere Evolution (scale={scale_factor})",
-                interval=animation_interval
-            )
-        
-        # Static plots
-        static_fig = plot_state_evolution(
-            result.states,
-            times,
-            title=f"{num_qubits}-Qubit Circuit Evolution (scale={scale_factor})"
-        )
-        
-        # Plot metrics if callback provided
-        metric_fig = None
-        if callback:
-            metrics = callback(result.states, times)
-            if metrics:
-                metric_fig = plot_metric_evolution(
-                    metrics,
-                    times,
-                    title=f"Circuit Metrics (scale={scale_factor})"
-                )
-        
-        plt.show()
-        
-        return result, state_anim, bloch_anim, static_fig, metric_fig
+    return result
+
+def run_phi_scaled_twoqubit_circuit(scaling_factor=1.0, noise_config=None):
+    """
+    2-qubit phi-scaled approach with configurable noise.
+    H0 = sigma_z(1) + 0.5 sigma_x(2)
+    
+    Parameters:
+    - scaling_factor (float): Scaling factor for evolution
+    - noise_config (dict): Optional noise configuration
+    
+    Returns:
+    - result: Evolution result containing states and times
+    """
+    # Create base Hamiltonian
+    H0 = tensor(sigmaz(), qeye(2)) + 0.5 * tensor(qeye(2), sigmax())
+    
+    # Create circuit with scaling
+    pcirc = ScaledCircuit(H0, scaling_factor=scaling_factor)
+    
+    # Add scaled gates
+    qc = QubitCircuit(2)
+    qc.add_gate("CNOT", controls=0, targets=1)
+    qc.add_gate("RX", targets=[1], arg_value=0.5 * scaling_factor)
+    
+    # Initialize state
+    psi_init = state_zero(num_qubits=2)
+    
+    # Evolve with or without noise
+    if noise_config:
+        result = pcirc.evolve_open(psi_init, n_steps=5)
+    else:
+        result = pcirc.evolve_closed(psi_init, n_steps=5)
     
     return result
 
 def run_fibonacci_braiding_circuit():
+    # TODO: Implement Fibonacci braiding circuit using variable parameters from app
     """
-    Fibonacci braiding in 2D subspace => B1, B2 from fibonacci_anyon_braiding.
+    Fibonacci anyon braiding circuit in 2D subspace.
+    Uses B1, B2 braid operators with qutip-qip gate compilation.
+    
+    Returns:
+    - psi_final: Final state after braiding operations
     """
     from simulations.scripts.fibonacci_anyon_braiding import braid_b1_2d, braid_b2_2d
+    
+    # Get braid operators
     B1_2 = braid_b1_2d()
     B2_2 = braid_b2_2d()
-
+    
+    # Create braiding circuit
     fib_circ = FibonacciBraidingCircuit()
+    
+    # Add braids as custom gates
     fib_circ.add_braid(B1_2)
     fib_circ.add_braid(B2_2)
-
+    
+    # Initialize state and evolve
     psi_init = fib_anyon_state_2d()
     psi_final = fib_circ.evolve(psi_init)
+    
     return psi_final
 
-def calculate_circuit_metrics(states, times):
-    """Calculate various metrics during circuit evolution."""
-    from analyses.coherence import coherence_metric
-    from analyses.entanglement import concurrence
-    from analyses.entropy import von_neumann_entropy
+def analyze_circuit_noise_effects(circuit_type="standard", noise_rates=None):
+    """
+    Analyze how different noise types affect circuit evolution.
     
-    metrics = {
-        'coherence': [coherence_metric(state) for state in states],
-        'entanglement': [concurrence(state) for state in states],
-        'entropy': [von_neumann_entropy(state) for state in states]
+    Parameters:
+    - circuit_type (str): "standard" or "phi_scaled"
+    - noise_rates (list): List of noise rates to test
+    
+    Returns:
+    - dict: Analysis results
+    """
+    if noise_rates is None:
+        noise_rates = [0.0, 0.01, 0.05, 0.1]
+    
+    results = {
+        'fidelities': [],
+        'purities': [],
+        'noise_rates': noise_rates
     }
-    return metrics
+    
+    # Initial state for comparison
+    psi_init = state_zero(num_qubits=2)
+    
+    for rate in noise_rates:
+        # Configure noise
+        noise_config = {
+            'relaxation': rate,
+            'dephasing': rate,
+            'thermal': 0.0,
+            'measurement': 0.0
+        }
+        
+        # Run circuit with noise
+        if circuit_type == "standard":
+            result = run_standard_twoqubit_circuit(noise_config=noise_config)
+        else:
+            result = run_phi_scaled_twoqubit_circuit(noise_config=noise_config)
+        
+        # Calculate fidelity with initial state
+        final_state = result.states[-1]
+        fidelity = (psi_init.dag() * final_state * psi_init).tr().real
+        
+        # Calculate purity
+        purity = (final_state * final_state).tr().real
+        
+        results['fidelities'].append(fidelity)
+        results['purities'].append(purity)
+    
+    return results
+
+def run_quantum_gate_circuit(circuit_type="Single Qubit", optimization=None, noise_config=None):
+    """
+    Run quantum circuit with specified gate operations.
+    
+    Parameters:
+    - circuit_type (str): Type of circuit ("Single Qubit", "CNOT", "Toffoli", "Custom")
+    - optimization (str): Optimization method ("GRAPE", "CRAB", "None")
+    - noise_config (dict): Optional noise configuration
+    
+    Returns:
+    - result: Evolution result containing states and times
+    """
+    if circuit_type == "Single Qubit":
+        # Create base Hamiltonian for single qubit
+        H0 = sigmaz()
+        
+        # Create circuit
+        circ = StandardCircuit(H0, total_time=5.0, n_steps=50)
+        
+        # Add single qubit gates
+        qc = QubitCircuit(1)
+        qc.add_gate("RX", targets=[0], arg_value=0.5)
+        qc.add_gate("RY", targets=[0], arg_value=0.3)
+        
+        # Initialize state
+        psi_init = basis([2], 0)
+        
+    elif circuit_type == "CNOT":
+        # Use existing two-qubit circuit
+        return run_standard_twoqubit_circuit(noise_config=noise_config)
+        
+    elif circuit_type == "Toffoli":
+        raise NotImplementedError("Toffoli gate not yet implemented")
+        
+    else:  # Custom
+        raise NotImplementedError("Custom circuits not yet implemented")
+    
+    # Apply optimization if specified
+    if optimization and optimization != "None":
+        if optimization == "GRAPE":
+            # Add GRAPE optimization
+            opts = Options(max_step=1000, accuracy_factor=1e-3)
+            # ... implement GRAPE optimization ...
+            pass
+        elif optimization == "CRAB":
+            # Add CRAB optimization
+            # ... implement CRAB optimization ...
+            pass
+        
+    # Evolve with or without noise
+    if noise_config:
+        result = circ.evolve_open(psi_init)
+    else:
+        result = circ.evolve_closed(psi_init)
+    
+    return result
 
 if __name__ == "__main__":
-    # Example: Standard evolution with visualization
-    result, state_anim, bloch_anim, static_fig, metric_fig = run_circuit_evolution(
-        num_qubits=2,
-        scale_factor=1.0,
-        n_steps=50,
-        total_time=5.0,
-        visualize=True,
-        animation_interval=50,
-        callback=calculate_circuit_metrics
-    )
-    print("Standard 2Q final:", result.states[-1])
-
-    # Example: Scaled evolution with visualization
-    result_scaled, state_anim_scaled, bloch_anim_scaled, static_fig_scaled, metric_fig_scaled = run_circuit_evolution(
-        num_qubits=2,
-        scale_factor=1.618,
-        n_steps=50,
-        visualize=True,
-        animation_interval=50,
-        callback=calculate_circuit_metrics
-    )
-    print("Scaled 2Q final:", result_scaled.states[-1])
-
-    # Example: Evolution with noise and visualization
-    noise_config = {
-        'noise': {
-            'depolarizing': {
-                'enabled': True,
-                'rate': 0.05
-            },
-            'dephasing': {
-                'enabled': True,
-                'rate': 0.05
-            }
-        }
-    }
-    result_noisy, state_anim_noisy, bloch_anim_noisy, static_fig_noisy, metric_fig_noisy = run_circuit_evolution(
-        num_qubits=2,
-        scale_factor=1.0,
-        n_steps=50,
-        total_time=5.0,
-        noise_config=noise_config,
-        visualize=True,
-        animation_interval=50,
-        callback=calculate_circuit_metrics
-    )
-    print("2Q final (with noise):", result_noisy.states[-1])
-
-    # Example: Fibonacci braiding
+    # Example usage
+    res_std = run_standard_twoqubit_circuit()
+    print("Standard 2Q final:", res_std.states[-1])
+    
+    res_phi = run_phi_scaled_twoqubit_circuit()
+    print("Scaled 2Q final:", res_phi.states[-1])
+    
     fib_final = run_fibonacci_braiding_circuit()
     print("Fibonacci braiding final:", fib_final)
+    
+    # Analyze noise effects
+    noise_analysis = analyze_circuit_noise_effects()
+    print("\nNoise Analysis:")
+    print("Fidelities:", noise_analysis['fidelities'])
+    print("Purities:", noise_analysis['purities'])
