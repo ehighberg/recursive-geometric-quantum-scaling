@@ -5,7 +5,6 @@ Analysis and visualization of quantum simulation results in Streamlit.
 import numpy as np
 import matplotlib.pyplot as plt
 import streamlit as st
-from typing import List, Optional
 from qutip import Qobj, fidelity
 
 from analyses.visualization.state_plots import (
@@ -20,21 +19,18 @@ from analyses.visualization.metric_plots import (
 )
 from analyses import run_analyses
 
-def analyze_simulation_results(result, mode: str):
+def analyze_simulation_results(result, mode: str = "Evolution"):  # Added mode parameter with default
     """
     Analyze and visualize simulation results.
     
     Parameters:
         result: Simulation result object containing states and times,
                or a single final state for braiding circuits
-        mode: Simulation mode (e.g., "Standard State", "Phi-Scaled", etc.)
     """
     if not result:
         st.warning("No simulation results to analyze. Please run a simulation first.")
-        return
-    
+        return   
     st.header("Simulation Analysis")
-    
     # Handle both time evolution results and single-state results
     if hasattr(result, 'states') and result.states:
         states = result.states
@@ -51,7 +47,6 @@ def analyze_simulation_results(result, mode: str):
     
     # Create tabs for different visualizations
     tab1, tab2, tab3, tab4 = st.tabs(["State Evolution", "Quantum Metrics", "Noise Analysis", "State Visualization"])
-    
     with tab1:
         st.subheader("State Evolution")
         
@@ -60,7 +55,7 @@ def analyze_simulation_results(result, mode: str):
             fig_evolution = plot_state_evolution(
                 states,
                 times,
-                title=f"{mode} Evolution"
+                title=f"State {mode}"  # Updated title format
             )
             st.pyplot(fig_evolution)
         
@@ -90,18 +85,30 @@ def analyze_simulation_results(result, mode: str):
         st.subheader("Quantum Metrics Evolution")
         
         if len(states) > 1:
+            # Calculate metrics for all states
+            metrics = {}
+            metric_names = ['vn_entropy', 'l1_coherence', 'negativity', 'purity', 'fidelity']
+            for metric in metric_names:
+                metrics[metric] = []
+            
+            # Populate metrics
+            for state in states:
+                analysis_results = run_analyses(states[0], state)
+                for metric in metric_names:
+                    metrics[metric].append(analysis_results[metric])
+            
             # Metric evolution plot
             fig_metrics = plot_metric_evolution(
                 states,
                 times,
-                title=f"Metrics Evolution - {mode}"
+                title=f"Metrics Evolution - {mode}"  # This line is fine
             )
             st.pyplot(fig_metrics)
             
             # Metric comparisons
             st.subheader("Metric Correlations")
             fig_comparison = plot_metric_comparison(
-                states,
+                states,  # Pass states directly since function now expects states
                 metric_pairs=[
                     ('vn_entropy', 'l1_coherence'),
                     ('vn_entropy', 'negativity'),
@@ -115,7 +122,7 @@ def analyze_simulation_results(result, mode: str):
             # Metric distributions
             st.subheader("Metric Distributions")
             fig_dist = plot_metric_distribution(
-                metrics,
+                metrics,  # Now metrics is properly defined
                 title="Metric Distributions"
             )
             st.pyplot(fig_dist)
@@ -280,7 +287,7 @@ def analyze_simulation_results(result, mode: str):
             )
             st.pyplot(fig_bloch)
 
-def display_experiment_summary(result, mode: str):
+def display_experiment_summary(result):  # Removed unused mode parameter
     """
     Display a summary of the experiment setup and results.
     """
