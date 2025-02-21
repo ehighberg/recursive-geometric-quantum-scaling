@@ -2,13 +2,14 @@
 Visualization functions for quantum metrics including entropy, coherence, and entanglement measures.
 """
 
-from .style_config import COLORS
+from typing import List, Dict, Optional, Tuple
+import itertools
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from typing import List, Dict, Optional, Tuple, Union, Any
 from qutip import Qobj
-from .style_config import set_style, configure_axis, get_color_cycle
+from .style_config import set_style, configure_axis, get_color_cycle, COLORS
+from analyses import run_analyses
 
 def animate_metric_evolution(
     metrics: Dict[str, List[float]],
@@ -89,8 +90,6 @@ def plot_metric_evolution(
     Returns:
         matplotlib Figure object
     """
-    from analyses import run_analyses
-    
     if metrics is None:
         metrics = [
             'vn_entropy',
@@ -151,9 +150,8 @@ def plot_metric_evolution(
     fig.tight_layout()
     return fig
 
-# TODO: fix either this function or the ones that call it so that the parameters match. right now the calls to this function use a list of states as the first argument.
 def plot_metric_comparison(
-    metrics: Dict[str, List[float]],
+    states: List[Qobj],
     metric_pairs: List[Tuple[str, str]],
     title: Optional[str] = None,
     figsize: Tuple[int, int] = (12, 4)
@@ -162,33 +160,52 @@ def plot_metric_comparison(
     Create scatter plots comparing pairs of quantum metrics.
     
     Parameters:
-        metrics: Dictionary of metric names to lists of values
-        metric_pairs: List of metric name pairs to compare
+        states: List of quantum states to analyze
+        metric_pairs: List of metric name pairs to compare (e.g., [('vn_entropy', 'l1_coherence')])
         title: Optional plot title
-        figsize: Figure size tuple
-        
+        figsize: Figure size tuple (width, height)
+    
     Returns:
-        matplotlib Figure object
+        plt.Figure: Matplotlib figure containing the comparison plots
     """
     set_style()
-    n_pairs = len(metric_pairs)
-    fig, axes = plt.subplots(1, n_pairs, figsize=figsize)
-    if n_pairs == 1:
+    
+    # Calculate metrics from states
+    metrics = {}
+    metric_names = set([m for pair in metric_pairs for m in pair])
+    for metric in metric_names:
+        metrics[metric] = []
+    
+    initial_state = states[0]  # Use first state as reference
+    for state in states:
+        analysis_results = run_analyses(initial_state, state)
+        for metric in metric_names:
+            metrics[metric].append(analysis_results[metric])
+    
+    # Create comparison plots
+    fig, axes = plt.subplots(1, len(metric_pairs), figsize=figsize)
+    if len(metric_pairs) == 1:
         axes = [axes]
     
-    # Create scatter plots
     for ax, (metric1, metric2) in zip(axes, metric_pairs):
-        print(metrics)
-        ax.scatter(metrics[metric1], metrics[metric2],
-                  alpha=0.6)
-        
-        configure_axis(ax,
-                      title=f'{metric1.replace("_", " ").title()} vs\n{metric2.replace("_", " ").title()}',
-                      xlabel=metric1.replace('_', ' ').title(),
-                      ylabel=metric2.replace('_', ' ').title())
+        if metric1 in metrics and metric2 in metrics:
+            ax.scatter(
+                metrics[metric1],
+                metrics[metric2],
+                alpha=0.6,
+                color=COLORS['primary']
+            )
+            ax.set_xlabel(metric1.replace('_', ' ').title())
+            ax.set_ylabel(metric2.replace('_', ' ').title())
+            
+            # Add correlation coefficient
+            corr = np.corrcoef(metrics[metric1], metrics[metric2])[0, 1]
+            ax.text(0.05, 0.95, f'ρ = {corr:.2f}',
+                   transform=ax.transAxes,
+                   verticalalignment='top')
     
     if title:
-        fig.suptitle(title, fontsize=14, y=1.05)
+        fig.suptitle(title)
     
     fig.tight_layout()
     return fig
@@ -298,7 +315,7 @@ def plot_metric_distribution(
         axes = [axes]
     
     # Create distribution plots
-    colors = iter(get_color_cycle())
+    colors = itertools.cycle(get_color_cycle())  # Use itertools.cycle to prevent StopIteration
     for ax, (metric, values) in zip(axes, metrics.items()):
         # For small datasets, use fewer bins
         n_points = len(values)
@@ -312,6 +329,49 @@ def plot_metric_distribution(
                       title=metric.replace('_', ' ').title(),
                       xlabel='Value',
                       ylabel='Count')
+    
+    if title:
+        fig.suptitle(title, fontsize=14, y=1.05)
+    
+    fig.tight_layout()
+    return fig
+
+def plot_quantum_metrics(metrics: Dict[str, List[float]], title: Optional[str] = None) -> plt.Figure:
+    """
+    Create a comprehensive visualization of quantum metrics.
+    
+    Parameters:
+        metrics: Dictionary of metric names to lists of values
+        title: Optional plot title
+        
+    Returns:
+        matplotlib Figure object containing the metric plots
+    """
+    set_style()
+    
+    # Create a grid of subplots based on number of metrics
+    n_metrics = len(metrics)
+    n_cols = min(3, n_metrics)  # Max 3 columns
+    n_rows = (n_metrics + n_cols - 1) // n_cols
+    
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(5*n_cols, 4*n_rows))
+    if n_metrics == 1:
+        axes = np.array([axes])
+    axes = axes.flatten()
+    
+    # Plot each metric
+    colors = get_color_cycle()
+    for ax, ((metric_name, values), color) in zip(axes, zip(metrics.items(), colors)):
+        ax.plot(range(len(values)), values, color=color, label=metric_name)
+        configure_axis(ax,
+                      title=metric_name.replace('_', ' ').title(),
+                      xlabel='Time Step',
+                      ylabel='Value')
+        ax.legend()
+    
+    # Hide empty subplots if any
+    for ax in axes[n_metrics:]:
+        ax.set_visible(False)
     
     if title:
         fig.suptitle(title, fontsize=14, y=1.05)

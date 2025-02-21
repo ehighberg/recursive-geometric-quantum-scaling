@@ -257,7 +257,7 @@ def main():
             analyze_simulation_results(result, mode)
             
         with tab4:
-            display_experiment_summary(result, mode)
+            display_experiment_summary(result)
             
             # Add export options
             st.subheader("Export Options")
