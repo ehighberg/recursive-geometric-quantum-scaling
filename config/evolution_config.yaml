@@ -27,3 +27,36 @@ noise:
     enabled: false
     nth: 0.1  # Average thermal photon number
     rate: 0.01  # Coupling rate
+
+# Fractal analysis configuration
+fractal:
+  # Energy spectrum analysis parameters
+  energy_spectrum:
+    f_s_range: [0.0, 10.0]  # Range for scaling parameter f_s
+    resolution: 100         # Number of points in f_s sweep
+    correlation_threshold: 0.8  # Threshold for detecting self-similar regions
+    window_size: 20        # Size of window for correlation analysis
+
+  # Wavefunction zoom parameters
+  wavefunction_zoom:
+    default_windows: [[0.2, 0.4], [0.6, 0.8]]  # Default zoom regions [x1, x2]
+    std_dev_threshold: 0.1  # Threshold for automatic region detection
+    zoom_factor: 2.0       # Magnification factor for inset plots
+
+  # Fractal dimension analysis parameters
+  fractal_dimension:
+    recursion_depths: [1, 2, 3, 4, 5]  # Depths to analyze
+    fit_parameters:
+      box_size_range: [0.001, 1.0]  # Range for box counting
+      points: 5                      # Number of box size points
+    theoretical_dimension: 1.5       # Expected theoretical dimension (if known)
+    confidence_level: 0.95          # For error bar calculation
+
+  # Visualization settings
+  visualization:
+    dpi: 300               # Resolution for saved figures
+    scaling_function_text: "D(n) ~ n^(-α)"  # LaTeX-compatible annotation
+    color_scheme:
+      primary: "#1f77b4"   # Main plot color
+      accent: "#ff7f0e"    # Highlight color
+      error_bars: "#2ca02c"  # Error bar color

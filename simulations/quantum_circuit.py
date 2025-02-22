@@ -3,12 +3,30 @@ Quantum circuit implementations using qutip and qutip-qip.
 """
 
 import numpy as np
-from constants import PHI
-from qutip import Qobj, ket2dm, mesolve, Options, basis, sigmax, sigmay, sigmaz
+from typing import List, Optional
+from qutip import Qobj, ket2dm, mesolve, Options, sigmax, sigmaz
 from qutip_qip.circuit import QubitCircuit
 from qutip_qip.noise import Noise
 from qutip_qip.operations import Gate
 from .config import load_config
+
+class EvolutionResult:
+    """Result object for quantum evolution containing states and times."""
+    def __init__(self, states: List[Qobj], times: List[float]):
+        self.states = states
+        self.times = times
+        self.eigenvalues: Optional[np.ndarray] = None
+        
+    @property
+    def dims(self):
+        """Get dimensions of the final state."""
+        if self.states and len(self.states) > 0:
+            return self.states[-1].dims
+        return None
+    
+    def full(self):
+        """Get the final state."""
+        return self.states[-1] if self.states else None
 
 class QuantumCircuit:
     """
@@ -50,10 +68,7 @@ class StandardCircuit(QuantumCircuit):
         # Initialize noise channels
         noise_config = self.config.get('noise', {})
         self._noise = Noise(noise_config)
-        base_c_ops = c_ops if c_ops is not None else self.config.get('c_ops', [])
-        #TODO: Generate noise collapse operators
-        # noise_c_ops = self._noise.get_collapse_operators(base_hamiltonian.shape[0])
-        self.c_ops = base_c_ops # + noise_c_ops
+        self.c_ops = c_ops if c_ops is not None else self.config.get('c_ops', [])
         
     @property
     def noise(self):
@@ -72,13 +87,18 @@ class StandardCircuit(QuantumCircuit):
         else:
             rho0 = initial_state
         
-        result = mesolve(
+        mesolve_result = mesolve(
             self.base_hamiltonian,
             rho0,
             tlist,
             c_ops=[],  # No collapse operators for closed evolution
-            options=Options(store_states=True)
+            options=Options(store_states=True, store_final_state=True)
         )
+        
+        # Create our EvolutionResult
+        result = EvolutionResult(mesolve_result.states, tlist)
+        result.eigenvalues = self.base_hamiltonian.eigenenergies()
+        
         return result
 
     def evolve_open(self, initial_state):
@@ -92,13 +112,16 @@ class StandardCircuit(QuantumCircuit):
         else:
             rho0 = initial_state
         
-        result = mesolve(
+        mesolve_result = mesolve(
             self.base_hamiltonian,
             rho0,
             tlist,
             self.c_ops,
             options=Options(store_states=True)
         )
+        
+        # Create our EvolutionResult
+        result = EvolutionResult(mesolve_result.states, tlist)
         return result
 
 class ScaledCircuit(QuantumCircuit):
@@ -116,6 +139,20 @@ class ScaledCircuit(QuantumCircuit):
         """Get Hamiltonian scaled by phi^step_idx."""
         scale = (self.scale_factor ** step_idx)
         return scale * self.base_hamiltonian
+    
+    def scale_unitary(self, step_idx):
+        """
+        Get the unitary operator for a given scaling step.
+        
+        Args:
+            step_idx (int): The scaling step index
+            
+        Returns:
+            Qobj: The scaled unitary operator
+        """
+        H_scaled = self.get_scaled_hamiltonian(step_idx)
+        dt = 1.0  # Unit time step
+        return (-1j * dt * H_scaled).expm()
     
     def evolve_closed(self, initial_state, n_steps=None):
         """
@@ -148,9 +185,7 @@ class ScaledCircuit(QuantumCircuit):
             current_time += dt
             times.append(current_time)
         
-        result = type('EvolutionResult', (), {})()
-        result.states = states
-        result.times = times
+        result = EvolutionResult(states, times)
         return result
 
     def evolve_open(self, initial_state, n_steps=None):
@@ -168,13 +203,16 @@ class ScaledCircuit(QuantumCircuit):
         # Build effective Hamiltonian
         H_eff = sum(self.get_scaled_hamiltonian(idx) for idx in range(steps))
         
-        result = mesolve(
+        mesolve_result = mesolve(
             H_eff,
             rho0,
             tlist,
             self.c_ops,
             options=Options(store_states=True)
         )
+        
+        # Create our EvolutionResult
+        result = EvolutionResult(mesolve_result.states, tlist)
         return result
 
 class FibonacciBraidingCircuit(QuantumCircuit):
@@ -201,9 +239,7 @@ class FibonacciBraidingCircuit(QuantumCircuit):
         - result: Evolution result containing states and times
         """
         # Create result object to match other evolution methods
-        result = type('EvolutionResult', (), {})()
-        
-        # Store initial state
+        # Store states and times
         states = [initial_state]
         times = [0.0]
         
@@ -217,6 +253,5 @@ class FibonacciBraidingCircuit(QuantumCircuit):
             states.append(current_state)
             times.append(float(i + 1))
         
-        result.states = states
-        result.times = times
+        result = EvolutionResult(states, times)
         return result

@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 # Third-party imports
 import numpy as np
 import streamlit as st
+from analyses.fractal_analysis import compute_energy_spectrum, load_fractal_config
 from analyses.visualization.state_plots import (
     plot_state_evolution,
     plot_bloch_sphere,
@@ -23,6 +24,11 @@ from analyses.visualization.metric_plots import (
     plot_metric_comparison,
     plot_metric_distribution,
     plot_noise_metrics
+)
+from analyses.visualization.fractal_plots import (
+    plot_energy_spectrum,
+    plot_wavefunction_profile,
+    plot_fractal_dimension
 )
 
 # Local imports
@@ -111,6 +117,46 @@ def main():
             noise_config['measurement'] = st.slider("Measurement Noise Rate", 0.0, 0.1, 0.0, 0.001)
             params['noise_config'] = noise_config
     
+        # Fractal analysis configuration in expandable section
+        with st.expander("Fractal Analysis Configuration"):
+            st.markdown("**Energy Spectrum Settings**")
+            energy_spectrum = {
+                'f_s_range': list(st.slider("f_s Range", 0.0, 10.0, (0.0, 5.0))),
+                'resolution': st.slider("Resolution", 50, 500, 100),
+                'correlation_threshold': st.slider("Self-similarity Threshold", 0.5, 1.0, 0.8),
+                'window_size': st.slider("Window Size", 10, 50, 20)
+            }
+            
+            st.markdown("**Wavefunction Analysis Settings**")
+            wavefunction_zoom = {
+                'zoom_factor': st.slider("Zoom Factor", 1.0, 5.0, 2.0),
+                'std_dev_threshold': st.slider("Region Detection Threshold", 0.01, 1.0, 0.1)
+            }
+            
+            st.markdown("**Fractal Dimension Settings**")
+            fractal_dimension = {
+                'recursion_depths': list(range(1, 6)),
+                'fit_parameters': {
+                    'box_size_range': [0.001, 1.0],
+                    'points': st.slider("Box Count Points", 5, 100, 50)
+                },
+                'theoretical_dimension': 1.5,
+                'confidence_level': 0.95
+            }
+            
+            # Store fractal analysis settings in params
+            params['fractal_config'] = {
+                'fractal': {
+                    'energy_spectrum': energy_spectrum,
+                    'wavefunction_zoom': wavefunction_zoom,
+                    'fractal_dimension': fractal_dimension,
+                    'visualization': {
+                        'dpi': 300,
+                        'scaling_function_text': "D(n) ~ n^(-α)",
+                        'color_scheme': {'primary': "#1f77b4", 'accent': "#ff7f0e", 'error_bars': "#2ca02c"}
+                    }
+                }}
+        
     # Main content area
     if 'simulation_results' not in st.session_state:
         st.session_state['simulation_results'] = None
@@ -160,17 +206,19 @@ def main():
         result = st.session_state['simulation_results']
         
         # Create tabs for different views
-        tab1, tab2, tab3, tab4 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "State Evolution",
             "Noise Analysis",
             "Quantum Metrics",
+            "Fractal Analysis",
             "Raw Data"
         ])
             
         with tab1:
             st.subheader("State Evolution")
             # Check if result has states and times
-            if hasattr(result, 'states') and hasattr(result, 'times') and result.states and result.times:
+            if (hasattr(result, 'states') and hasattr(result, 'times') and 
+                len(result.states) > 0 and len(result.times) > 0):
                 # Plot state evolution with populations and phases
                 fig_evolution = plot_state_evolution(
                     result.states,
@@ -256,7 +304,38 @@ def main():
         with tab3:
             analyze_simulation_results(result, mode)
             
+        # New Fractal Analysis tab
         with tab4:
+            st.header("Fractal Analysis")
+            
+            config = params.get('fractal_config', {'fractal': {}})
+  # Get config from params
+
+            if hasattr(result, 'hamiltonian'):
+                st.subheader("Energy Spectrum Analysis")
+                
+                parameter_values, energies, analysis = compute_energy_spectrum(
+                    result.hamiltonian,
+                    config=config,
+                    eigen_index=0
+                )
+                fig_spectrum = plot_energy_spectrum(parameter_values, energies, analysis)
+                st.pyplot(fig_spectrum)
+            else:
+                st.info("No Hamiltonian available for energy spectrum analysis.")
+            
+            st.subheader("Wavefunction Profile Analysis")
+            if hasattr(result, 'states') and result.states:
+                fig_wavefunction = plot_wavefunction_profile(
+                    result.states[-1],
+                    x_array=np.linspace(0, 1, 100),
+                    config=config
+                )
+                st.pyplot(fig_wavefunction)
+            else:
+                st.info("No quantum states available for wavefunction analysis.")
+        
+        with tab5:
             display_experiment_summary(result)
             
             # Add export options
