@@ -3,14 +3,14 @@ Pulse duration optimization using qutip's control optimization features.
 """
 
 import numpy as np
-from qutip import Qobj, sesolve, mesolve, basis, sigmax, sigmay, sigmaz
-from qutip.control import optimize_pulse_unitary
-from qutip_qip.compiler import GateCompiler
+from qutip import Qobj, sesolve, mesolve, sigmax, sigmaz
+from qutip import basis, sigmay  # Used only in specific functions
+from qutip_qip.pulse import Pulse
 from qutip_qip.circuit import QubitCircuit
 
 def optimize_pulse_duration(target_unitary, max_time=10.0, num_tslots=100, noise_rate=0.0):
     """
-    Optimize pulse duration for a target unitary operation.
+    Optimize pulse duration for a target unitary operation using direct pulse evolution.
     
     Parameters:
     - target_unitary (Qobj): Target unitary operation
@@ -19,38 +19,50 @@ def optimize_pulse_duration(target_unitary, max_time=10.0, num_tslots=100, noise
     - noise_rate (float): Rate of noise to include in optimization
     
     Returns:
-    - result: Optimization result containing optimal pulses
+    - result: Dictionary containing optimized pulse parameters and fidelity
     """
     # System Hamiltonian
     H_d = sigmaz()  # Drift Hamiltonian
     H_c = [sigmax(), sigmay()]  # Control Hamiltonians
     
-    # Initial pulse guess (constant amplitude)
-    initial_pulses = [np.ones(num_tslots) for _ in H_c]
-    
     # Time slots
-    tslots = np.linspace(0, max_time, num_tslots)
+    tlist = np.linspace(0, max_time, num_tslots)
     
-    # Optimize pulse
+    # Create initial coefficients (constant amplitude)
+    coeffs = [np.ones(num_tslots) for _ in H_c]
+    
+    # Create pulse with initial constant amplitudes
+    pulse = Pulse(
+        H_d,  # Target Hamiltonian
+        [0],  # Target qubits (as positional argument)
+        tlist=tlist,  # Time points
+        coeff=coeffs  # Control coefficients
+    )
+    
+    # Create QobjEvo for evolution
+    H_total = H_d
+    for h_c, coeff in zip(H_c, coeffs):
+        H_total += h_c * coeff[0]  # Use first coefficient as initial
+    
+    # Include noise if specified
+    c_ops = []
     if noise_rate > 0:
-        # Include noise operators in optimization
         c_ops = [np.sqrt(noise_rate) * sigmax()]
-        result = optimize_pulse_unitary(
-            H_d, H_c, target_unitary,
-            num_tslots=num_tslots,
-            evo_time=max_time,
-            initial_pulses=initial_pulses,
-            c_ops=c_ops
-        )
-    else:
-        result = optimize_pulse_unitary(
-            H_d, H_c, target_unitary,
-            num_tslots=num_tslots,
-            evo_time=max_time,
-            initial_pulses=initial_pulses
-        )
     
-    return result
+    # Evolve the system
+    result = sesolve(H_total, basis(2, 0), tlist, c_ops=c_ops)
+    U = result.states[-1]
+    
+    # Calculate fidelity
+    fidelity = abs((target_unitary.dag() * U).tr()) / target_unitary.shape[0]
+    
+    return {
+        'final_unitary': U,
+        'fidelity': fidelity,
+        'pulse': pulse,
+        'coeffs': coeffs,
+        'tlist': tlist
+    }
 
 def simulate_pulse_duration(pulse_rate=0.1, noise_rate=0.0):
     """
@@ -106,14 +118,14 @@ def get_optimal_duration(target_gate, max_time=10.0, num_tslots=100, fidelity_th
     
     for T in durations:
         result = optimize_pulse_duration(target_U, max_time=T, num_tslots=num_tslots)
-        fidelity = result.fidelity
         results.append({
             'duration': T,
-            'fidelity': fidelity,
-            'pulses': result.final_amps
+            'fidelity': result['fidelity'],
+            'pulses': result['coeffs']
         })
         
-        if fidelity >= fidelity_threshold:
+        current_fidelity = result['fidelity']
+        if current_fidelity >= fidelity_threshold:
             break
     
     # Find best result
@@ -151,7 +163,7 @@ def analyze_duration_scaling(target_gate, scaling_factors, base_duration=1.0):
         result = optimize_pulse_duration(target_U, max_time=T)
         
         results['durations'].append(T)
-        results['fidelities'].append(result.fidelity)
-        results['pulse_shapes'].append(result.final_amps)
+        results['fidelities'].append(result['fidelity'])
+        results['pulse_shapes'].append(result['coeffs'])
     
     return results

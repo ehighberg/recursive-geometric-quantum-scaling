@@ -4,7 +4,7 @@ import pytest
 import numpy as np
 from qutip import Qobj, basis, expect, sigmax, sigmay, sigmaz
 from simulations.quantum_state import (
-    state_zero, state_one, state_plus, state_ghz, state_w,
+    state_zero, state_plus, state_ghz, state_w,
     positivity_projection, fib_anyon_state_2d
 )
 

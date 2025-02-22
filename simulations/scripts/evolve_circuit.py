@@ -5,16 +5,10 @@
 Circuit-based approach using qutip-qip features for multi-qubit and braiding operations.
 """
 
-import sys
-import os
-# Add the project root to the Python path to ensure modules can be found
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-
-from qutip import sigmaz, sigmax, qeye, tensor, basis, Options
-from qutip_qip.circuit import QubitCircuit
+import numpy as np
+from qutip import sigmaz, sigmax, qeye, tensor, basis
 from simulations.quantum_state import state_zero, fib_anyon_state_2d
 from simulations.quantum_circuit import StandardCircuit, ScaledCircuit, FibonacciBraidingCircuit
-from simulations.amplitude_scaling import get_pulse_sequence
 
 def run_standard_twoqubit_circuit(noise_config=None):
     """
@@ -33,14 +27,6 @@ def run_standard_twoqubit_circuit(noise_config=None):
     # Create circuit
     circ = StandardCircuit(H0, total_time=5.0, n_steps=50)
     
-    # Add some standard gates
-    qc = QubitCircuit(2)
-    qc.add_gate("CNOT", controls=0, targets=1)
-    qc.add_gate("RX", targets=[1], arg_value=0.5)
-    
-    # Get pulse sequence for the gates
-    H_list, coeff_list, tlist = get_pulse_sequence(H0, total_time=5.0, steps=50)
-    
     # Initialize state
     psi_init = state_zero(num_qubits=2)
     
@@ -49,6 +35,11 @@ def run_standard_twoqubit_circuit(noise_config=None):
         result = circ.evolve_open(psi_init)
     else:
         result = circ.evolve_closed(psi_init)
+    
+    # Store Hamiltonian function for fractal analysis
+    def hamiltonian(f_s):
+        return f_s * H0
+    result.hamiltonian = hamiltonian
     
     return result
 
@@ -70,11 +61,6 @@ def run_phi_scaled_twoqubit_circuit(scaling_factor=1.0, noise_config=None):
     # Create circuit with scaling
     pcirc = ScaledCircuit(H0, scaling_factor=scaling_factor)
     
-    # Add scaled gates
-    qc = QubitCircuit(2)
-    qc.add_gate("CNOT", controls=0, targets=1)
-    qc.add_gate("RX", targets=[1], arg_value=0.5 * scaling_factor)
-    
     # Initialize state
     psi_init = state_zero(num_qubits=2)
     
@@ -84,16 +70,20 @@ def run_phi_scaled_twoqubit_circuit(scaling_factor=1.0, noise_config=None):
     else:
         result = pcirc.evolve_closed(psi_init, n_steps=5)
     
+    # Store Hamiltonian function for fractal analysis
+    def hamiltonian(f_s):
+        return f_s * H0
+    result.hamiltonian = hamiltonian
+    
     return result
 
 def run_fibonacci_braiding_circuit():
-    # TODO: Implement Fibonacci braiding circuit using variable parameters from app
     """
     Fibonacci anyon braiding circuit in 2D subspace.
     Uses B1, B2 braid operators with qutip-qip gate compilation.
     
     Returns:
-    - psi_final: Final state after braiding operations
+    - result: Evolution result containing states and times
     """
     from simulations.scripts.fibonacci_anyon_braiding import braid_b1_2d, braid_b2_2d
     
@@ -110,9 +100,15 @@ def run_fibonacci_braiding_circuit():
     
     # Initialize state and evolve
     psi_init = fib_anyon_state_2d()
-    psi_final = fib_circ.evolve(psi_init)
+    result = fib_circ.evolve(psi_init)
     
-    return psi_final
+    # Store Hamiltonian function for fractal analysis
+    def hamiltonian(f_s):
+        # Scale both braid operators by f_s
+        return f_s * (B1_2 + B2_2)
+    result.hamiltonian = hamiltonian
+    
+    return result
 
 def analyze_circuit_noise_effects(circuit_type="standard", noise_rates=None):
     """
@@ -138,19 +134,22 @@ def analyze_circuit_noise_effects(circuit_type="standard", noise_rates=None):
     psi_init = state_zero(num_qubits=2)
     
     for rate in noise_rates:
-        # Configure noise
-        noise_config = {
-            'relaxation': rate,
-            'dephasing': rate,
-            'thermal': 0.0,
-            'measurement': 0.0
-        }
+        # Configure noise collapse operators
+        if rate > 0:
+            # Add dephasing noise on first qubit
+            c_ops = [np.sqrt(rate) * tensor(sigmaz(), qeye(2))]
+            noise_config = {'c_ops': c_ops}
+        else:
+            noise_config = None
         
         # Run circuit with noise
         if circuit_type == "standard":
             result = run_standard_twoqubit_circuit(noise_config=noise_config)
         else:
-            result = run_phi_scaled_twoqubit_circuit(noise_config=noise_config)
+            result = run_phi_scaled_twoqubit_circuit(
+                scaling_factor=1.0,
+                noise_config=noise_config
+            )
         
         # Calculate fidelity with initial state
         final_state = result.states[-1]
@@ -183,11 +182,6 @@ def run_quantum_gate_circuit(circuit_type="Single Qubit", optimization=None, noi
         # Create circuit
         circ = StandardCircuit(H0, total_time=5.0, n_steps=50)
         
-        # Add single qubit gates
-        qc = QubitCircuit(1)
-        qc.add_gate("RX", targets=[0], arg_value=0.5)
-        qc.add_gate("RY", targets=[0], arg_value=0.3)
-        
         # Initialize state
         psi_init = basis([2], 0)
         
@@ -204,14 +198,9 @@ def run_quantum_gate_circuit(circuit_type="Single Qubit", optimization=None, noi
     # Apply optimization if specified
     if optimization and optimization != "None":
         if optimization == "GRAPE":
-            # Add GRAPE optimization
-            opts = Options(max_step=1000, accuracy_factor=1e-3)
-            # ... implement GRAPE optimization ...
-            pass
+            raise NotImplementedError("GRAPE optimization not yet implemented")
         elif optimization == "CRAB":
-            # Add CRAB optimization
-            # ... implement CRAB optimization ...
-            pass
+            raise NotImplementedError("CRAB optimization not yet implemented")
         
     # Evolve with or without noise
     if noise_config:
@@ -219,18 +208,23 @@ def run_quantum_gate_circuit(circuit_type="Single Qubit", optimization=None, noi
     else:
         result = circ.evolve_closed(psi_init)
     
+    # Store Hamiltonian function for fractal analysis
+    def hamiltonian(f_s):
+        return f_s * H0
+    result.hamiltonian = hamiltonian
+    
     return result
 
 if __name__ == "__main__":
     # Example usage
     res_std = run_standard_twoqubit_circuit()
-    print("Standard 2Q final:", res_std.states[-1])
+    print("Standard 2Q final state:", res_std.states[-1])
     
     res_phi = run_phi_scaled_twoqubit_circuit()
-    print("Scaled 2Q final:", res_phi.states[-1])
+    print("Scaled 2Q final state:", res_phi.states[-1])
     
-    fib_final = run_fibonacci_braiding_circuit()
-    print("Fibonacci braiding final:", fib_final)
+    fib_result = run_fibonacci_braiding_circuit()
+    print("Fibonacci braiding final state:", fib_result.states[-1])
     
     # Analyze noise effects
     noise_analysis = analyze_circuit_noise_effects()
