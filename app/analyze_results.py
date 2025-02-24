@@ -28,97 +28,7 @@ from analyses.visualization.metric_plots import (
 )
 from analyses import run_analyses
 
-def analyze_quantum_simulation(result, output_dir: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Comprehensive analysis of quantum simulation results, generating
-    visualizations and computing key metrics.
-    
-    Parameters:
-    -----------
-    result : SimulationResult
-        Result object from quantum simulation containing states and metrics
-    output_dir : Optional[str]
-        Directory to save visualization outputs. If None, uses current directory.
-    
-    Returns:
-    --------
-    Dict[str, Any]
-        Dictionary containing analysis results and paths to generated visualizations
-    """
-    if output_dir:
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
-    
-    # Load fractal analysis configuration
-    config = load_fractal_config()
-    
-    # Generate core visualizations
-    parameter_values = np.linspace(0, 1, 100)  # Default range for f_s
-    if hasattr(result, 'parameter_values'):
-        parameter_values = result.parameter_values
-   # Compute energy spectrum
-    energies, analysis = compute_energy_spectrum(
-        lambda f_s: result.hamiltonian(f_s) if hasattr(result, 'hamiltonian') else None,
-        config=config
-    ) if hasattr(result, 'hamiltonian') else (None, None)
-    
-    if energies is not None:
-        energy_plot = plot_energy_spectrum(
-            parameter_values,
-            energies,
-            analysis,
-            parameter_name="f_s"
-        )
-    else:
-        energy_plot = None
-    
-    # Get final state for analysis
-    if hasattr(result, 'states') and result.states:
-        final_state = result.states[-1]
-    else:
-        final_state = result if isinstance(result, Qobj) else None
-    
-    wavefunction_plot = plot_wavefunction_profile(
-        result.wavefunction,
-        config=config
-    )
-    
-    fractal_plot = plot_fractal_dimension(
-        result.recursion_depths,
-        result.fractal_dimensions,
-        error_bars=getattr(result, 'dimension_errors', None),
-        config=config
-    )
-    
-    state_plot = plot_state_evolution(result.states, result.times)
-    
-    # Save visualizations
-    plot_paths = {}
-    for name, plot in [
-        ('energy_spectrum', energy_plot),
-        ('wavefunction_profile', wavefunction_plot),
-        ('fractal_dimension', fractal_plot),
-        ('state_evolution', state_plot)
-    ]:
-        path = f"{output_dir + '/' if output_dir else ''}{name}.png"
-        plot.savefig(path)
-        plot_paths[name] = path
-        plt.close(plot)
-    
-    # Compute quantum metrics
-    metrics = run_analyses(result.states[0], result.states[-1])
-    
-    return {
-        'metrics': metrics,
-        'visualizations': plot_paths,
-        'final_state': str(final_state) if final_state else None,
-        'fractal_analysis': {
-            'energy_spectrum': energies is not None,
-            'wavefunction_profile': final_state is not None,
-            'fractal_dimension': hasattr(result, 'fractal_dimensions')
-        }
-    }
-
-def analyze_simulation_results(result, mode: str = "Evolution"):  # Added mode parameter with default
+def analyze_simulation_results(result, mode: str = "Evolution"):
     """
     Analyze and visualize simulation results.
     
@@ -128,8 +38,10 @@ def analyze_simulation_results(result, mode: str = "Evolution"):  # Added mode p
     """
     if not result:
         st.warning("No simulation results to analyze. Please run a simulation first.")
-        return   
+        return
+        
     st.header("Quantum Metrics")
+    
     # Handle both time evolution results and single-state results
     if hasattr(result, 'states') and result.states:
         states = result.states
@@ -145,8 +57,9 @@ def analyze_simulation_results(result, mode: str = "Evolution"):  # Added mode p
         return
 
     # Create tabs for different analyses
-    metrics_tab, evolution_tab, fractal_tab = st.tabs(["Quantum Metrics", "State Evolution", "Fractal Analysis"])
-    
+    tab_names = ["Quantum Metrics", "State Evolution", "Fractal Analysis", "Topological Analysis"]
+    metrics_tab, evolution_tab, fractal_tab, topo_tab = st.tabs(tab_names)
+
     if len(states) > 1:
         # Calculate metrics for all states
         metrics = {}
@@ -163,32 +76,26 @@ def analyze_simulation_results(result, mode: str = "Evolution"):  # Added mode p
         with metrics_tab:
             st.subheader("Quantum Metrics Evolution")
             # Metric evolution plot
-            fig_metrics = plot_metric_evolution(
-                states,
-                times,
-    
-            title=f"Metrics Evolution - {mode}"
-            )
+            fig_metrics = plot_metric_evolution(states, times, title=f"Metrics Evolution - {mode}")
             st.pyplot(fig_metrics)
+            
             # Metric comparisons
             st.subheader("Metric Correlations")
             fig_comparison = plot_metric_comparison(
-               states,
-               metric_pairs=[
+                states,
+                metric_pairs=[
                     ('vn_entropy', 'l1_coherence'),
                     ('vn_entropy', 'negativity'),
                     ('l1_coherence', 'negativity'),
                     ('purity', 'fidelity')
                 ],
                 title="Metric Correlations"
-           )
+            )
             st.pyplot(fig_comparison)
+            
             # Metric distributions
             st.subheader("Metric Distributions")
-            fig_dist = plot_metric_distribution(
-                metrics,
-                title="Metric Distributions"
-            )
+            fig_dist = plot_metric_distribution(metrics, title="Metric Distributions")
             st.pyplot(fig_dist)
             
         with evolution_tab:
@@ -229,6 +136,32 @@ def analyze_simulation_results(result, mode: str = "Evolution"):  # Added mode p
                 st.pyplot(fig_dimension)
             else:
                 st.info("No fractal dimension data available. Run a fractal analysis first.")
+
+        with topo_tab:
+            st.subheader("Topological Analysis")
+            if mode == "Topological Braiding":
+                # Display topological invariants
+                if hasattr(result, 'chern_number'):
+                    st.metric("Chern Number", result.chern_number)
+                if hasattr(result, 'winding_number'):
+                    st.metric("Winding Number", result.winding_number)
+                if hasattr(result, 'z2_index'):
+                    st.metric("Z₂ Index", result.z2_index)
+                
+                # Display combined metrics
+                if hasattr(result, 'fractal_chern_correlation'):
+                    st.metric("Fractal-Chern Correlation", result.fractal_chern_correlation)
+                if hasattr(result, 'protection_dimension'):
+                    st.metric("Protection Dimension", result.protection_dimension)
+                
+                # Add interactive controls
+                time_range = st.slider("Time Range", min_value=float(times[0]), max_value=float(times[-1]))
+                
+                # Add export functionality
+                if hasattr(result, 'computation_times'):
+                    total_time = sum(result.computation_times.values())
+                    st.metric("Computation Time", f"{total_time:.2f}s")
+                    st.download_button("Export Analysis Results", data=str(result.__dict__), file_name="topological_analysis.txt")
                 
     else:
         # For single-state results, show metrics as cards
@@ -245,8 +178,7 @@ def analyze_simulation_results(result, mode: str = "Evolution"):  # Added mode p
         with col5:
             st.metric("Fidelity", f"{analysis_results['fidelity']:.4f}")
 
-
-def display_experiment_summary(result):  # Removed unused mode parameter
+def display_experiment_summary(result):
     """
     Display a summary of the experiment setup and results.
     """

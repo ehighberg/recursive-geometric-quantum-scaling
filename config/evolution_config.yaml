@@ -33,24 +33,28 @@ fractal:
   # Energy spectrum analysis parameters
   energy_spectrum:
     f_s_range: [0.0, 10.0]  # Range for scaling parameter f_s
-    resolution: 100         # Number of points in f_s sweep
-    correlation_threshold: 0.8  # Threshold for detecting self-similar regions
-    window_size: 20        # Size of window for correlation analysis
+    resolution: 200         # Increased resolution for better sampling
+    correlation_threshold: 0.7  # Lowered threshold for better detection
+    window_size: 30        # Increased window size for better statistics
 
   # Wavefunction zoom parameters
   wavefunction_zoom:
     default_windows: [[0.2, 0.4], [0.6, 0.8]]  # Default zoom regions [x1, x2]
-    std_dev_threshold: 0.1  # Threshold for automatic region detection
-    zoom_factor: 2.0       # Magnification factor for inset plots
+    std_dev_threshold: 0.05  # Lowered threshold for better region detection
+    zoom_factor: 4.0       # Increased magnification for better detail
 
   # Fractal dimension analysis parameters
   fractal_dimension:
-    recursion_depths: [1, 2, 3, 4, 5]  # Depths to analyze
+    recursion_depths: [1, 2, 3, 4, 5, 6, 7]  # Added more depths
     fit_parameters:
-      box_size_range: [0.001, 1.0]  # Range for box counting
-      points: 5                      # Number of box size points
-    theoretical_dimension: 1.5       # Expected theoretical dimension (if known)
+      box_size_range: [0.0001, 1.0]  # Extended range for better scaling
+      points: 50                      # Increased points for better statistics
+    threshold_factor: 0.1            # Added threshold factor for box counting
+    min_points: 5                    # Minimum points for valid fit
+    theoretical_dimension: 1.5       # Expected theoretical dimension
     confidence_level: 0.95          # For error bar calculation
+    use_weighted_fit: true          # Enable weighted fitting
+    outlier_threshold: 2.0          # Standard deviations for outlier removal
 
   # Visualization settings
   visualization:
@@ -60,3 +64,6 @@ fractal:
       primary: "#1f77b4"   # Main plot color
       accent: "#ff7f0e"    # Highlight color
       error_bars: "#2ca02c"  # Error bar color
+    show_error_bars: true  # Always show error bars
+    plot_fit_line: true    # Show regression line
+    show_confidence_band: true  # Show confidence intervals

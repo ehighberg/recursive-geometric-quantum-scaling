@@ -206,11 +206,12 @@ def main():
         result = st.session_state['simulation_results']
         
         # Create tabs for different views
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
             "State Evolution",
             "Noise Analysis",
             "Quantum Metrics",
             "Fractal Analysis",
+            "Topological Analysis",
             "Raw Data"
         ])
             
@@ -309,7 +310,7 @@ def main():
             st.header("Fractal Analysis")
             
             config = params.get('fractal_config', {'fractal': {}})
-  # Get config from params
+            # Get config from params
 
             if hasattr(result, 'hamiltonian'):
                 st.subheader("Energy Spectrum Analysis")
@@ -336,21 +337,30 @@ def main():
                 st.info("No quantum states available for wavefunction analysis.")
         
         with tab5:
-            display_experiment_summary(result)
-            
-            # Add export options
-            st.subheader("Export Options")
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if st.button("Download Raw Data"):
-                    # TODO: Implement data export functionality
-                    st.info("Data export functionality coming soon!")
-            
-            with col2:
-                if st.button("Download Metrics"):
-                    # TODO: Implement metrics export
-                    st.info("Metrics export functionality coming soon!")
+            st.header("Topological Analysis")
+            control_range = st.slider("Topological Control Parameter Range", 0.0, 10.0, (0.0, 5.0))
+            from analyses.topology_plots import plot_invariants, plot_protection_metrics
+            # Generate invariant plot using placeholder functions
+            fig_invariants = plot_invariants(control_range)
+            st.pyplot(fig_invariants)
+            # For demonstration, generate dummy protection metrics data
+            x_demo = np.linspace(control_range[0], control_range[1], 100)
+            energy_gaps = np.abs(np.sin(x_demo))
+            localization_measures = np.abs(np.cos(x_demo))
+            fig_protection = plot_protection_metrics(control_range, energy_gaps, localization_measures)
+            st.pyplot(fig_protection)
+       
+        # Export tab for simulation results
+        with tab6:
+           display_experiment_summary(result)
+           st.subheader("Export Options")
+           col1, col2 = st.columns(2)
+           with col1:
+               if st.button("Download Raw Data"):
+                   st.info("Data export functionality coming soon!")
+           with col2:
+               if st.button("Download Metrics"):
+                   st.info("Metrics export functionality coming soon!")
     else:
         st.info("Run a simulation to see the results!")
 
