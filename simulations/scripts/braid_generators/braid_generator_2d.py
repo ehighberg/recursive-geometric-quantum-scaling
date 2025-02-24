@@ -15,6 +15,8 @@ class BraidGenerator2D(AbstractBraidGenerator):
       - The braid for index 2 computed via:
             B₂ = F⁻¹ B₁ F
     """
+    def __init__(self):
+        super().__init__(dimensionality=2)  # 2D Hilbert space for Fibonacci anyons
     def F_matrix(self) -> Qobj:
         # Compute φ⁻¹ and φ^(-1/2)
         phi_inv = 1.0 / self.phi
