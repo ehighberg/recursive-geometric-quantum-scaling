@@ -7,39 +7,41 @@ evolution, phi-scaled evolution, and Fibonacci anyon braiding circuits.
 # Add the project root to Python path
 import sys
 from pathlib import Path
-from constants import PHI
+# Import PHI when needed directly in the code
+# from constants import PHI
 sys.path.insert(0, str(Path(__file__).parent))
 
 # Third-party imports
 import numpy as np
 import streamlit as st
-from analyses.fractal_analysis import compute_energy_spectrum, load_fractal_config
+from analyses.fractal_analysis import compute_energy_spectrum
 from analyses.visualization.state_plots import (
     plot_state_evolution,
-    plot_bloch_sphere,
-    plot_state_matrix
+    plot_bloch_sphere
+    # plot_state_matrix - Unused import
 )
 from analyses.visualization.metric_plots import (
-    plot_metric_evolution,
-    plot_metric_comparison,
-    plot_metric_distribution,
+    # plot_metric_evolution - Unused import
+    # plot_metric_comparison - Unused import
+    # plot_metric_distribution - Unused import
     plot_noise_metrics
 )
 from analyses.visualization.fractal_plots import (
     plot_energy_spectrum,
-    plot_wavefunction_profile,
-    plot_fractal_dimension
+    plot_wavefunction_profile
+    # plot_fractal_dimension - Unused import
 )
 
 # Local imports
 from simulations.scripts.evolve_state import run_state_evolution
 from simulations.scripts.evolve_circuit import (
-    run_standard_twoqubit_circuit,
+    # run_standard_twoqubit_circuit - Unused import
     run_phi_scaled_twoqubit_circuit,
     run_fibonacci_braiding_circuit,
     run_quantum_gate_circuit
 )
 from app.analyze_results import analyze_simulation_results, display_experiment_summary
+from app.scaling_analysis import display_scaling_analysis
 
 st.set_page_config(
     page_title="Quantum Simulation and Analysis Tool",
@@ -185,14 +187,18 @@ def main():
                         noise_config=params.get('noise_config')
                     )
                 else:  # Topological Braiding
-                    # TODO: use params to configure braiding circuit
-                    result = run_fibonacci_braiding_circuit()
-                    # result = run_fibonacci_braiding_circuit(
-                    #     braid_type=params['braid_type'],
-                    #     num_anyons=params['num_anyons'],
-                    #     braid_sequence=params['braid_sequence'],
-                    #     noise_config=params.get('noise_config')
-                    # )
+                    # Configure braiding circuit with parameters
+                    # Get parameters with defaults
+                    braid_type = params.get('braid_type', 'Fibonacci')
+                    braid_sequence = params.get('braid_sequence', '1,2,1,3')
+                    noise_config = params.get('noise_config', {})
+                    
+                    # Call with only supported parameters
+                    result = run_fibonacci_braiding_circuit(
+                        braid_type=braid_type,
+                        braid_sequence=braid_sequence,
+                        noise_config=noise_config
+                    )
                 
                 st.session_state['simulation_results'] = result
                 st.success("Simulation completed successfully!")
@@ -206,12 +212,13 @@ def main():
         result = st.session_state['simulation_results']
         
         # Create tabs for different views
-        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
             "State Evolution",
             "Noise Analysis",
             "Quantum Metrics",
             "Fractal Analysis",
             "Topological Analysis",
+            "Scaling Analysis",
             "Raw Data"
         ])
             
@@ -350,17 +357,21 @@ def main():
             fig_protection = plot_protection_metrics(control_range, energy_gaps, localization_measures)
             st.pyplot(fig_protection)
        
-        # Export tab for simulation results
+        # New Scaling Analysis tab
         with tab6:
-           display_experiment_summary(result)
-           st.subheader("Export Options")
-           col1, col2 = st.columns(2)
-           with col1:
-               if st.button("Download Raw Data"):
-                   st.info("Data export functionality coming soon!")
-           with col2:
-               if st.button("Download Metrics"):
-                   st.info("Metrics export functionality coming soon!")
+            display_scaling_analysis(result, mode)
+            
+        # Export tab for simulation results
+        with tab7:
+            display_experiment_summary(result)
+            st.subheader("Export Options")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Download Raw Data"):
+                    st.info("Data export functionality coming soon!")
+            with col2:
+                if st.button("Download Metrics"):
+                    st.info("Metrics export functionality coming soon!")
     else:
         st.info("Run a simulation to see the results!")
 

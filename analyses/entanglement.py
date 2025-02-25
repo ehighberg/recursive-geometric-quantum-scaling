@@ -51,19 +51,20 @@ def concurrence(state: Union[Qobj, List[Qobj]]) -> float:
     c = float(max(0, evals[0] - evals[1] - evals[2] - evals[3]))
     return c
 
-def negativity(state: Union[Qobj, List[Qobj]]) -> float:
+def compute_negativity(state: Qobj, sysA: List[int] = None) -> float:
     """
     Calculate the negativity of a bipartite quantum state.
     N = (||ρ^(TA)||_1 - 1)/2 where ρ^(TA) is partial transpose.
     
     Parameters:
-        state: Quantum state (Qobj) or list of states
+        state: Quantum state (Qobj)
+        sysA: List of indices for subsystem A (default: [0])
         
     Returns:
         float: Negativity value in [0,1]
     """
-    if isinstance(state, list):
-        return [negativity(s) for s in state]
+    if sysA is None:
+        sysA = [0]
     
     # Convert to density matrix if needed
     if state.isket:
@@ -108,19 +109,17 @@ def negativity(state: Union[Qobj, List[Qobj]]) -> float:
     # Calculate negativity
     return float((trace_norm - 1) / 2)
 
-def log_negativity(state: Union[Qobj, List[Qobj]]) -> float:
+def compute_log_negativity(state: Qobj) -> float:
     """
     Calculate the logarithmic negativity of a bipartite quantum state.
     EN = log2(||ρ^(TA)||_1)
     
     Parameters:
-        state: Quantum state (Qobj) or list of states
+        state: Quantum state (Qobj)
         
     Returns:
         float: Logarithmic negativity value
     """
-    if isinstance(state, list):
-        return [log_negativity(s) for s in state]
     
     # Convert to density matrix if needed
     if state.isket:
@@ -164,7 +163,32 @@ def log_negativity(state: Union[Qobj, List[Qobj]]) -> float:
     # Calculate logarithmic negativity
     return float(np.log2(trace_norm))
 
-def entanglement_entropy(state: Union[Qobj, List[Qobj]], subsys: int = 0) -> float:
+def bipartite_partial_trace(state: Qobj, keep: int, dims: List[int]) -> Qobj:
+    """
+    Compute the partial trace of a multipartite quantum state.
+    
+    Parameters:
+        state: Quantum state (Qobj)
+        keep: Index of subsystem to keep
+        dims: List of dimensions for each subsystem
+        
+    Returns:
+        Qobj: Reduced density matrix
+    """
+    # Convert to density matrix if needed
+    if state.isket:
+        rho = state * state.dag()
+    else:
+        rho = state
+        
+    # Set dimensions
+    if not rho.dims[0] == dims:
+        rho.dims = [dims, dims]
+    
+    # Return partial trace
+    return rho.ptrace(keep)
+
+def entanglement_entropy(state: Qobj, subsys: int = 0) -> float:
     """
     Calculate the entanglement entropy of a bipartite quantum state.
     S = -Tr(ρ_A log_2(ρ_A)) where ρ_A is reduced density matrix.

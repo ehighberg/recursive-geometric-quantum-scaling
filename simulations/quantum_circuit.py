@@ -255,3 +255,64 @@ class FibonacciBraidingCircuit(QuantumCircuit):
         
         result = EvolutionResult(states, times)
         return result
+        
+    def evolve_with_noise(self, initial_state, noise_config):
+        """
+        Evolve the initial state through the braiding circuit with noise.
+        
+        Parameters:
+        - initial_state: Initial quantum state
+        - noise_config: Dictionary containing noise parameters
+        
+        Returns:
+        - result: Evolution result containing states and times
+        """
+        # Create result object to match other evolution methods
+        # Store states and times
+        states = [initial_state]
+        times = [0.0]
+        
+        # Convert to density matrix if needed
+        if initial_state.isket:
+            current_state = ket2dm(initial_state)
+        else:
+            current_state = initial_state
+        
+        # Create collapse operators from noise_config
+        c_ops = []
+        if 'relaxation' in noise_config and noise_config['relaxation'] > 0:
+            # T1 relaxation
+            c_ops.append(np.sqrt(noise_config['relaxation']) * sigmax())
+            
+        if 'dephasing' in noise_config and noise_config['dephasing'] > 0:
+            # T2 dephasing
+            c_ops.append(np.sqrt(noise_config['dephasing']) * sigmaz())
+            
+        # Apply each braid operation sequentially with noise
+        for i, braid in enumerate(self.braids):
+            # Apply braid
+            current_state = braid * current_state * braid.dag()
+            
+            # Apply noise if c_ops exist
+            if c_ops:
+                # Create a small time evolution to apply noise
+                H0 = 0 * sigmaz()  # Zero Hamiltonian, just for noise
+                tlist = np.linspace(0, 0.1, 2)  # Small time step
+                
+                # Solve master equation for this small step
+                noise_result = mesolve(
+                    H0,
+                    current_state,
+                    tlist,
+                    c_ops,
+                    options=Options(store_states=True)
+                )
+                
+                # Update current state with noisy result
+                current_state = noise_result.states[-1]
+            
+            states.append(current_state)
+            times.append(float(i + 1))
+        
+        result = EvolutionResult(states, times)
+        return result

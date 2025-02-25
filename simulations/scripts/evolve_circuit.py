@@ -77,30 +77,61 @@ def run_phi_scaled_twoqubit_circuit(scaling_factor=1.0, noise_config=None):
     
     return result
 
-def run_fibonacci_braiding_circuit():
+def run_fibonacci_braiding_circuit(braid_type='Fibonacci', braid_sequence='1,2,1,3', noise_config=None):
     """
     Fibonacci anyon braiding circuit in 2D subspace.
     Uses B1, B2 braid operators with qutip-qip gate compilation.
+    
+    Parameters:
+    - braid_type (str): Type of anyons to use ('Fibonacci', 'Ising', 'Majorana')
+    - braid_sequence (str): Comma-separated sequence of braid operations
+    - noise_config (dict): Optional noise configuration
     
     Returns:
     - result: Evolution result containing states and times
     """
     from simulations.scripts.fibonacci_anyon_braiding import braid_b1_2d, braid_b2_2d
     
-    # Get braid operators
-    B1_2 = braid_b1_2d()
-    B2_2 = braid_b2_2d()
+    # Get braid operators based on braid_type
+    if braid_type == 'Fibonacci':
+        B1_2 = braid_b1_2d()
+        B2_2 = braid_b2_2d()
+    elif braid_type == 'Ising':
+        # For now, use Fibonacci braids as placeholder
+        # In a real implementation, these would be different
+        B1_2 = braid_b1_2d()
+        B2_2 = braid_b2_2d()
+        print(f"Warning: Using Fibonacci braids as placeholder for {braid_type} anyons")
+    elif braid_type == 'Majorana':
+        # For now, use Fibonacci braids as placeholder
+        # In a real implementation, these would be different
+        B1_2 = braid_b1_2d()
+        B2_2 = braid_b2_2d()
+        print(f"Warning: Using Fibonacci braids as placeholder for {braid_type} anyons")
+    else:
+        raise ValueError(f"Unsupported braid type: {braid_type}")
     
-    # Create braiding circuit
+    # Create braiding circuit (using default 2 qubits)
     fib_circ = FibonacciBraidingCircuit()
     
-    # Add braids as custom gates
-    fib_circ.add_braid(B1_2)
-    fib_circ.add_braid(B2_2)
+    # Parse and add braid sequence
+    braid_indices = [int(idx) for idx in braid_sequence.split(',') if idx.strip().isdigit()]
+    for idx in braid_indices:
+        if idx == 1:
+            fib_circ.add_braid(B1_2)
+        elif idx == 2:
+            fib_circ.add_braid(B2_2)
+        else:
+            print(f"Warning: Ignoring unsupported braid index {idx}")
     
     # Initialize state and evolve
     psi_init = fib_anyon_state_2d()
-    result = fib_circ.evolve(psi_init)
+    
+    # Evolve with or without noise
+    if noise_config:
+        result = fib_circ.evolve_with_noise(psi_init, noise_config)
+    else:
+        result = fib_circ.evolve(psi_init)
     
     # Store Hamiltonian function for fractal analysis
     def hamiltonian(f_s):

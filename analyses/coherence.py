@@ -6,19 +6,18 @@ import numpy as np
 from qutip import Qobj
 from typing import Union, List
 
-def coherence_metric(state: Union[Qobj, List[Qobj]]) -> float:
+def l1_coherence(state: Qobj, dim: int = None) -> float:
     """
     Calculate the l1-norm of coherence for a quantum state.
     For a density matrix ρ, this is the sum of absolute values of off-diagonal elements.
     
     Parameters:
-        state: Quantum state (Qobj) or list of states
+        state: Quantum state (Qobj)
+        dim: Dimension of the system (optional)
         
     Returns:
-        float: Coherence measure in [0,1]
+        float: L1 coherence measure
     """
-    if isinstance(state, list):
-        return [coherence_metric(s) for s in state]
     
     # Convert to density matrix if needed
     if state.isket:
