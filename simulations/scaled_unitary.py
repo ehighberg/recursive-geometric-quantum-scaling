@@ -3,7 +3,7 @@ Scaled unitary operator implementation using qutip's features.
 """
 
 import numpy as np
-from qutip import Qobj, sesolve, propagator, basis, sigmax, sigmay, sigmaz
+from qutip import Qobj, propagator, sigmax, sigmaz
 from qutip_qip.operations import Gate
 from qutip_qip.circuit import QubitCircuit
 

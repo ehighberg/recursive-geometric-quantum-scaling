@@ -1,6 +1,5 @@
 # tests/test_quantum_circuit.py
 
-import pytest
 import numpy as np
 from qutip import sigmaz, sigmax, sigmay, Qobj, basis, expect
 from simulations.quantum_circuit import StandardCircuit, ScaledCircuit, FibonacciBraidingCircuit
@@ -39,6 +38,13 @@ def test_scale_unitary():
     s = 8.0  # 2^3
     expected = np.array([[np.exp(-1j*s), 0], [0, np.exp(1j*s)]])
     assert np.allclose(U_3.full(), expected, atol=1e-10)
+    
+    # Test evolution result
+    psi_init = state_plus()
+    result = circuit.evolve_closed(psi_init, n_steps=3)
+    assert hasattr(result, 'states')
+    assert hasattr(result, 'times')
+    assert result.dims == [[2], [1]]  # Single qubit state
 
 def test_standard_evolution_analytical():
     """Test standard evolution (scale_factor=1) against analytical solution"""
@@ -108,12 +114,24 @@ def test_numerical_stability():
         
         # Check unitarity preservation
         for state in result.states:
+            # Convert to density matrix if it's a ket
+            if state.isket:
+                rho = state * state.dag()
+            else:
+                rho = state
+                
             # Trace of density matrix should be 1
-            assert np.allclose(state.tr(), 1.0, atol=1e-10)
-            # Eigenvalues should be real and positive
-            evals = state.eigenenergies()
-            assert np.allclose(evals.imag, 0, atol=1e-10)
-            assert all(ev >= -1e-10 for ev in evals.real)
+            assert np.allclose(rho.tr(), 1.0, atol=1e-10)
+            
+            # Ensure rho is a square matrix before computing eigenvalues
+            if rho.shape[0] == rho.shape[1]:  # Check if square
+                # Eigenvalues should be real and positive
+                evals = rho.eigenenergies()
+                assert np.allclose(evals.imag, 0, atol=1e-10)
+                assert all(ev >= -1e-10 for ev in evals.real)
+            else:
+                # For non-square matrices, check norm instead
+                assert np.allclose(state.norm(), 1.0, atol=1e-10)
 
 def test_fibonacci_braiding_circuit():
     """Test Fibonacci braiding circuit operations"""
@@ -127,5 +145,7 @@ def test_fibonacci_braiding_circuit():
     
     # Test evolution with identity braid
     psi = state_zero()
-    psi_final = fib.evolve(psi)
+    result = fib.evolve(psi)
+    # Get final state from evolution result
+    psi_final = result.states[-1]
     assert np.allclose(psi_final.full(), psi.full())

@@ -46,7 +46,17 @@ def animate_state_evolution(
         
     Returns:
         matplotlib Animation object
+        
+    Raises:
+        ValueError: If states and times have different lengths or if smoothing_steps is invalid
     """
+    # Validate inputs
+    if len(states) != len(times):
+        raise ValueError(f"Number of states ({len(states)}) must match number of time points ({len(times)})")
+    
+    if smoothing_steps < 1:
+        raise ValueError(f"Smoothing steps must be at least 1, got {smoothing_steps}")
+    
     plt.rcParams.update(PLOT_STYLE)
     
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
@@ -177,7 +187,8 @@ def plot_state_evolution(
     plt.rcParams.update(PLOT_STYLE)
     
     # Handle empty or invalid input
-    if not states or not times or len(states) == 0 or len(times) == 0:
+    if (states is None or len(states) == 0 or 
+        times is None or len(times) == 0):
         # Create empty figure with message
         fig = plt.figure(figsize=figsize)
         plt.text(0.5, 0.5, 'No data to plot',
@@ -291,7 +302,14 @@ def animate_bloch_sphere(
         
     Returns:
         matplotlib Animation object
+        
+    Raises:
+        ValueError: If states are not single-qubit or if smoothing_steps is invalid
     """
+    # Validate inputs
+    if smoothing_steps < 1:
+        raise ValueError(f"Smoothing steps must be at least 1, got {smoothing_steps}")
+    
     # Verify states are single-qubit
     for state in states:
         if state.dims != [[2], [1]] and state.dims != [[2], [2]]:
