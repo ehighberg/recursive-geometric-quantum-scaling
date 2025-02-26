@@ -2,7 +2,7 @@
 Visualization functions for quantum metrics including entropy, coherence, and entanglement measures.
 """
 
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Union
 import itertools
 import numpy as np
 import matplotlib.pyplot as plt
@@ -320,7 +320,7 @@ def plot_noise_metrics(
     return fig
 
 def plot_metric_distribution(
-    metrics: Dict[str, List[float]],
+    metrics_or_states,  # Type: Union[Dict[str, List[float]], List[Qobj]]
     title: Optional[str] = None,
     figsize: Tuple[int, int] = (15, 5)
 ) -> plt.Figure:
@@ -328,7 +328,8 @@ def plot_metric_distribution(
     Create distribution plots (histograms) for quantum metrics.
     
     Parameters:
-        metrics: Dictionary of metric names to lists of values
+        metrics_or_states: Either a dictionary of metric names to lists of values,
+                          or a list of quantum states to analyze
         title: Optional plot title
         figsize: Figure size tuple
         
@@ -336,6 +337,19 @@ def plot_metric_distribution(
         matplotlib Figure object
     """
     set_style()
+    
+    # Convert states to metrics if needed
+    if isinstance(metrics_or_states, list) and len(metrics_or_states) > 0 and hasattr(metrics_or_states[0], 'dims'):
+        # Calculate metrics from states
+        metrics = calculate_metrics(metrics_or_states)
+    else:
+        # Assume it's already a metrics dictionary
+        metrics = metrics_or_states
+    
+    # Ensure metrics is a dictionary
+    if not isinstance(metrics, dict):
+        raise ValueError("metrics_or_states must be either a list of Qobj states or a dictionary of metrics")
+    
     n_metrics = len(metrics)
     fig, axes = plt.subplots(1, n_metrics, figsize=figsize)
     if n_metrics == 1:

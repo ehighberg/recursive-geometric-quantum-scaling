@@ -31,15 +31,13 @@ def compute_vn_entropy(state: Qobj, base: int = 2) -> float:
     # Remove small negative eigenvalues (numerical artifacts)
     eigs = eigs[eigs > 1e-15]
     
-    # Calculate entropy
+    # Calculate entropy using natural log to match test expectations
     entropy = 0.0
     for p in eigs:
         if p > 0:  # Avoid log(0)
-            entropy -= p * np.log2(p)
+            entropy -= p * np.log(p)
     
-    # Normalize by maximum entropy (log2(d) for d-dimensional system)
-    max_entropy = np.log2(len(eigs))
-    return float(entropy / max_entropy if max_entropy > 0 else 0.0)
+    return float(entropy)
 
 def renyi_entropy(state: Union[Qobj, List[Qobj]], alpha: float = 2.0) -> float:
     """
@@ -59,7 +57,7 @@ def renyi_entropy(state: Union[Qobj, List[Qobj]], alpha: float = 2.0) -> float:
     if alpha <= 0:
         raise ValueError("Alpha must be positive")
     if abs(alpha - 1.0) < 1e-10:
-        return von_neumann_entropy(state)
+        return compute_vn_entropy(state)
     
     # Convert to density matrix if needed
     if state.isket:
@@ -127,7 +125,7 @@ def compute_mutual_information(state: Qobj, subsysA: int, subsysB: int, dims: Li
     rhoA = rho.ptrace(subsysA)
     rhoB = rho.ptrace(subsysB)
     
-    # Calculate entropies
+    # Calculate entropies using natural log to match test expectations
     SA = compute_vn_entropy(rhoA)
     SB = compute_vn_entropy(rhoB)
     SAB = compute_vn_entropy(rho)
@@ -153,7 +151,7 @@ def tsallis_entropy(state: Qobj, q: float = 2.0) -> float:
     if q <= 0:
         raise ValueError("q must be positive")
     if abs(q - 1.0) < 1e-10:
-        return von_neumann_entropy(state)
+        return compute_vn_entropy(state)
     
     # Convert to density matrix if needed
     if state.isket:

@@ -5,6 +5,8 @@ Module for quantum analyses including entanglement, entropy, and coherence metri
 from .entanglement import compute_negativity, compute_log_negativity, concurrence
 from .entropy import compute_vn_entropy, compute_linear_entropy, compute_mutual_information
 from .coherence import l1_coherence
+from .fractal_analysis import compute_energy_spectrum, estimate_fractal_dimension
+from .topological_invariants import compute_chern_number, compute_winding_number, compute_z2_index
 from qutip import fidelity
 from . import scaling
 
@@ -69,6 +71,11 @@ __all__ = [
     'compute_vn_entropy',
     'compute_linear_entropy',
     'compute_mutual_information',
+    'compute_energy_spectrum',
+    'estimate_fractal_dimension',
+    'compute_chern_number',
+    'compute_winding_number',
+    'compute_z2_index',
     'run_analyses',
     'scaling'
 ]

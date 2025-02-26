@@ -6,7 +6,7 @@ Circuit-based approach using qutip-qip features for multi-qubit and braiding ope
 """
 
 import numpy as np
-from qutip import sigmaz, sigmax, qeye, tensor, basis
+from qutip import sigmaz, sigmax, qeye, tensor, basis, ket2dm
 from simulations.quantum_state import state_zero, fib_anyon_state_2d
 from simulations.quantum_circuit import StandardCircuit, ScaledCircuit, FibonacciBraidingCircuit
 
@@ -29,16 +29,17 @@ def run_standard_twoqubit_circuit(noise_config=None):
     
     # Initialize state
     psi_init = state_zero(num_qubits=2)
+    psi_init.dims = [[2, 2], [1]]  # Ensure correct dimensions
     
     # Evolve with or without noise
-    if noise_config:
-        result = circ.evolve_open(psi_init)
+    if noise_config is not None and isinstance(noise_config, dict) and 'c_ops' in noise_config:
+        result = circ.evolve_open(psi_init, noise_config['c_ops'])
     else:
         result = circ.evolve_closed(psi_init)
     
     # Store Hamiltonian function for fractal analysis
     def hamiltonian(f_s):
-        return f_s * H0
+        return float(f_s) * H0
     result.hamiltonian = hamiltonian
     
     return result
@@ -59,20 +60,21 @@ def run_phi_scaled_twoqubit_circuit(scaling_factor=1.0, noise_config=None):
     H0 = tensor(sigmaz(), qeye(2)) + 0.5 * tensor(qeye(2), sigmax())
     
     # Create circuit with scaling
-    pcirc = ScaledCircuit(H0, scaling_factor=scaling_factor)
+    pcirc = ScaledCircuit(H0, scaling_factor=float(scaling_factor))
     
     # Initialize state
     psi_init = state_zero(num_qubits=2)
+    psi_init.dims = [[2, 2], [1]]  # Ensure correct dimensions
     
     # Evolve with or without noise
-    if noise_config:
-        result = pcirc.evolve_open(psi_init, n_steps=5)
+    if noise_config is not None and isinstance(noise_config, dict) and 'c_ops' in noise_config:
+        result = pcirc.evolve_open(psi_init, noise_config['c_ops'], n_steps=5)
     else:
         result = pcirc.evolve_closed(psi_init, n_steps=5)
     
     # Store Hamiltonian function for fractal analysis
     def hamiltonian(f_s):
-        return f_s * H0
+        return float(f_s) * H0
     result.hamiltonian = hamiltonian
     
     return result
@@ -128,15 +130,15 @@ def run_fibonacci_braiding_circuit(braid_type='Fibonacci', braid_sequence='1,2,1
     psi_init = fib_anyon_state_2d()
     
     # Evolve with or without noise
-    if noise_config:
-        result = fib_circ.evolve_with_noise(psi_init, noise_config)
+    if noise_config is not None and isinstance(noise_config, dict) and 'c_ops' in noise_config:
+        result = fib_circ.evolve_with_noise(psi_init, noise_config['c_ops'])
     else:
         result = fib_circ.evolve(psi_init)
     
     # Store Hamiltonian function for fractal analysis
     def hamiltonian(f_s):
         # Scale both braid operators by f_s
-        return f_s * (B1_2 + B2_2)
+        return float(f_s) * (B1_2 + B2_2)
     result.hamiltonian = hamiltonian
     
     return result
@@ -163,8 +165,10 @@ def analyze_circuit_noise_effects(circuit_type="standard", noise_rates=None):
     
     # Initial state for comparison
     psi_init = state_zero(num_qubits=2)
+    psi_init.dims = [[2, 2], [1]]  # Ensure correct dimensions
     
     for rate in noise_rates:
+        rate = float(rate)  # Ensure rate is float
         # Configure noise collapse operators
         if rate > 0:
             # Add dephasing noise on first qubit
@@ -184,10 +188,17 @@ def analyze_circuit_noise_effects(circuit_type="standard", noise_rates=None):
         
         # Calculate fidelity with initial state
         final_state = result.states[-1]
-        fidelity = (psi_init.dag() * final_state * psi_init).tr().real
+        if final_state.isket:
+            final_dm = ket2dm(final_state)
+        else:
+            final_dm = final_state
+        
+        # Convert initial state to density matrix for fidelity calculation
+        psi_init_dm = ket2dm(psi_init)
+        fidelity = float((psi_init_dm.dag() * final_dm * psi_init_dm).tr().real)
         
         # Calculate purity
-        purity = (final_state * final_state).tr().real
+        purity = float((final_dm * final_dm).tr().real)
         
         results['fidelities'].append(fidelity)
         results['purities'].append(purity)
@@ -234,14 +245,14 @@ def run_quantum_gate_circuit(circuit_type="Single Qubit", optimization=None, noi
             raise NotImplementedError("CRAB optimization not yet implemented")
         
     # Evolve with or without noise
-    if noise_config:
-        result = circ.evolve_open(psi_init)
+    if noise_config is not None and isinstance(noise_config, dict) and 'c_ops' in noise_config:
+        result = circ.evolve_open(psi_init, noise_config['c_ops'])
     else:
         result = circ.evolve_closed(psi_init)
     
     # Store Hamiltonian function for fractal analysis
     def hamiltonian(f_s):
-        return f_s * H0
+        return float(f_s) * H0
     result.hamiltonian = hamiltonian
     
     return result

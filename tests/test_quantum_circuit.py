@@ -114,12 +114,24 @@ def test_numerical_stability():
         
         # Check unitarity preservation
         for state in result.states:
+            # Convert to density matrix if it's a ket
+            if state.isket:
+                rho = state * state.dag()
+            else:
+                rho = state
+                
             # Trace of density matrix should be 1
-            assert np.allclose(state.tr(), 1.0, atol=1e-10)
-            # Eigenvalues should be real and positive
-            evals = state.eigenenergies()
-            assert np.allclose(evals.imag, 0, atol=1e-10)
-            assert all(ev >= -1e-10 for ev in evals.real)
+            assert np.allclose(rho.tr(), 1.0, atol=1e-10)
+            
+            # Ensure rho is a square matrix before computing eigenvalues
+            if rho.shape[0] == rho.shape[1]:  # Check if square
+                # Eigenvalues should be real and positive
+                evals = rho.eigenenergies()
+                assert np.allclose(evals.imag, 0, atol=1e-10)
+                assert all(ev >= -1e-10 for ev in evals.real)
+            else:
+                # For non-square matrices, check norm instead
+                assert np.allclose(state.norm(), 1.0, atol=1e-10)
 
 def test_fibonacci_braiding_circuit():
     """Test Fibonacci braiding circuit operations"""

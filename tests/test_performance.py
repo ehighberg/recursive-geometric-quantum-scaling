@@ -206,8 +206,12 @@ class TestEvolutionPerformance(unittest.TestCase):
             result = circuit.evolve_closed(self.psi_init, n_steps=n_steps)
             # Check unitarity preservation
             for state in result.states:
-                tr = state.tr()
-                assert np.allclose(tr, 1.0, atol=1e-10)
+                # For ket states, check norm is 1
+                if state.isket:
+                    assert np.allclose(state.norm(), 1.0, atol=1e-10)
+                else:
+                    # For density matrices, check trace is 1
+                    assert np.allclose(state.tr(), 1.0, atol=1e-10)
         
         for sf in scale_factors:
             circuit = ScaledCircuit(self.H0, scaling_factor=sf)

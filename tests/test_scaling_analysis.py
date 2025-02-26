@@ -22,6 +22,56 @@ class MockResult:
         self.states = [Qobj(np.eye(4)) for _ in range(10)]  # Mock states
         self.times = np.linspace(0, 10, 10)  # Mock times
 
+@pytest.fixture
+def mock_streamlit():
+    """Mock Streamlit components"""
+    with patch('streamlit.header') as mock_header, \
+         patch('streamlit.subheader') as mock_subheader, \
+         patch('streamlit.pyplot') as mock_pyplot, \
+         patch('streamlit.slider') as mock_slider, \
+         patch('streamlit.columns') as mock_columns, \
+         patch('streamlit.tabs') as mock_tabs, \
+         patch('streamlit.metric') as mock_metric, \
+         patch('streamlit.button') as mock_button, \
+         patch('streamlit.number_input') as mock_number_input, \
+         patch('streamlit.checkbox') as mock_checkbox, \
+         patch('streamlit.markdown') as mock_markdown, \
+         patch('streamlit.spinner') as mock_spinner, \
+         patch('streamlit.warning') as mock_warning, \
+         patch('streamlit.dataframe') as mock_dataframe:
+        
+        mock_header.return_value = None
+        mock_subheader.return_value = None
+        mock_pyplot.return_value = None
+        mock_slider.return_value = (0.0, 5.0)
+        mock_columns.return_value = [MagicMock(), MagicMock()]
+        mock_tabs.return_value = [MagicMock() for _ in range(3)]  # 3 tabs for scaling analysis
+        mock_metric.return_value = None
+        mock_button.return_value = True
+        mock_number_input.side_effect = [0.5, 3.0, 6, 0.5, 3.0, 21]
+        mock_checkbox.return_value = True
+        mock_markdown.return_value = None
+        mock_spinner.return_value = MagicMock(__enter__=MagicMock(), __exit__=MagicMock())
+        mock_warning.return_value = None
+        mock_dataframe.return_value = None
+        
+        yield {
+            'header': mock_header,
+            'subheader': mock_subheader,
+            'pyplot': mock_pyplot,
+            'slider': mock_slider,
+            'columns': mock_columns,
+            'tabs': mock_tabs,
+            'metric': mock_metric,
+            'button': mock_button,
+            'number_input': mock_number_input,
+            'checkbox': mock_checkbox,
+            'markdown': mock_markdown,
+            'spinner': mock_spinner,
+            'warning': mock_warning,
+            'dataframe': mock_dataframe
+        }
+
 def test_analyze_fs_scaling():
     """Test the analyze_fs_scaling function."""
     # Define test f_s values
@@ -106,73 +156,49 @@ def test_analyze_fractal_topology_relation():
     "Quantum Gate Operations",
     "Topological Braiding"
 ])
-def test_display_scaling_analysis(mode):
+def test_display_scaling_analysis(mode, mock_streamlit):
     """Test the display_scaling_analysis function with different modes."""
     # Create mock result
     result = MockResult()
     
-    # Mock streamlit components
-    with patch('app.scaling_analysis.st') as mock_st:
-        # Set up mock tabs
-        mock_tabs = [MagicMock(), MagicMock(), MagicMock()]
-        mock_st.tabs.return_value = mock_tabs
-        
-        # Call the function
-        display_scaling_analysis(result, mode)
-        
-        # Verify that tabs were created
-        mock_st.tabs.assert_called_once()
-        
-        # Verify that warning is not shown (since result has hamiltonian)
-        mock_st.warning.assert_not_called()
+    # Call the function
+    display_scaling_analysis(result, mode)
+    
+    # Verify that tabs were created
+    mock_streamlit['tabs'].assert_called_once()
+    
+    # Verify that warning is not shown (since result has hamiltonian)
+    mock_streamlit['warning'].assert_not_called()
 
-def test_display_scaling_analysis_no_hamiltonian():
+def test_display_scaling_analysis_no_hamiltonian(mock_streamlit):
     """Test the display_scaling_analysis function with a result that has no hamiltonian."""
     # Create mock result without hamiltonian
     result = MagicMock()
     delattr(result, 'hamiltonian')
     
-    # Mock streamlit components
-    with patch('app.scaling_analysis.st') as mock_st:
-        # Call the function
-        display_scaling_analysis(result)
-        
-        # Verify that warning is shown
-        mock_st.warning.assert_called_once()
+    # Call the function
+    display_scaling_analysis(result)
+    
+    # Verify that warning is shown
+    mock_streamlit['warning'].assert_called_once()
 
-def test_display_scaling_analysis_no_result():
+def test_display_scaling_analysis_no_result(mock_streamlit):
     """Test the display_scaling_analysis function with no result."""
-    # Mock streamlit components
-    with patch('app.scaling_analysis.st') as mock_st:
-        # Call the function with None
-        display_scaling_analysis(None)
-        
-        # Verify that warning is shown
-        mock_st.warning.assert_called_once()
+    # Call the function with None
+    display_scaling_analysis(None)
+    
+    # Verify that warning is shown
+    mock_streamlit['warning'].assert_called_once()
 
-def test_integration_with_app():
+def test_integration_with_app(mock_streamlit):
     """Test the integration of scaling analysis with the app."""
     # Create mock result
     result = MockResult()
     
-    # Mock streamlit components
-    with patch('app.scaling_analysis.st') as mock_st, \
-         patch('app.scaling_analysis.analyze_fs_scaling') as mock_analyze_fs, \
+    # Mock analysis functions
+    with patch('app.scaling_analysis.analyze_fs_scaling') as mock_analyze_fs, \
          patch('app.scaling_analysis.analyze_phi_significance') as mock_analyze_phi, \
          patch('app.scaling_analysis.analyze_fractal_topology_relation') as mock_analyze_ft:
-        
-        # Set up mock tabs and buttons
-        mock_tabs = [MagicMock(), MagicMock(), MagicMock()]
-        mock_st.tabs.return_value = mock_tabs
-        
-        # Set up mock button returns
-        mock_st.button.side_effect = [True, True, True]  # All buttons return True
-        
-        # Set up mock number_input returns
-        mock_st.number_input.side_effect = [0.5, 3.0, 6, 0.5, 3.0, 21]
-        
-        # Set up mock checkbox returns
-        mock_st.checkbox.side_effect = [True, False, True]
         
         # Set up mock analysis returns
         mock_analyze_fs.return_value = {
@@ -214,7 +240,7 @@ def test_integration_with_app():
         display_scaling_analysis(result, "Amplitude-Scaled Evolution")
         
         # Verify that tabs were created
-        mock_st.tabs.assert_called_once()
+        mock_streamlit['tabs'].assert_called_once()
         
         # Verify that analysis functions were called
         mock_analyze_fs.assert_called_once()
@@ -222,4 +248,4 @@ def test_integration_with_app():
         mock_analyze_ft.assert_called_once()
         
         # Verify that plots were created
-        assert mock_st.pyplot.call_count >= 6  # At least 6 plots should be created
+        assert mock_streamlit['pyplot'].call_count >= 6  # At least 6 plots should be created

@@ -58,7 +58,11 @@ def analyze_simulation_results(result, mode: str = "Evolution"):
 
     # Create tabs for different analyses
     tab_names = ["Quantum Metrics", "State Evolution", "Fractal Analysis", "Topological Analysis"]
-    metrics_tab, evolution_tab, fractal_tab, topo_tab = st.tabs(tab_names)
+    tabs = st.tabs(tab_names)
+    metrics_tab = tabs[0]
+    evolution_tab = tabs[1]
+    fractal_tab = tabs[2]
+    topo_tab = tabs[3]
 
     if len(states) > 1:
         # Calculate metrics for all states

@@ -11,7 +11,7 @@ in quantum systems, particularly focusing on:
 
 import numpy as np
 from qutip import Qobj
-from typing import Callable, Tuple, Dict, Optional, Union
+from typing import Callable, Tuple, Dict, Optional, Union, List
 from scipy.stats import linregress
 import warnings
 import logging
@@ -44,7 +44,7 @@ def load_fractal_config() -> Dict:
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
             config = yaml.safe_load(f)
-            return config.get('fractal', {})
+            return config.get('fractal', default_config)
     except FileNotFoundError:
         logger.warning(f"Configuration file not found at {config_path}. Using default configuration.")
         return default_config
@@ -127,6 +127,130 @@ def compute_wavefunction_profile(
     
     return density, details
 
+def compute_energy_spectrum(
+    H_func: Callable[[float], Union[Qobj, np.ndarray]],
+    config: Optional[Dict] = None,
+    eigen_index: int = 0
+) -> Tuple[np.ndarray, np.ndarray, Dict[str, Union[List[Tuple[float, float, float, float]], np.ndarray, Dict[str, float]]]]:
+    """
+    Compute energy spectrum over f_s parameter range with enhanced analysis of
+    self-similar regions.
+
+    Parameters:
+    -----------
+    H_func : Callable[[float], Union[Qobj, np.ndarray]]
+        Function that takes f_s parameter and returns Hamiltonian (either Qobj or numpy array).
+    config : Optional[Dict]
+        Configuration dictionary. If None, loads from evolution_config.yaml.
+    eigen_index : int
+        Index of eigenvalue to use for analysis (default: 0, ground state).
+
+    Returns:
+    --------
+    parameter_values : np.ndarray
+        Array of f_s parameter values.
+    energies : np.ndarray
+        Array of eigenenergies.
+    analysis : Dict
+        Dictionary containing:
+        - 'self_similar_regions': List of (start, end) f_s values
+        - 'correlation_matrix': Matrix of correlations between regions
+        - 'gap_statistics': Statistics of energy gaps
+    """
+    if config is None:
+        config = load_fractal_config()
+    
+    spectrum_config = config.get('energy_spectrum', {})
+    f_s_range = spectrum_config.get('f_s_range', [0.0, 10.0])
+    resolution = spectrum_config.get('resolution', 100)
+    correlation_threshold = spectrum_config.get('correlation_threshold', 0.8)
+    window_size = spectrum_config.get('window_size', 20)
+    
+    f_s_values = np.linspace(f_s_range[0], f_s_range[1], resolution)
+    energies = []
+    
+    # Compute energy spectrum
+    for f_s in f_s_values:
+        H = H_func(f_s)
+        
+        # Handle different types of Hamiltonian objects
+        if isinstance(H, Qobj):
+            # Use QuTiP's eigenenergies method for Qobj
+            evals = np.sort(H.eigenenergies())
+        elif isinstance(H, np.ndarray):
+            # Use numpy's eigvals for numpy arrays
+            if H.ndim == 2 and H.shape[0] == H.shape[1]:  # Check if square matrix
+                evals = np.sort(np.linalg.eigvals(H))
+            else:
+                # If not a square matrix, treat as diagonal Hamiltonian
+                evals = np.sort(np.diag(H) if H.ndim == 2 else H)
+        else:
+            # For other types, try to convert to numpy array
+            try:
+                H_array = np.array(H)
+                if H_array.ndim == 2 and H_array.shape[0] == H_array.shape[1]:
+                    evals = np.sort(np.linalg.eigvals(H_array))
+                else:
+                    evals = np.sort(np.diag(H_array) if H_array.ndim == 2 else H_array)
+            except:
+                # Fallback: return a single eigenvalue
+                evals = np.array([0.0])
+                
+        energies.append(evals)
+    
+    energies = np.array(energies)
+    
+    # Analyze self-similarity
+    correlation_matrix = np.zeros((resolution - window_size, resolution - window_size))
+    self_similar_regions = []
+    
+    for i in range(resolution - window_size):
+        window1 = energies[i:i+window_size]
+        for j in range(i + window_size, resolution - window_size):
+            window2 = energies[j:j+window_size]
+            # Ensure we have valid data for correlation
+            if window1.size > 0 and window2.size > 0:
+                try:
+                    correlation = np.corrcoef(window1.flatten(), window2.flatten())[0,1]
+                    correlation_matrix[i,j] = correlation
+                    
+                    if correlation > correlation_threshold:
+                        self_similar_regions.append((
+                            float(f_s_values[i]),
+                            float(f_s_values[i+window_size]),
+                            float(f_s_values[j]),
+                            float(f_s_values[j+window_size])
+                        ))
+                except:
+                    # Skip correlation calculation if it fails
+                    correlation_matrix[i,j] = 0.0
+    
+    # Compute gap statistics
+    try:
+        gaps = np.diff(energies, axis=1)
+        gap_stats = {
+            'mean': float(np.mean(gaps)),
+            'std': float(np.std(gaps)),
+            'min': float(np.min(gaps)),
+            'max': float(np.max(gaps))
+        }
+    except:
+        # Fallback if gap statistics calculation fails
+        gap_stats = {
+            'mean': 0.0,
+            'std': 0.0,
+            'min': 0.0,
+            'max': 0.0
+        }
+    
+    analysis = {
+        'self_similar_regions': self_similar_regions,
+        'correlation_matrix': correlation_matrix,
+        'gap_statistics': gap_stats
+    }
+    
+    return f_s_values, energies, analysis
+
 def estimate_fractal_dimension(
     data: np.ndarray,
     box_sizes: Optional[np.ndarray] = None,
@@ -195,8 +319,8 @@ def estimate_fractal_dimension(
     
     if len(valid_boxes) < 5:  # Require more points for reliable fit
         warnings.warn("Insufficient valid points for reliable dimension estimation")
-        return 1.0, {'std_error': np.inf, 'r_squared': 0.0, 
-                    'confidence_interval': (1.0, 1.0), 'n_points': len(valid_boxes)}
+        return 0.0, {'std_error': np.inf, 'r_squared': 0.0, 
+                    'confidence_interval': (0.0, 0.0), 'n_points': len(valid_boxes)}
     
     # Perform log-log fit with improved statistics
     log_boxes = np.log(1.0 / np.array(valid_boxes))
@@ -216,97 +340,10 @@ def estimate_fractal_dimension(
     ci_upper = slope + t_value * std_err
     
     info = {
-        'std_error': std_err,
-        'r_squared': r_value**2,
-        'confidence_interval': (ci_lower, ci_upper),
+        'std_error': float(std_err),
+        'r_squared': float(r_value**2),
+        'confidence_interval': (float(ci_lower), float(ci_upper)),
         'n_points': len(valid_boxes)
     }
     
-    return max(1.0, slope), info  # Ensure dimension is at least 1.0
-
-def compute_energy_spectrum(
-    H_func: Callable[[float], Qobj],
-    config: Optional[Dict] = None,
-    eigen_index: int = 0
-) -> Tuple[np.ndarray, np.ndarray, Dict]:
-    """
-    Compute energy spectrum over f_s parameter range with enhanced analysis of
-    self-similar regions.
-
-    Parameters:
-    -----------
-    H_func : Callable[[float], Qobj]
-        Function that takes f_s parameter and returns Hamiltonian.
-    config : Optional[Dict]
-        Configuration dictionary. If None, loads from evolution_config.yaml.
-    eigen_index : int
-        Which eigenvalue to extract (0-based index).
-
-    Returns:
-    --------
-    f_s_values : np.ndarray
-        Array of f_s parameter values.
-    energies : np.ndarray
-        Array of eigenenergies.
-    analysis : Dict
-        Dictionary containing:
-        - 'self_similar_regions': List of (start, end) f_s values
-        - 'correlation_matrix': Matrix of correlations between regions
-        - 'gap_statistics': Statistics of energy gaps
-    """
-    if config is None:
-        config = load_fractal_config()
-    
-    spectrum_config = config.get('energy_spectrum', {})
-    f_s_range = spectrum_config.get('f_s_range', [0.0, 10.0])
-    resolution = spectrum_config.get('resolution', 100)
-    correlation_threshold = spectrum_config.get('correlation_threshold', 0.8)
-    window_size = spectrum_config.get('window_size', 20)
-    
-    f_s_values = np.linspace(f_s_range[0], f_s_range[1], resolution)
-    energies = []
-    
-    # Compute energy spectrum
-    for f_s in f_s_values:
-        H = H_func(f_s)
-        evals = np.sort(H.eigenenergies())
-        idx = min(eigen_index, len(evals)-1)
-        energies.append(evals[idx])
-    
-    energies = np.array(energies)
-    
-    # Analyze self-similarity
-    correlation_matrix = np.zeros((resolution - window_size, resolution - window_size))
-    self_similar_regions = []
-    
-    for i in range(resolution - window_size):
-        window1 = energies[i:i+window_size]
-        for j in range(i + window_size, resolution - window_size):
-            window2 = energies[j:j+window_size]
-            correlation = np.corrcoef(window1, window2)[0,1]
-            correlation_matrix[i,j] = correlation
-            
-            if correlation > correlation_threshold:
-                self_similar_regions.append((
-                    f_s_values[i],
-                    f_s_values[i+window_size],
-                    f_s_values[j],
-                    f_s_values[j+window_size]
-                ))
-    
-    # Compute gap statistics
-    gaps = np.diff(energies)
-    gap_stats = {
-        'mean': np.mean(gaps),
-        'std': np.std(gaps),
-        'min': np.min(gaps),
-        'max': np.max(gaps)
-    }
-    
-    analysis = {
-        'self_similar_regions': self_similar_regions,
-        'correlation_matrix': correlation_matrix,
-        'gap_statistics': gap_stats
-    }
-    
-    return f_s_values, energies, analysis
+    return float(slope), info

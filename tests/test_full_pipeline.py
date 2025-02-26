@@ -48,7 +48,7 @@ def mock_streamlit():
          patch('streamlit.tabs') as mock_tabs, \
          patch('streamlit.session_state', {}) as mock_state:
         
-        mock_tabs.return_value = [MagicMock() for _ in range(6)]
+        mock_tabs.return_value = [MagicMock() for _ in range(4)]
         mock_columns.return_value = [MagicMock() for _ in range(3)]
         
         yield {
@@ -108,7 +108,7 @@ def test_topological_analysis_integration(mock_streamlit):
     
     # Mock the topological analysis tab
     tabs = mock_streamlit['tabs'].return_value
-    with tabs[4]:  # Topological Analysis tab
+    with tabs[3]:  # Topological Analysis tab
         analyze_simulation_results(result, mode="Topological Braiding")
         
         # Verify topological plots were generated
