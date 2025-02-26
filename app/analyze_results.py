@@ -77,6 +77,19 @@ def analyze_simulation_results(result, mode: str = "Evolution"):
             for metric in metric_names:
                 metrics[metric].append(analysis_results[metric])
         
+        # Check for noise by examining purity decay or coherence
+        has_noise = False
+        if len(metrics['purity']) > 1:
+            purity_change = metrics['purity'][-1] - metrics['purity'][0]
+            if purity_change < -0.01:  # Significant purity decay indicates noise
+                has_noise = True
+        
+        # Also check for coherence attribute which might indicate noise
+        if hasattr(result, 'coherence') and len(result.coherence) > 1:
+            coherence_change = result.coherence[-1] - result.coherence[0]
+            if coherence_change < -0.1:  # Significant coherence decay indicates noise
+                has_noise = True
+        
         with metrics_tab:
             st.subheader("Quantum Metrics Evolution")
             # Metric evolution plot
@@ -101,6 +114,42 @@ def analyze_simulation_results(result, mode: str = "Evolution"):
             st.subheader("Metric Distributions")
             fig_dist = plot_metric_distribution(metrics, title="Metric Distributions")
             st.pyplot(fig_dist)
+            
+            # Add noise analysis section if noise is detected
+            if has_noise:
+                st.subheader("Noise Analysis")
+                st.write("Noise effects detected in the quantum evolution.")
+                
+                # Calculate decoherence rate
+                if 'l1_coherence' in metrics and len(metrics['l1_coherence']) > 1 and metrics['l1_coherence'][0] > 0:
+                    coherence_values = metrics['l1_coherence']
+                    decoherence_rates = [-np.log(c/coherence_values[0]) if c > 0 else 0 for c in coherence_values]
+                    
+                    # Plot decoherence
+                    fig_noise, ax = plt.subplots(figsize=(10, 6))
+                    ax.plot(times, metrics['purity'], label='Purity', color='blue')
+                    ax.plot(times, metrics['l1_coherence'], label='Coherence', color='green')
+                    ax.plot(times, decoherence_rates, label='Decoherence Rate', color='red')
+                    ax.set_xlabel('Time')
+                    ax.set_ylabel('Value')
+                    ax.set_title('Noise Effects')
+                    ax.legend()
+                    st.pyplot(fig_noise)
+                    
+                    # Calculate noise parameters
+                    if len(decoherence_rates) > 2:
+                        # Estimate T1 and T2 times
+                        try:
+                            # Simple linear fit to estimate decoherence time
+                            valid_rates = [r for r, t in zip(decoherence_rates, times) if r > 0]
+                            valid_times = [t for r, t in zip(decoherence_rates, times) if r > 0]
+                            if len(valid_rates) > 2:
+                                slope, _ = np.polyfit(valid_times, valid_rates, 1)
+                                if slope > 0:
+                                    t2_estimate = 1.0 / slope
+                                    st.metric("Estimated T₂ Time", f"{t2_estimate:.2f}")
+                        except:
+                            pass
             
         with evolution_tab:
             st.subheader("State Evolution")
@@ -161,10 +210,25 @@ def analyze_simulation_results(result, mode: str = "Evolution"):
                 # Add interactive controls
                 time_range = st.slider("Time Range", min_value=float(times[0]), max_value=float(times[-1]))
                 
-                # Add export functionality
+                # Add performance monitoring section
                 if hasattr(result, 'computation_times'):
+                    st.subheader("Performance Monitoring")
                     total_time = sum(result.computation_times.values())
-                    st.metric("Computation Time", f"{total_time:.2f}s")
+                    st.metric("Total Computation Time", f"{total_time:.2f}s")
+                    
+                    # Create performance breakdown chart
+                    fig_perf, ax = plt.subplots(figsize=(10, 6))
+                    labels = list(result.computation_times.keys())
+                    values = list(result.computation_times.values())
+                    ax.bar(labels, values)
+                    ax.set_xlabel('Component')
+                    ax.set_ylabel('Time (s)')
+                    ax.set_title('Computation Time Breakdown')
+                    plt.xticks(rotation=45, ha='right')
+                    fig_perf.tight_layout()
+                    st.pyplot(fig_perf)
+                    
+                    # Add export functionality
                     st.download_button("Export Analysis Results", data=str(result.__dict__), file_name="topological_analysis.txt")
                 
     else:

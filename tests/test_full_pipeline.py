@@ -80,10 +80,13 @@ def test_pipeline_with_noise(mock_streamlit):
     # Add noise to states
     noisy_states = []
     for state in result.states:
-        noise = np.random.normal(0, 0.01, (2,1))
+        noise = np.random.normal(0, 0.1, (2,1))  # Increased noise amplitude
         noisy_state = (state + Qobj(noise)).unit()
         noisy_states.append(noisy_state)
     result.states = noisy_states
+    
+    # Add coherence metric that shows significant decay
+    result.coherence = [0.9, 0.5]  # Significant coherence decay
     
     # Run analysis
     analyze_simulation_results(result, mode="Topological Braiding")

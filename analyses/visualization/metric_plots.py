@@ -365,7 +365,20 @@ def plot_metric_distribution(
             ax.set_xlim(-0.5, 0.5)
         else:
             # For larger datasets, use histogram
-            ax.hist(values, bins='auto', color=next(colors), alpha=0.7)
+            # Check if all values are nearly identical
+            value_range = np.max(values) - np.min(values)
+            if value_range < 1e-6:
+                # If values are nearly identical, plot as points with small jitter
+                jitter = np.random.normal(0, 0.01, size=len(values))
+                ax.plot(jitter, values, 'o', color=next(colors), alpha=0.7)
+                ax.set_xlim(-0.5, 0.5)
+            else:
+                # Use fixed number of bins if range is small
+                if value_range < 0.1:
+                    bins = 5  # Use fewer bins for small ranges
+                else:
+                    bins = 'auto'
+                ax.hist(values, bins=bins, color=next(colors), alpha=0.7)
         
         configure_axis(ax,
                       title=metric.replace('_', ' ').title(),
