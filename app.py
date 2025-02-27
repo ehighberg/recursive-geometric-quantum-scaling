@@ -42,6 +42,7 @@ from simulations.scripts.evolve_circuit import (
 )
 from app.analyze_results import analyze_simulation_results, display_experiment_summary
 from app.scaling_analysis import display_scaling_analysis
+from app.reference_tables import display_reference_tables
 
 st.set_page_config(
     page_title="Quantum Simulation and Analysis Tool",
@@ -212,7 +213,7 @@ def main():
         result = st.session_state['simulation_results']
         
     # Create tabs for different views
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
             "State Evolution",
             "Noise Analysis",
             "Quantum Metrics",
@@ -221,6 +222,7 @@ def main():
             "Scaling Analysis",
             "Dynamical Evolution",
             "Entanglement Dynamics",
+            "Reference Tables",
             "Raw Data"
         ])
             
@@ -485,8 +487,12 @@ def main():
             else:
                 st.info("Entanglement analysis requires time evolution data.")
         
-        # Export tab for simulation results
+        # Reference Tables tab
         with tab9:
+            display_reference_tables(result)
+            
+        # Export tab for simulation results
+        with tab10:
             display_experiment_summary(result)
             st.subheader("Export Options")
             col1, col2 = st.columns(2)
