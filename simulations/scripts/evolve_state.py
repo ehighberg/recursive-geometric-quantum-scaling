@@ -5,10 +5,17 @@
 State-based approach. 
 We define example functions that demonstrate standard or scale_factor-scaled evolution
 on a single or multi-qubit state.
+
+This module includes implementations for:
+- Standard quantum evolution with configurable noise
+- Phi-resonant evolution with recursive geometric scaling
+- Fractal analysis of quantum states
 """
 
 import numpy as np
 from qutip import sigmaz, tensor, qeye, sesolve, mesolve, sigmax, Options
+from constants import PHI
+from simulations.scaled_unitary import get_phi_recursive_unitary
 
 def construct_nqubit_hamiltonian(num_qubits):
     """
@@ -93,7 +100,10 @@ def simulate_evolution(H, psi0, times, noise_config=None, e_ops=None):
         return sesolve(H, psi0, times, e_ops=e_ops, options=Options(store_states=True))
 
 # Import quantum states at module level
-from simulations.quantum_state import state_zero, state_one, state_plus, state_ghz, state_w
+from simulations.quantum_state import (
+    state_zero, state_one, state_plus, state_ghz, state_w,
+    state_fractal, state_fibonacci, state_phi_sensitive, state_recursive_superposition
+)
 
 def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, noise_config=None, pulse_type="Square", analyze_fractal=False):
     """
@@ -101,11 +111,11 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     
     Parameters:
     - num_qubits (int): Number of qubits in the system
-    - state_label (str): Label for initial state ("zero", "one", "plus", "ghz", "w")
+    - state_label (str): Label for initial state ("zero", "one", "plus", "ghz", "w", "fractal", "fibonacci", "phi_sensitive")
     - n_steps (int): Number of evolution steps
     - scaling_factor (float): Factor to scale the Hamiltonian (default: 1)
     - noise_config (dict): Noise configuration dictionary (see simulate_evolution docstring)
-    - pulse_type (str): Type of pulse shape ("Square", "Gaussian", "DRAG")
+    - pulse_type (str): Type of pulse shape ("Square", "Gaussian", "DRAG", "PhiResonant")
     - analyze_fractal (bool): Whether to perform fractal analysis (computationally expensive)
     
     Returns:
@@ -129,11 +139,63 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
         def drag_envelope(t, args):
             return np.exp(-((t - T/2)**2)/((T/4)**2)) * (1 + 0.1*(t - T/2))
         H_effective = lambda t, args: scaling_factor * drag_envelope(t, args) * H0
+    elif pulse_type == "PhiResonant":
+        # Create phi-resonant Hamiltonian with recursive structure
+        phi = PHI
+        phi_proximity = np.exp(-(scaling_factor - phi)**2 / 0.1)  # Gaussian centered at phi
+        
+        # Add phi-resonant terms to Hamiltonian
+        H_phi = H0.copy()
+        
+        # For multi-qubit systems, add Fibonacci-pattern couplings
+        if num_qubits > 1:
+            # Generate Fibonacci sequence
+            fib = [1, 1]
+            while len(fib) < num_qubits:
+                fib.append(fib[-1] + fib[-2])
+            
+            # Add interactions between qubits at Fibonacci-separated indices
+            for i in range(num_qubits):
+                for j in range(i+1, num_qubits):
+                    if j-i in fib:
+                        # Create operators for interaction
+                        op_list_xx = [qeye(2) for _ in range(num_qubits)]
+                        op_list_xx[i] = sigmax()
+                        op_list_xx[j] = sigmax()
+                        
+                        # Add interaction term with phi-dependent strength
+                        fib_idx = fib.index(j-i)
+                        coupling = scaling_factor * phi**(-fib_idx) * phi_proximity
+                        H_phi += coupling * tensor(op_list_xx)
+        
+        # Create time-dependent envelope with phi-resonant properties
+        T = 10.0
+        def phi_envelope(t, args):
+            # Create envelope with Fibonacci-like time structure
+            t_norm = t / T
+            return np.exp(-((t - T/2)**2)/((T/4)**2)) * (1 + 0.1 * np.sin(2*np.pi*phi*t_norm))
+        
+        H_effective = lambda t, args: phi_envelope(t, args) * H_phi
     else:
         H_effective = scaling_factor * H0
     
     # Initialize state with correct dimensions
-    psi_init = eval(f"state_{state_label}")(num_qubits=num_qubits)
+    # Handle standard states
+    if state_label in ["zero", "one", "plus", "ghz", "w"]:
+        psi_init = eval(f"state_{state_label}")(num_qubits=num_qubits)
+    # Handle phi-resonant states
+    elif state_label == "fractal":
+        psi_init = state_fractal(num_qubits=num_qubits, depth=3, phi_param=scaling_factor)
+    elif state_label == "fibonacci":
+        psi_init = state_fibonacci(num_qubits=num_qubits)
+    elif state_label == "phi_sensitive":
+        psi_init = state_phi_sensitive(num_qubits=num_qubits, scaling_factor=scaling_factor)
+    elif state_label == "recursive":
+        psi_init = state_recursive_superposition(num_qubits=num_qubits, depth=3, scaling_factor=scaling_factor)
+    else:
+        # Default to plus state if unknown label
+        psi_init = state_plus(num_qubits=num_qubits)
+    
     if num_qubits > 1:
         # Ensure correct dimensions for multi-qubit states
         psi_init.dims = [[2] * num_qubits, [1]]
@@ -152,6 +214,11 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     def hamiltonian(f_s):
         return f_s * H0
     result.hamiltonian = hamiltonian
+    
+    # Store additional metadata
+    result.scaling_factor = scaling_factor
+    result.state_label = state_label
+    result.pulse_type = pulse_type
     
     # Only perform fractal analysis if explicitly requested
     if analyze_fractal:
@@ -264,15 +331,247 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     
     return result
 
+
+def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor=PHI, recursion_depth=3, analyze_phi=True):
+    """
+    Run quantum evolution with phi-recursive Hamiltonian structure.
+    
+    Parameters:
+    - num_qubits (int): Number of qubits in the system
+    - state_label (str): Label for initial state
+    - n_steps (int): Number of evolution steps
+    - scaling_factor (float): Scaling factor (default: PHI)
+    - recursion_depth (int): Depth of recursion for phi-based patterns
+    - analyze_phi (bool): Whether to perform phi-sensitive analysis
+    
+    Returns:
+    - qutip.Result: Result object containing evolution data
+    """
+    # Construct appropriate n-qubit Hamiltonian
+    H0 = construct_nqubit_hamiltonian(num_qubits)
+    
+    # Initialize state with phi-sensitive properties
+    if state_label == "fractal":
+        psi_init = state_fractal(num_qubits=num_qubits, depth=recursion_depth, phi_param=scaling_factor)
+    elif state_label == "fibonacci":
+        psi_init = state_fibonacci(num_qubits=num_qubits)
+    elif state_label == "phi_sensitive":
+        psi_init = state_phi_sensitive(num_qubits=num_qubits, scaling_factor=scaling_factor)
+    elif state_label == "recursive":
+        psi_init = state_recursive_superposition(num_qubits=num_qubits, depth=recursion_depth, scaling_factor=scaling_factor)
+    else:
+        # Use standard states if not using phi-specific states
+        if state_label in ["zero", "one", "plus", "ghz", "w"]:
+            psi_init = eval(f"state_{state_label}")(num_qubits=num_qubits)
+        else:
+            # Default to plus state
+            psi_init = state_plus(num_qubits=num_qubits)
+    
+    if num_qubits > 1:
+        # Ensure correct dimensions for multi-qubit states
+        psi_init.dims = [[2] * num_qubits, [1]]
+    
+    # Generate Fibonacci-based time sequence
+    times = []
+    if scaling_factor == PHI:
+        # For phi, use Fibonacci sequence for time points
+        fib = [0.1, 0.1]  # Start with small time steps
+        while len(fib) < n_steps:
+            fib.append(fib[-1] + fib[-2])
+        times = np.array(fib[:n_steps])
+    else:
+        # For other values, use geometric sequence
+        times = np.linspace(0.0, 10.0, n_steps)
+    
+    # Add measurement operators for observables
+    e_ops = [sigmaz()] if num_qubits == 1 else [tensor([sigmaz() if i == j else qeye(2) for i in range(num_qubits)]) for j in range(num_qubits)]
+    
+    # Create phi-recursive unitary for each time step
+    unitaries = []
+    for t in times:
+        U = get_phi_recursive_unitary(H0, t, scaling_factor, recursion_depth)
+        unitaries.append(U)
+    
+    # Manually evolve the state using the unitaries
+    states = [psi_init]
+    current_state = psi_init
+    
+    for U in unitaries:
+        current_state = U * current_state
+        states.append(current_state)
+    
+    # Create result object
+    from qutip.solver import Result
+    result = Result()
+    result.times = times
+    result.states = states
+    
+    # Compute expectation values
+    result.expect = []
+    for op in e_ops:
+        expect_values = []
+        for state in states:
+            expect_values.append((state.dag() * op * state).tr())
+        result.expect.append(np.array(expect_values))
+    
+    # Store metadata
+    result.scaling_factor = scaling_factor
+    result.state_label = state_label
+    result.recursion_depth = recursion_depth
+    
+    # Perform phi-sensitive analysis if requested
+    if analyze_phi:
+        from analyses.fractal_analysis import phi_sensitive_dimension, compute_multifractal_spectrum
+        from analyses.topological_invariants import compute_phi_sensitive_winding, compute_phi_resonant_berry_phase
+        
+        # Compute phi-sensitive fractal dimension
+        final_state = states[-1]
+        wf_data = np.abs(final_state.full().flatten())**2
+        
+        # Compute phi-sensitive dimension
+        phi_dim = phi_sensitive_dimension(wf_data, scaling_factor=scaling_factor)
+        result.phi_dimension = phi_dim
+        
+        # Compute multifractal spectrum
+        mf_spectrum = compute_multifractal_spectrum(wf_data, scaling_factor=scaling_factor)
+        result.multifractal_spectrum = mf_spectrum
+        
+        # Compute phi-sensitive topological metrics
+        # Create k-points for path in parameter space
+        k_points = np.linspace(0, 2*np.pi, 100)
+        
+        # Generate eigenstates along the path
+        eigenstates = []
+        for k in k_points:
+            # Create k-dependent Hamiltonian
+            H_k = H0 + k * sigmax() if num_qubits == 1 else H0
+            
+            # Get phi-recursive unitary
+            U_k = get_phi_recursive_unitary(H_k, 1.0, scaling_factor, recursion_depth)
+            
+            # Apply to initial state
+            state_k = U_k * psi_init
+            eigenstates.append(state_k)
+        
+        # Compute phi-sensitive winding number
+        winding = compute_phi_sensitive_winding(eigenstates, k_points, scaling_factor)
+        result.phi_winding = winding
+        
+        # Compute phi-resonant Berry phase
+        berry_phase = compute_phi_resonant_berry_phase(eigenstates, scaling_factor)
+        result.phi_berry_phase = berry_phase
+    
+    return result
+
+
+def run_comparative_analysis(scaling_factors=None, num_qubits=1, state_label="plus", n_steps=100):
+    """
+    Run comparative analysis of standard vs. phi-recursive evolution.
+    
+    Parameters:
+    - scaling_factors (list): List of scaling factors to analyze
+    - num_qubits (int): Number of qubits in the system
+    - state_label (str): Label for initial state
+    - n_steps (int): Number of evolution steps
+    
+    Returns:
+    - dict: Dictionary containing analysis results
+    """
+    if scaling_factors is None:
+        # Include phi and nearby values for comparison
+        phi = PHI
+        scaling_factors = [0.5, 1.0, 1.5, phi, 2.0, 2.5, 3.0]
+    
+    results = {
+        'scaling_factors': scaling_factors,
+        'standard_results': {},
+        'phi_recursive_results': {},
+        'comparative_metrics': {}
+    }
+    
+    # Run standard and phi-recursive evolution for each scaling factor
+    for factor in scaling_factors:
+        # Run standard evolution
+        std_result = run_state_evolution(
+            num_qubits=num_qubits,
+            state_label=state_label,
+            n_steps=n_steps,
+            scaling_factor=factor,
+            analyze_fractal=True
+        )
+        
+        # Run phi-recursive evolution
+        phi_result = run_phi_recursive_evolution(
+            num_qubits=num_qubits,
+            state_label=state_label,
+            n_steps=n_steps,
+            scaling_factor=factor,
+            analyze_phi=True
+        )
+        
+        # Store results
+        results['standard_results'][factor] = std_result
+        results['phi_recursive_results'][factor] = phi_result
+        
+        # Compute comparative metrics
+        from analyses.fractal_analysis import estimate_fractal_dimension
+        
+        # Get final states
+        std_final = std_result.states[-1]
+        phi_final = phi_result.states[-1]
+        
+        # Compute state overlap
+        overlap = abs((std_final.dag() * phi_final).tr())
+        
+        # Compute fractal dimension difference
+        std_wf = np.abs(std_final.full().flatten())**2
+        phi_wf = np.abs(phi_final.full().flatten())**2
+        
+        std_dim, _ = estimate_fractal_dimension(std_wf)
+        phi_dim = phi_result.phi_dimension if hasattr(phi_result, 'phi_dimension') else 0.0
+        
+        dim_diff = abs(std_dim - phi_dim)
+        
+        # Store comparative metrics
+        results['comparative_metrics'][factor] = {
+            'state_overlap': float(overlap),
+            'dimension_difference': float(dim_diff),
+            'phi_proximity': float(np.exp(-(factor - PHI)**2 / 0.1))
+        }
+    
+    return results
+
+
 if __name__=="__main__":
-    # Run evolution simulation with parameters tuned for fractal analysis
-    evolution_result = run_state_evolution(
+    # Run comparative analysis with phi-recursive evolution
+    phi = PHI
+    
+    print(f"Running comparative analysis with phi = {phi:.6f}...")
+    
+    # Run standard evolution
+    std_result = run_state_evolution(
         num_qubits=1,
         state_label="plus",
-        n_steps=400,  # High temporal resolution
-        scaling_factor=2.0,  # Strong scaling to enhance geometric effects
-        analyze_fractal=True  # Enable fractal analysis
+        n_steps=100,
+        scaling_factor=phi,
+        analyze_fractal=True
+    )
+    
+    # Run phi-recursive evolution
+    phi_result = run_phi_recursive_evolution(
+        num_qubits=1,
+        state_label="phi_sensitive",
+        n_steps=100,
+        scaling_factor=phi,
+        recursion_depth=3,
+        analyze_phi=True
     )
     
     print("\nAnalysis complete.")
-    print(f"Final state: {evolution_result.states[-1]}")
+    print(f"Standard final state: {std_result.states[-1]}")
+    print(f"Phi-recursive final state: {phi_result.states[-1]}")
+    
+    # Compare fractal dimensions
+    if hasattr(std_result, 'fractal_dimensions') and hasattr(phi_result, 'phi_dimension'):
+        print(f"Standard fractal dimension: {np.mean(std_result.fractal_dimensions):.6f}")
+        print(f"Phi-sensitive dimension: {phi_result.phi_dimension:.6f}")
