@@ -57,14 +57,18 @@ def run_evolution_analysis():
         result_phi.times,
         title=f"Entanglement Entropy Evolution (φ={PHI:.4f})"
     )
-    fig_entropy_phi.savefig("entanglement_entropy_phi.png", dpi=300, bbox_inches='tight')
+    # Create plots directory if it doesn't exist
+    plots_dir = Path("plots")
+    plots_dir.mkdir(exist_ok=True)
+    
+    fig_entropy_phi.savefig(plots_dir / "entanglement_entropy_phi.png", dpi=300, bbox_inches='tight')
     
     fig_entropy_unit = plot_entanglement_entropy_vs_time(
         result_unit.states,
         result_unit.times,
         title="Entanglement Entropy Evolution (Unit Scaling)"
     )
-    fig_entropy_unit.savefig("entanglement_entropy_unit.png", dpi=300, bbox_inches='tight')
+    fig_entropy_unit.savefig(plots_dir / "entanglement_entropy_unit.png", dpi=300, bbox_inches='tight')
     
     # Plot entanglement spectrum
     fig_spectrum_phi = plot_entanglement_spectrum(
@@ -72,7 +76,7 @@ def run_evolution_analysis():
         result_phi.times,
         title=f"Entanglement Spectrum (φ={PHI:.4f})"
     )
-    fig_spectrum_phi.savefig("entanglement_spectrum_phi.png", dpi=300, bbox_inches='tight')
+    fig_spectrum_phi.savefig(plots_dir / "entanglement_spectrum_phi.png", dpi=300, bbox_inches='tight')
     
     # Plot entanglement growth rate
     fig_growth_phi = plot_entanglement_growth_rate(
@@ -80,7 +84,7 @@ def run_evolution_analysis():
         result_phi.times,
         title=f"Entanglement Growth Rate (φ={PHI:.4f})"
     )
-    fig_growth_phi.savefig("entanglement_growth_phi.png", dpi=300, bbox_inches='tight')
+    fig_growth_phi.savefig(plots_dir / "entanglement_growth_phi.png", dpi=300, bbox_inches='tight')
     
     # Plot wavepacket evolution
     fig_wavepacket_phi = plot_wavepacket_evolution(
@@ -89,7 +93,7 @@ def run_evolution_analysis():
         coordinates=coordinates,
         title=f"Wavepacket Evolution (φ={PHI:.4f})"
     )
-    fig_wavepacket_phi.savefig("wavepacket_evolution_phi.png", dpi=300, bbox_inches='tight')
+    fig_wavepacket_phi.savefig(plots_dir / "wavepacket_evolution_phi.png", dpi=300, bbox_inches='tight')
     
     fig_wavepacket_unit = plot_wavepacket_evolution(
         result_unit.states,
@@ -97,7 +101,7 @@ def run_evolution_analysis():
         coordinates=coordinates,
         title="Wavepacket Evolution (Unit Scaling)"
     )
-    fig_wavepacket_unit.savefig("wavepacket_evolution_unit.png", dpi=300, bbox_inches='tight')
+    fig_wavepacket_unit.savefig(plots_dir / "wavepacket_evolution_unit.png", dpi=300, bbox_inches='tight')
     
     # Plot wavepacket spacetime diagram
     fig_spacetime_phi = plot_wavepacket_spacetime(
@@ -106,7 +110,7 @@ def run_evolution_analysis():
         coordinates=coordinates,
         title=f"Wavepacket Spacetime (φ={PHI:.4f})"
     )
-    fig_spacetime_phi.savefig("wavepacket_spacetime_phi.png", dpi=300, bbox_inches='tight')
+    fig_spacetime_phi.savefig(plots_dir / "wavepacket_spacetime_phi.png", dpi=300, bbox_inches='tight')
     
     # Create comparison plot for phi vs unit scaling
     plt.figure(figsize=(12, 8))
@@ -170,7 +174,7 @@ def run_evolution_analysis():
     plt.grid(alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig("phi_vs_unit_comparison.png", dpi=300, bbox_inches='tight')
+    plt.savefig(plots_dir / "phi_vs_unit_comparison.png", dpi=300, bbox_inches='tight')
     
     print("Evolution analysis complete. Results saved to PNG files.")
 

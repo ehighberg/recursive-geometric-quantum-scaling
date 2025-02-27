@@ -22,10 +22,10 @@ python -m analyses.scaling.analyze_phi_significance
 ```
 
 **Outputs:**
-- `phi_significance_results.csv` - Numerical data
-- `phi_significance_plots.png` - Visualizations of band gaps, fractal dimensions, etc.
-- `phi_significance_derivatives.png` - Shows rate of change, helping identify phase transitions
-- `phi_significance_zoom.png` - Detailed view of behavior around phi
+- `data/phi_significance_results.csv` - Numerical data
+- `plots/phi_significance_plots.png` - Visualizations of band gaps, fractal dimensions, etc.
+- `plots/phi_significance_derivatives.png` - Shows rate of change, helping identify phase transitions
+- `plots/phi_significance_zoom.png` - Detailed view of behavior around phi
 
 ### 2. Run the Fractal-Topology Relation Analysis
 
@@ -36,9 +36,9 @@ python -m analyses.scaling.analyze_fractal_topology_relation
 ```
 
 **Outputs:**
-- `fractal_topology_relation.csv` - Numerical data
-- `fractal_topology_relation.png` - Plots showing the relationship between fractal and topological properties
-- `fractal_topology_phase_diagram.png` - Phase diagram showing different regimes
+- `data/fractal_topology_relation.csv` - Numerical data
+- `plots/fractal_topology_relation.png` - Plots showing the relationship between fractal and topological properties
+- `plots/fractal_topology_phase_diagram.png` - Phase diagram showing different regimes
 
 ### 3. Run the f_s Scaling Analysis
 
@@ -49,9 +49,9 @@ python -m analyses.scaling.analyze_fs_scaling
 ```
 
 **Outputs:**
-- `fs_scaling_results.csv` - Numerical data
-- `fs_scaling_plots.png` - Individual plots for each property
-- `fs_scaling_combined.png` - Combined plot showing all properties together
+- `data/fs_scaling_results.csv` - Numerical data
+- `plots/fs_scaling_plots.png` - Individual plots for each property
+- `plots/fs_scaling_combined.png` - Combined plot showing all properties together
 
 ### 4. Run the Evolution Analysis
 
@@ -62,14 +62,14 @@ python run_evolution_analysis.py
 ```
 
 **Outputs:**
-- `entanglement_entropy_phi.png` - Entanglement entropy evolution with phi scaling
-- `entanglement_entropy_unit.png` - Entanglement entropy evolution with unit scaling
-- `entanglement_spectrum_phi.png` - Entanglement spectrum with phi scaling
-- `entanglement_growth_phi.png` - Entanglement growth rate with phi scaling
-- `wavepacket_evolution_phi.png` - Wavepacket evolution with phi scaling
-- `wavepacket_evolution_unit.png` - Wavepacket evolution with unit scaling
-- `wavepacket_spacetime_phi.png` - Wavepacket spacetime diagram with phi scaling
-- `phi_vs_unit_comparison.png` - Comparison of phi vs unit scaling
+- `plots/entanglement_entropy_phi.png` - Entanglement entropy evolution with phi scaling
+- `plots/entanglement_entropy_unit.png` - Entanglement entropy evolution with unit scaling
+- `plots/entanglement_spectrum_phi.png` - Entanglement spectrum with phi scaling
+- `plots/entanglement_growth_phi.png` - Entanglement growth rate with phi scaling
+- `plots/wavepacket_evolution_phi.png` - Wavepacket evolution with phi scaling
+- `plots/wavepacket_evolution_unit.png` - Wavepacket evolution with unit scaling
+- `plots/wavepacket_spacetime_phi.png` - Wavepacket spacetime diagram with phi scaling
+- `plots/phi_vs_unit_comparison.png` - Comparison of phi vs unit scaling
 
 ### 5. Generate Summary Tables
 
@@ -80,12 +80,12 @@ python generate_summary_table.py
 ```
 
 **Outputs:**
-- `summary_table.csv` - CSV file with the summary data
-- `summary_table.png` - Visualization of the summary table
-- `summary_table.tex` - LaTeX version of the summary table for the paper
-- `phi_comparison_table.csv` - CSV file with the phi comparison data
-- `phi_comparison_table.png` - Visualization of the phi comparison table
-- `phi_comparison_table.tex` - LaTeX version of the phi comparison table for the paper
+- `data/summary_table.csv` - CSV file with the summary data
+- `plots/summary_table.png` - Visualization of the summary table
+- `data/summary_table.tex` - LaTeX version of the summary table for the paper
+- `data/phi_comparison_table.csv` - CSV file with the phi comparison data
+- `plots/phi_comparison_table.png` - Visualization of the phi comparison table
+- `data/phi_comparison_table.tex` - LaTeX version of the phi comparison table for the paper
 
 ### 6. Generate the Comprehensive Report
 
@@ -139,12 +139,12 @@ For direct inclusion in your LaTeX paper, use the generated `.tex` files:
 ```latex
 \begin{table}[h]
 \caption{Quantum Properties at Different Scaling Factors}
-\input{summary_table.tex}
+\input{data/summary_table.tex}
 \end{table}
 
 \begin{table}[h]
 \caption{Comparison of Quantum Properties at φ vs. Other Scaling Factors}
-\input{phi_comparison_table.tex}
+\input{data/phi_comparison_table.tex}
 \end{table}
 ```
 

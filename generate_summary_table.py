@@ -81,9 +81,17 @@ def generate_summary_table():
     # Create summary DataFrame
     summary_df = pd.DataFrame(summary_data)
     
+    # Create data directory if it doesn't exist
+    data_dir = Path("data")
+    data_dir.mkdir(exist_ok=True)
+    
+    # Create plots directory if it doesn't exist
+    plots_dir = Path("plots")
+    plots_dir.mkdir(exist_ok=True)
+    
     # Save summary table to CSV
-    summary_df.to_csv("summary_table.csv", index=False)
-    print("Summary table saved to summary_table.csv")
+    summary_df.to_csv(data_dir / "summary_table.csv", index=False)
+    print("Summary table saved to data/summary_table.csv")
     
     # Create a publication-ready table visualization
     fig, ax = plt.figure(figsize=(10, 6)), plt.gca()
@@ -115,15 +123,15 @@ def generate_summary_table():
     
     # Save table as image
     plt.tight_layout()
-    plt.savefig("summary_table.png", dpi=300, bbox_inches='tight')
-    print("Summary table visualization saved to summary_table.png")
+    plt.savefig(plots_dir / "summary_table.png", dpi=300, bbox_inches='tight')
+    print("Summary table visualization saved to plots/summary_table.png")
     
     # Generate LaTeX table for the paper
     latex_table = summary_df.to_latex(index=False, float_format="%.4f")
     
-    with open("summary_table.tex", "w", encoding="utf-8") as f:
+    with open(data_dir / "summary_table.tex", "w", encoding="utf-8") as f:
         f.write(latex_table)
-    print("LaTeX table saved to summary_table.tex")
+    print("LaTeX table saved to data/summary_table.tex")
     
     # Generate a more comprehensive comparison table
     if phi_results is not None and fs_results is not None:
@@ -164,8 +172,8 @@ def generate_summary_table():
         comparison_df = pd.DataFrame(comparison_data)
         
         # Save comparison table to CSV
-        comparison_df.to_csv("phi_comparison_table.csv", index=False)
-        print("Phi comparison table saved to phi_comparison_table.csv")
+        comparison_df.to_csv(data_dir / "phi_comparison_table.csv", index=False)
+        print("Phi comparison table saved to data/phi_comparison_table.csv")
         
         # Create a publication-ready comparison table visualization
         fig, ax = plt.figure(figsize=(12, 6)), plt.gca()
@@ -191,15 +199,15 @@ def generate_summary_table():
         
         # Save table as image
         plt.tight_layout()
-        plt.savefig("phi_comparison_table.png", dpi=300, bbox_inches='tight')
-        print("Phi comparison table visualization saved to phi_comparison_table.png")
+        plt.savefig(plots_dir / "phi_comparison_table.png", dpi=300, bbox_inches='tight')
+        print("Phi comparison table visualization saved to plots/phi_comparison_table.png")
         
         # Generate LaTeX table for the paper
         latex_comparison = comparison_df.to_latex(index=False, float_format="%.4f")
         
-        with open("phi_comparison_table.tex", "w", encoding="utf-8") as f:
+        with open(data_dir / "phi_comparison_table.tex", "w", encoding="utf-8") as f:
             f.write(latex_comparison)
-        print("LaTeX comparison table saved to phi_comparison_table.tex")
+        print("LaTeX comparison table saved to data/phi_comparison_table.tex")
 
 if __name__ == "__main__":
     generate_summary_table()
