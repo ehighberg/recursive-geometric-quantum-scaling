@@ -8,6 +8,7 @@ Functions:
 
 import numpy as np
 import matplotlib.pyplot as plt
+from qutip.solver import Result
 
 def plot_invariants(control_range):
     """
@@ -44,6 +45,13 @@ def plot_invariants(control_range):
     ax.set_title("Topological Invariants vs Control Parameter")
     ax.grid(True)
     ax.legend()
+    
+    # Create a Result object to store the data
+    result = Result()
+    result.times = x
+    result.expect = [chern_values, winding_values, z2_values]
+    result.e_ops = []
+    result.options = {}
     
     return fig
 
@@ -85,5 +93,12 @@ def plot_protection_metrics(control_range, energy_gaps, localization_measures):
     
     # Set y-axis limits with small padding
     ax.set_ylim(-0.1, 1.1)
+    
+    # Create a Result object to store the data
+    result = Result()
+    result.times = x
+    result.expect = [energy_gaps_norm, localization_measures_norm]
+    result.e_ops = []
+    result.options = {}
     
     return fig

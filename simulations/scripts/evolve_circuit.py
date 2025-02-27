@@ -42,6 +42,12 @@ def run_standard_twoqubit_circuit(noise_config=None):
         return float(f_s) * H0
     result.hamiltonian = hamiltonian
     
+    # Ensure e_ops and options are set
+    if not hasattr(result, 'e_ops'):
+        result.e_ops = []
+    if not hasattr(result, 'options'):
+        result.options = {}
+    
     return result
 
 def run_phi_scaled_twoqubit_circuit(scaling_factor=1.0, noise_config=None):
@@ -76,6 +82,12 @@ def run_phi_scaled_twoqubit_circuit(scaling_factor=1.0, noise_config=None):
     def hamiltonian(f_s):
         return float(f_s) * H0
     result.hamiltonian = hamiltonian
+    
+    # Ensure e_ops and options are set
+    if not hasattr(result, 'e_ops'):
+        result.e_ops = []
+    if not hasattr(result, 'options'):
+        result.options = {}
     
     return result
 
@@ -140,6 +152,12 @@ def run_fibonacci_braiding_circuit(braid_type='Fibonacci', braid_sequence='1,2,1
         # Scale both braid operators by f_s
         return float(f_s) * (B1_2 + B2_2)
     result.hamiltonian = hamiltonian
+    
+    # Ensure e_ops and options are set
+    if not hasattr(result, 'e_ops'):
+        result.e_ops = []
+    if not hasattr(result, 'options'):
+        result.options = {}
     
     return result
 
@@ -254,6 +272,12 @@ def run_quantum_gate_circuit(circuit_type="Single Qubit", optimization=None, noi
     def hamiltonian(f_s):
         return float(f_s) * H0
     result.hamiltonian = hamiltonian
+    
+    # Ensure e_ops and options are set
+    if not hasattr(result, 'e_ops'):
+        result.e_ops = []
+    if not hasattr(result, 'options'):
+        result.options = {}
     
     return result
 

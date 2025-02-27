@@ -16,6 +16,8 @@ class EvolutionResult:
         self.states = states
         self.times = times
         self.eigenvalues: Optional[np.ndarray] = None
+        self.e_ops = []
+        self.options = {}
         
     @property
     def dims(self):
@@ -122,6 +124,8 @@ class StandardCircuit(QuantumCircuit):
         # Create our EvolutionResult
         result = EvolutionResult(mesolve_result.states, tlist)
         result.eigenvalues = self.base_hamiltonian.eigenenergies()
+        result.e_ops = []
+        result.options = {}
         
         return result
 
@@ -149,6 +153,8 @@ class StandardCircuit(QuantumCircuit):
         
         # Create our EvolutionResult
         result = EvolutionResult(mesolve_result.states, tlist)
+        result.e_ops = []
+        result.options = {}
         return result
 
 class ScaledCircuit(QuantumCircuit):
@@ -245,6 +251,8 @@ class ScaledCircuit(QuantumCircuit):
             times.append(current_time)
         
         result = EvolutionResult(states, times)
+        result.e_ops = []
+        result.options = {}
         return result
 
     def evolve_open(self, initial_state, c_ops=None, n_steps=None):
@@ -275,6 +283,8 @@ class ScaledCircuit(QuantumCircuit):
         
         # Create our EvolutionResult
         result = EvolutionResult(mesolve_result.states, tlist)
+        result.e_ops = []
+        result.options = {}
         return result
 
 class FibonacciBraidingCircuit(QuantumCircuit):
@@ -316,6 +326,8 @@ class FibonacciBraidingCircuit(QuantumCircuit):
             times.append(float(i + 1))
         
         result = EvolutionResult(states, times)
+        result.e_ops = []
+        result.options = {}
         return result
         
     def evolve_with_noise(self, initial_state, c_ops=None):
@@ -367,4 +379,6 @@ class FibonacciBraidingCircuit(QuantumCircuit):
             times.append(float(i + 1))
         
         result = EvolutionResult(states, times)
+        result.e_ops = []
+        result.options = {}
         return result

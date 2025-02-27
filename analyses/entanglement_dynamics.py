@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from qutip import Qobj, tensor, basis
+from qutip.solver import Result
 from typing import List, Dict, Optional, Tuple, Union, Callable
 from analyses.entanglement import entanglement_entropy
 from analyses.visualization.style_config import configure_axis, COLORS, PLOT_STYLE
@@ -132,6 +133,14 @@ def plot_entanglement_entropy_vs_time(
         ax.legend()
     
     fig.tight_layout()
+    
+    # Create a Result object to store the data
+    result = Result()
+    result.times = times
+    result.expect = [entropies]
+    result.e_ops = []
+    result.options = {}
+    
     return fig
 
 def analyze_entanglement_scaling(
@@ -225,6 +234,14 @@ def analyze_entanglement_scaling(
     if title:
         fig.suptitle(title, fontsize=14, y=1.05)
     fig.tight_layout()
+    
+    # Create a Result object to store the data
+    result = Result()
+    result.times = times
+    result.expect = []
+    result.e_ops = []
+    result.options = {}
+    
     return fig
 
 def compare_boundary_conditions(
@@ -290,6 +307,14 @@ def compare_boundary_conditions(
     if title:
         fig.suptitle(title, fontsize=14, y=1.05)
     fig.tight_layout()
+    
+    # Create a Result object to store the data
+    result = Result()
+    result.times = times
+    result.expect = [entropies_pbc, entropies_obc, diff]
+    result.e_ops = []
+    result.options = {}
+    
     return fig
 
 def plot_entanglement_spectrum(
@@ -324,6 +349,9 @@ def plot_entanglement_spectrum(
     fig = plt.figure(figsize=figsize)
     gs = GridSpec(2, 3, figure=fig)
     
+    # Store all eigenvalues for Result object
+    all_eigenvalues = []
+    
     # Plot entanglement spectrum at each time point
     for i, idx in enumerate(time_indices):
         if idx >= len(states):
@@ -348,6 +376,7 @@ def plot_entanglement_spectrum(
         
         # Compute eigenvalues
         evals = rho_reduced.eigenenergies()
+        all_eigenvalues.append(evals)
         
         # Plot eigenvalues
         ax.stem(range(len(evals)), evals, linefmt='-', markerfmt='o', 
@@ -362,6 +391,14 @@ def plot_entanglement_spectrum(
     if title:
         fig.suptitle(title, fontsize=14, y=1.05)
     fig.tight_layout()
+    
+    # Create a Result object to store the data
+    result = Result()
+    result.times = [times[idx] for idx in time_indices if idx < len(times)]
+    result.expect = all_eigenvalues
+    result.e_ops = []
+    result.options = {}
+    
     return fig
 
 def plot_entanglement_growth_rate(
@@ -417,4 +454,12 @@ def plot_entanglement_growth_rate(
     ax.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
     
     fig.tight_layout()
+    
+    # Create a Result object to store the data
+    result = Result()
+    result.times = times
+    result.expect = [entropies, growth_rates]
+    result.e_ops = []
+    result.options = {}
+    
     return fig

@@ -17,20 +17,81 @@ from qutip import sigmaz, tensor, qeye, sesolve, mesolve, sigmax, Options
 from constants import PHI
 from simulations.scaled_unitary import get_phi_recursive_unitary
 
-def construct_nqubit_hamiltonian(num_qubits):
+def construct_nqubit_hamiltonian(num_qubits, interaction_strength=0.5, transverse_field=0.3):
     """
-    Construct n-qubit Hamiltonian as sum of local sigma_z terms.
-    H = Σi σzi
-    """
-    if num_qubits == 1:
-        return sigmaz()
+    Construct a more realistic n-qubit Hamiltonian with:
+    1. Local sigma_z terms (longitudinal field)
+    2. Local sigma_x terms (transverse field)
+    3. Nearest-neighbor sigma_z-sigma_z interactions (Ising-type)
+    4. Next-nearest-neighbor sigma_x-sigma_x interactions (XY-type)
     
-    # Create list of operators for tensor product
+    H = Σi σzi + h Σi σxi + J Σ<i,j> σzi⊗σzj + J' Σ<i,j'> σxi⊗σxj'
+    
+    Parameters:
+    - num_qubits (int): Number of qubits
+    - interaction_strength (float): Strength of nearest-neighbor interactions
+    - transverse_field (float): Strength of transverse field
+    
+    Returns:
+    - Qobj: Hamiltonian operator
+    """
+    from qutip import sigmay
+    
+    if num_qubits == 1:
+        # For single qubit, include both z and x terms
+        return sigmaz() + transverse_field * sigmax()
+    
+    # Initialize Hamiltonian
     H0 = 0
+    
+    # 1. Add local sigma_z terms (longitudinal field)
     for i in range(num_qubits):
         op_list = [qeye(2) for _ in range(num_qubits)]
         op_list[i] = sigmaz()
         H0 += tensor(op_list)
+    
+    # 2. Add local sigma_x terms (transverse field)
+    for i in range(num_qubits):
+        op_list = [qeye(2) for _ in range(num_qubits)]
+        op_list[i] = sigmax()
+        H0 += transverse_field * tensor(op_list)
+    
+    # 3. Add nearest-neighbor sigma_z-sigma_z interactions (Ising-type)
+    for i in range(num_qubits - 1):
+        op_list = [qeye(2) for _ in range(num_qubits)]
+        op_list[i] = sigmaz()
+        op_list[i+1] = sigmaz()
+        H0 += interaction_strength * tensor(op_list)
+    
+    # 4. Add next-nearest-neighbor sigma_x-sigma_x interactions (XY-type)
+    # This creates more complex dynamics and entanglement
+    for i in range(num_qubits - 2):
+        # X-X interactions
+        op_list_xx = [qeye(2) for _ in range(num_qubits)]
+        op_list_xx[i] = sigmax()
+        op_list_xx[i+2] = sigmax()
+        H0 += 0.3 * interaction_strength * tensor(op_list_xx)
+        
+        # Y-Y interactions for more complex dynamics
+        op_list_yy = [qeye(2) for _ in range(num_qubits)]
+        op_list_yy[i] = sigmay()
+        op_list_yy[i+2] = sigmay()
+        H0 += 0.2 * interaction_strength * tensor(op_list_yy)
+    
+    # 5. Add periodic boundary condition (connect last qubit to first)
+    if num_qubits > 2:
+        # Z-Z interaction
+        op_list_zz = [qeye(2) for _ in range(num_qubits)]
+        op_list_zz[0] = sigmaz()
+        op_list_zz[-1] = sigmaz()
+        H0 += 0.5 * interaction_strength * tensor(op_list_zz)
+        
+        # X-X interaction
+        op_list_xx = [qeye(2) for _ in range(num_qubits)]
+        op_list_xx[0] = sigmax()
+        op_list_xx[-1] = sigmax()
+        H0 += 0.3 * interaction_strength * tensor(op_list_xx)
+    
     return H0
 
 def simulate_evolution(H, psi0, times, noise_config=None, e_ops=None):
@@ -95,9 +156,12 @@ def simulate_evolution(H, psi0, times, noise_config=None, e_ops=None):
                     op_list_z[i] = sigmaz()
                     c_ops.append(np.sqrt(noise_config['measurement']) * tensor(op_list_z))
         
-        return mesolve(H, psi0, times, c_ops, e_ops=e_ops, options=Options(store_states=True))
+        # Increase nsteps for better integration with noise
+        options = Options(store_states=True, nsteps=10000)
+        return mesolve(H, psi0, times, c_ops, e_ops=e_ops, options=options)
     else:
-        return sesolve(H, psi0, times, e_ops=e_ops, options=Options(store_states=True))
+        options = Options(store_states=True)
+        return sesolve(H, psi0, times, e_ops=e_ops, options=options)
 
 # Import quantum states at module level
 from simulations.quantum_state import (
@@ -151,30 +215,66 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
         if num_qubits > 1:
             # Generate Fibonacci sequence
             fib = [1, 1]
-            while len(fib) < num_qubits:
+            while len(fib) < num_qubits * 2:  # Generate more Fibonacci numbers
                 fib.append(fib[-1] + fib[-2])
             
             # Add interactions between qubits at Fibonacci-separated indices
             for i in range(num_qubits):
-                for j in range(i+1, num_qubits):
-                    if j-i in fib:
-                        # Create operators for interaction
+                for j in range(num_qubits):
+                    if i != j and abs(j-i) in fib:
+                        # Create operators for interaction - use both XX and ZZ interactions
+                        # XX interactions (transverse coupling)
                         op_list_xx = [qeye(2) for _ in range(num_qubits)]
                         op_list_xx[i] = sigmax()
                         op_list_xx[j] = sigmax()
                         
-                        # Add interaction term with phi-dependent strength
-                        fib_idx = fib.index(j-i)
-                        coupling = scaling_factor * phi**(-fib_idx) * phi_proximity
-                        H_phi += coupling * tensor(op_list_xx)
+                        # ZZ interactions (longitudinal coupling)
+                        op_list_zz = [qeye(2) for _ in range(num_qubits)]
+                        op_list_zz[i] = sigmaz()
+                        op_list_zz[j] = sigmaz()
+                        
+                        # Add interaction terms with phi-dependent strength
+                        fib_idx = fib.index(abs(j-i))
+                        
+                        # Scale coupling strength by phi^(-fib_idx) to create hierarchical structure
+                        xx_coupling = scaling_factor * phi**(-fib_idx) * phi_proximity
+                        zz_coupling = scaling_factor * 0.7 * phi**(-fib_idx) * phi_proximity
+                        
+                        # Add both types of interactions
+                        H_phi += xx_coupling * tensor(op_list_xx)
+                        H_phi += zz_coupling * tensor(op_list_zz)
+            
+            # Add special phi-resonant three-body interactions for systems with 3+ qubits
+            if num_qubits >= 3:
+                for i in range(num_qubits - 2):
+                    # Create three-body interaction operators
+                    op_list_3body = [qeye(2) for _ in range(num_qubits)]
+                    op_list_3body[i] = sigmax()
+                    op_list_3body[i+1] = sigmaz()
+                    op_list_3body[i+2] = sigmax()
+                    
+                    # Add with phi-dependent coupling
+                    three_body_coupling = 0.2 * scaling_factor * phi_proximity
+                    H_phi += three_body_coupling * tensor(op_list_3body)
         
         # Create time-dependent envelope with phi-resonant properties
         T = 10.0
         def phi_envelope(t, args):
             # Create envelope with Fibonacci-like time structure
             t_norm = t / T
-            return np.exp(-((t - T/2)**2)/((T/4)**2)) * (1 + 0.1 * np.sin(2*np.pi*phi*t_norm))
+            
+            # Enhanced envelope with phi-resonant modulation
+            # Base Gaussian envelope
+            gaussian = np.exp(-((t - T/2)**2)/((T/4)**2))
+            
+            # Phi-resonant modulation with multiple harmonics
+            modulation = (1 + 0.1 * np.sin(2*np.pi*phi*t_norm) + 
+                          0.05 * np.sin(2*np.pi*phi**2*t_norm) +
+                          0.025 * np.sin(2*np.pi*phi**3*t_norm))
+            
+            return gaussian * modulation
         
+        # Create time-dependent Hamiltonian
         H_effective = lambda t, args: phi_envelope(t, args) * H_phi
     else:
         H_effective = scaling_factor * H0
@@ -332,7 +432,7 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     return result
 
 
-def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor=PHI, recursion_depth=3, analyze_phi=True):
+def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor=PHI, recursion_depth=3, analyze_phi=True, noise_config=None):
     """
     Run quantum evolution with phi-recursive Hamiltonian structure.
     
@@ -393,25 +493,83 @@ def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor
         unitaries.append(U)
     
     # Manually evolve the state using the unitaries
-    states = [psi_init]
+    states = []  # Initialize states list
     current_state = psi_init
     
-    for U in unitaries:
-        current_state = U * current_state
-        states.append(current_state)
+    for i, U in enumerate(unitaries):
+        # Apply unitary evolution
+        evolved_state = U * current_state
+        
+        # If noise is configured, apply noise effects manually
+        if noise_config:
+            # Convert to density matrix if it's a ket
+            if evolved_state.isket:
+                evolved_state = evolved_state * evolved_state.dag()
+            
+            # Apply dephasing noise (diagonal terms decay)
+            if noise_config.get('dephasing', 0) > 0:
+                dephasing = noise_config['dephasing']
+                # For each element in the density matrix
+                data = evolved_state.full()
+                for i in range(data.shape[0]):
+                    for j in range(data.shape[1]):
+                        if i != j:  # Off-diagonal elements
+                            # Apply exponential decay to off-diagonal elements
+                            data[i, j] *= np.exp(-dephasing * times[i])
+                
+                # Create new density matrix with decayed elements
+                from qutip import Qobj
+                evolved_state = Qobj(data, dims=evolved_state.dims)
+            
+            # Apply relaxation noise (population decay to ground state)
+            if noise_config.get('relaxation', 0) > 0:
+                relaxation = noise_config['relaxation']
+                # For each element in the density matrix
+                data = evolved_state.full()
+                # Diagonal elements decay toward ground state
+                for i in range(1, data.shape[0]):  # Skip ground state
+                    # Population decay
+                    decay_factor = np.exp(-relaxation * times[i])
+                    # Population transfers to ground state
+                    ground_transfer = (1 - decay_factor) * data[i, i]
+                    # Update diagonal elements
+                    data[i, i] *= decay_factor
+                    data[0, 0] += ground_transfer
+                
+                # Create new density matrix with decayed populations
+                from qutip import Qobj
+                evolved_state = Qobj(data, dims=evolved_state.dims)
+        
+        # Add state to list
+        states.append(evolved_state)
     
-    # Create result object
-    from qutip.solver import Result
-    result = Result()
+    # Create a custom result object instead of using QuTiP's Result class
+    class CustomResult:
+        def __init__(self):
+            self.times = None
+            self.states = None
+            self.e_ops = None
+            self.options = {}
+            self.expect = []
+    
+    result = CustomResult()
     result.times = times
     result.states = states
+    result.e_ops = e_ops
     
     # Compute expectation values
-    result.expect = []
     for op in e_ops:
         expect_values = []
         for state in states:
-            expect_values.append((state.dag() * op * state).tr())
+            # Handle the case where the result is already a complex number
+            expectation = state.dag() * op * state
+            if hasattr(expectation, 'tr'):
+                # If it's a QuTiP object with a trace method
+                expectation = expectation.tr()
+            # Ensure the result is a real number if it's supposed to be
+            if isinstance(expectation, complex) and abs(expectation.imag) < 1e-10:
+                expectation = expectation.real
+            expect_values.append(expectation)
         result.expect.append(np.array(expect_values))
     
     # Store metadata
