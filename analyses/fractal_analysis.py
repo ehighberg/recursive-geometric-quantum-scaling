@@ -302,22 +302,48 @@ def estimate_fractal_dimension(
     # Dynamic thresholding based on data statistics
     base_threshold = threshold_factor * np.mean(data)
     
+    # Set maximum number of segments to prevent memory errors
+    MAX_SEGMENTS = 1000  # Limit to prevent memory overflow
+    
     for box in box_sizes:
         # Use multiple thresholds for each box size
         thresholds = np.linspace(base_threshold * box, base_threshold, 5)
         box_counts = []
         
         for threshold in thresholds:
-            # Count boxes containing values above threshold
-            segments = np.array_split(data, int(1/box))
-            count = sum(1 for segment in segments if np.any(segment > threshold))
+            # Calculate number of segments safely
+            n_segments = min(int(1/box), MAX_SEGMENTS)
+            
+            if n_segments <= 1:
+                # Skip if box size is too large (would create only 1 segment)
+                continue
+                
+            # Memory-efficient box counting
+            if len(data) > 10000 and n_segments > 100:
+                # For large datasets, use sampling approach
+                segment_size = len(data) // n_segments
+                count = 0
+                
+                for i in range(n_segments):
+                    start_idx = i * segment_size
+                    end_idx = min((i + 1) * segment_size, len(data))
+                    segment = data[start_idx:end_idx]
+                    
+                    if np.any(segment > threshold):
+                        count += 1
+            else:
+                # For smaller datasets, use array_split
+                segments = np.array_split(data, n_segments)
+                count = sum(1 for segment in segments if np.any(segment > threshold))
+                
             box_counts.append(count)
         
         # Take maximum count across thresholds
-        max_count = max(box_counts)
-        if max_count > 0:  # Only include non-zero counts
-            counts.append(max_count)
-            valid_boxes.append(box)
+        if box_counts:  # Check if we have any counts
+            max_count = max(box_counts)
+            if max_count > 0:  # Only include non-zero counts
+                counts.append(max_count)
+                valid_boxes.append(box)
     
     if len(valid_boxes) < 5:  # Require more points for reliable fit
         warnings.warn("Insufficient valid points for reliable dimension estimation")
@@ -391,7 +417,11 @@ def phi_sensitive_dimension(
     
     # Set default box sizes if none provided
     if box_sizes is None:
-        box_sizes = np.logspace(-3, 0, 20)
+        # Use safer box size range to avoid memory issues
+        box_sizes = np.logspace(-2, 0, 20)  # Minimum box size of 0.01 instead of 0.001
+    
+    # Set maximum number of segments to prevent memory errors
+    MAX_SEGMENTS = 1000  # Limit to prevent memory overflow
     
     # Modified box-counting algorithm
     counts = []
@@ -401,9 +431,30 @@ def phi_sensitive_dimension(
         # Dynamic thresholding with phi sensitivity
         threshold = 0.1 * np.mean(data) * (1 + phi_proximity * (box - 0.5)**2)
         
-        # Count boxes
-        segments = np.array_split(data, int(1/box))
-        count = sum(1 for segment in segments if np.any(segment > threshold))
+        # Calculate number of segments safely
+        n_segments = min(int(1/box), MAX_SEGMENTS)
+        
+        if n_segments <= 1:
+            # Skip if box size is too large (would create only 1 segment)
+            continue
+        
+        # Memory-efficient box counting
+        if len(data) > 10000 and n_segments > 100:
+            # For large datasets, use sampling approach
+            segment_size = len(data) // n_segments
+            count = 0
+            
+            for i in range(n_segments):
+                start_idx = i * segment_size
+                end_idx = min((i + 1) * segment_size, len(data))
+                segment = data[start_idx:end_idx]
+                
+                if np.any(segment > threshold):
+                    count += 1
+        else:
+            # For smaller datasets, use array_split
+            segments = np.array_split(data, n_segments)
+            count = sum(1 for segment in segments if np.any(segment > threshold))
         
         if count > 0:
             counts.append(count)
@@ -455,7 +506,8 @@ def compute_multifractal_spectrum(
         q_values = np.linspace(-5, 5, 21)
     
     if box_sizes is None:
-        box_sizes = np.logspace(-3, 0, 20)
+        # Use safer box size range to avoid memory issues
+        box_sizes = np.logspace(-2, 0, 20)  # Minimum box size of 0.01 instead of 0.001
     
     if scaling_factor is None:
         scaling_factor = PHI
@@ -471,6 +523,9 @@ def compute_multifractal_spectrum(
     
     data = data / np.max(data)  # Normalize to [0,1]
     
+    # Set maximum number of segments to prevent memory errors
+    MAX_SEGMENTS = 1000  # Limit to prevent memory overflow
+    
     # Initialize results
     tq_values = np.zeros_like(q_values, dtype=float)
     f_alpha = []
@@ -485,17 +540,42 @@ def compute_multifractal_spectrum(
         # Compute partition function for each box size
         partition_values = []
         for box in box_sizes:
-            segments = np.array_split(data, int(1/box))
+            # Calculate number of segments safely
+            n_segments = min(int(1/box), MAX_SEGMENTS)
             
-            # Compute measure for each segment
-            measures = []
-            for segment in segments:
-                # Apply phi-sensitive threshold
-                threshold = 0.05 * np.mean(data) * (1 + phi_proximity * (box - 0.5)**2)
-                if np.any(segment > threshold):
-                    # Compute measure (probability) for this segment
-                    measure = np.sum(segment) / np.sum(data)
-                    measures.append(measure)
+            if n_segments <= 1:
+                # Skip if box size is too large (would create only 1 segment)
+                continue
+            
+            # Memory-efficient segmentation
+            if len(data) > 10000 and n_segments > 100:
+                # For large datasets, use manual segmentation
+                segment_size = len(data) // n_segments
+                measures = []
+                
+                for j in range(n_segments):
+                    start_idx = j * segment_size
+                    end_idx = min((j + 1) * segment_size, len(data))
+                    segment = data[start_idx:end_idx]
+                    
+                    # Apply phi-sensitive threshold
+                    threshold = 0.05 * np.mean(data) * (1 + phi_proximity * (box - 0.5)**2)
+                    if np.any(segment > threshold):
+                        # Compute measure (probability) for this segment
+                        measure = np.sum(segment) / np.sum(data)
+                        measures.append(measure)
+            else:
+                # For smaller datasets, use array_split
+                segments = np.array_split(data, n_segments)
+                measures = []
+                
+                for segment in segments:
+                    # Apply phi-sensitive threshold
+                    threshold = 0.05 * np.mean(data) * (1 + phi_proximity * (box - 0.5)**2)
+                    if np.any(segment > threshold):
+                        # Compute measure (probability) for this segment
+                        measure = np.sum(segment) / np.sum(data)
+                        measures.append(measure)
             
             # Compute partition function
             if measures:
@@ -531,25 +611,52 @@ def compute_multifractal_spectrum(
     
     # Handle q=1 case (information dimension)
     info_dim = 0.0
+    partition_values_q1 = []  # Separate list for q=1 case
+    
     for box in box_sizes:
-        segments = np.array_split(data, int(1/box))
+        # Calculate number of segments safely
+        n_segments = min(int(1/box), MAX_SEGMENTS)
+        
+        if n_segments <= 1:
+            continue
+            
         entropy = 0.0
         total_measure = 0.0
         
-        for segment in segments:
-            threshold = 0.05 * np.mean(data) * (1 + phi_proximity * (box - 0.5)**2)
-            if np.any(segment > threshold):
-                measure = np.sum(segment) / np.sum(data)
-                if measure > 0:
-                    entropy -= measure * np.log(measure)
-                    total_measure += measure
+        # Memory-efficient segmentation
+        if len(data) > 10000 and n_segments > 100:
+            # For large datasets, use manual segmentation
+            segment_size = len(data) // n_segments
+            
+            for j in range(n_segments):
+                start_idx = j * segment_size
+                end_idx = min((j + 1) * segment_size, len(data))
+                segment = data[start_idx:end_idx]
+                
+                threshold = 0.05 * np.mean(data) * (1 + phi_proximity * (box - 0.5)**2)
+                if np.any(segment > threshold):
+                    measure = np.sum(segment) / np.sum(data)
+                    if measure > 0:
+                        entropy -= measure * np.log(measure)
+                        total_measure += measure
+        else:
+            # For smaller datasets, use array_split
+            segments = np.array_split(data, n_segments)
+            
+            for segment in segments:
+                threshold = 0.05 * np.mean(data) * (1 + phi_proximity * (box - 0.5)**2)
+                if np.any(segment > threshold):
+                    measure = np.sum(segment) / np.sum(data)
+                    if measure > 0:
+                        entropy -= measure * np.log(measure)
+                        total_measure += measure
         
         if total_measure > 0:
             # Normalize entropy
             entropy /= total_measure
             
             # Store (box_size, entropy) pairs
-            partition_values.append((box, entropy))
+            partition_values_q1.append((box, entropy))
     
     # Compute information dimension D_1
     if len(partition_values) >= 5:
