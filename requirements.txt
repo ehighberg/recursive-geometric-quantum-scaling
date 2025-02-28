@@ -16,6 +16,7 @@ scikit-image>=0.25.0
 
 # Experiment logging
 sklearn-evaluation>=0.2.12
+tqdm>=4.0.0
 
 
 # Testing
