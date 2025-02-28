@@ -217,10 +217,11 @@ def test_anyon_topological_protection(braid_sequences=None, noise_levels=None, o
             
             # Run with standard quantum gates
             print("  Running standard quantum circuit...")
-            # Since custom circuits aren't implemented yet, use CNOT circuit as a substitute
+            # Use the equivalent circuit we created
             std_result = run_quantum_gate_circuit(
-                circuit_type="CNOT",
-                noise_config=noise_config
+                circuit_type="Custom",
+                noise_config=noise_config,
+                custom_gates=std_circuit  # Pass the equivalent circuit
             )
             
             # Compare results

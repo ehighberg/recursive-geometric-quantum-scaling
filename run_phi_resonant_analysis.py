@@ -16,6 +16,7 @@ from matplotlib.gridspec import GridSpec
 import pandas as pd
 from pathlib import Path
 from constants import PHI
+from tqdm import tqdm
 
 # Import simulation components
 from simulations.scripts.evolve_state import (
@@ -90,7 +91,8 @@ def run_phi_analysis(output_dir=None, num_qubits=1, n_steps=100):
         'berry_phases': []
     }
     
-    for factor in scaling_factors:
+    print("Extracting metrics for plotting...")
+    for factor in tqdm(scaling_factors, desc="Processing scaling factors", unit="factor"):
         # Get comparative metrics
         comp_metrics = results['comparative_metrics'][factor]
         metrics['state_overlaps'].append(comp_metrics['state_overlap'])
@@ -124,9 +126,11 @@ def run_phi_analysis(output_dir=None, num_qubits=1, n_steps=100):
             metrics['berry_phases'].append(np.nan)
     
     # Create comparative plots
+    print("Creating comparative plots...")
     create_comparative_plots(metrics, output_dir)
     
     # Save results to CSV
+    print("Saving results to CSV...")
     df = pd.DataFrame({
         'Scaling Factor': metrics['scaling_factors'],
         'State Overlap': metrics['state_overlaps'],
@@ -142,6 +146,7 @@ def run_phi_analysis(output_dir=None, num_qubits=1, n_steps=100):
     print(f"Results saved to {output_dir / 'phi_resonant_analysis.csv'}")
     
     # Generate summary table
+    print("Generating summary table...")
     phi_idx = np.argmin(np.abs(scaling_factors - phi))
     summary = {
         'At Phi': {
@@ -190,6 +195,7 @@ def create_comparative_plots(metrics, output_dir):
         Directory to save plots.
     """
     # Create figure with subplots
+    print("Creating fractal dimension comparison plot...")
     fig = plt.figure(figsize=(14, 10))
     gs = GridSpec(2, 2, figure=fig)
     
@@ -205,6 +211,7 @@ def create_comparative_plots(metrics, output_dir):
     ax1.legend()
     
     # Plot dimension difference
+    print("Creating dimension difference plot...")
     ax2 = fig.add_subplot(gs[0, 1])
     ax2.plot(metrics['scaling_factors'], metrics['dimension_differences'], 'o-', color='#2ca02c')
     ax2.axvline(x=PHI, color='r', linestyle='--', alpha=0.7, label=f'φ ≈ {PHI:.6f}')
@@ -215,6 +222,7 @@ def create_comparative_plots(metrics, output_dir):
     ax2.legend()
     
     # Plot phi-sensitive winding
+    print("Creating phi-sensitive winding plot...")
     ax3 = fig.add_subplot(gs[1, 0])
     ax3.plot(metrics['scaling_factors'], metrics['phi_windings'], 'o-', color='#d62728')
     ax3.axvline(x=PHI, color='r', linestyle='--', alpha=0.7, label=f'φ ≈ {PHI:.6f}')
@@ -225,6 +233,7 @@ def create_comparative_plots(metrics, output_dir):
     ax3.legend()
     
     # Plot Berry phase
+    print("Creating Berry phase plot...")
     ax4 = fig.add_subplot(gs[1, 1])
     ax4.plot(metrics['scaling_factors'], metrics['berry_phases'], 'o-', color='#9467bd')
     ax4.axvline(x=PHI, color='r', linestyle='--', alpha=0.7, label=f'φ ≈ {PHI:.6f}')
@@ -243,6 +252,7 @@ def create_comparative_plots(metrics, output_dir):
     print(f"Plots saved to {output_dir / 'phi_resonant_comparison.png'}")
     
     # Create state overlap plot
+    print("Creating state overlap plot...")
     plt.figure(figsize=(10, 6))
     plt.plot(metrics['scaling_factors'], metrics['state_overlaps'], 'o-', color='#1f77b4')
     plt.axvline(x=PHI, color='r', linestyle='--', alpha=0.7, label=f'φ ≈ {PHI:.6f}')

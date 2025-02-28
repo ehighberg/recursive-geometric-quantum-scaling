@@ -157,6 +157,170 @@ class StandardCircuit(QuantumCircuit):
         result.options = {}
         return result
 
+class CustomCircuit(QuantumCircuit):
+    """
+    Custom circuit implementation for arbitrary gate sequences.
+    """
+    def __init__(self, num_qubits=2, total_time=None, n_steps=None):
+        super().__init__(num_qubits)
+        self.config = load_config()
+        
+        # Get configuration values with proper type handling
+        config_total_time = float(self.config.get('total_time', 1.0))
+        config_n_steps = int(self.config.get('n_steps', 10))
+        
+        # Use provided values or defaults from config
+        self.total_time = float(total_time if total_time is not None else config_total_time)
+        self.n_steps = int(n_steps if n_steps is not None else config_n_steps)
+        
+        # Initialize gates list
+        self.gates = []
+    
+    def add_gate(self, gate_type, qubits, params=None, angle=None):
+        """
+        Add a gate to the circuit.
+        
+        Parameters:
+        -----------
+        gate_type : str
+            Type of gate (e.g., "RZ", "CNOT")
+        qubits : list
+            List of qubit indices the gate acts on
+        params : list, optional
+            Additional parameters for the gate
+        angle : float, optional
+            Rotation angle for rotation gates
+        """
+        if gate_type == "RZ":
+            # Rotation around Z axis
+            target = qubits[0]
+            self.circuit.add_gate("RZ", targets=[target], arg_value=angle)
+        elif gate_type == "CNOT":
+            # CNOT gate
+            control, target = qubits
+            self.circuit.add_gate("CNOT", targets=[target], controls=[control])
+        else:
+            # Generic gate
+            self.circuit.add_gate(gate_type, targets=qubits, arg_value=angle)
+        
+        # Store gate for reference
+        self.gates.append((gate_type, qubits, params, angle))
+    
+    def evolve_closed(self, initial_state):
+        """
+        Evolve the initial state through the circuit without noise.
+        
+        Parameters:
+        -----------
+        initial_state : Qobj
+            Initial quantum state
+            
+        Returns:
+        --------
+        EvolutionResult
+            Result object containing states and times
+        """
+        # Get the unitary for the entire circuit
+        U = self.circuit.compute_unitary()
+        
+        # Apply the unitary to the initial state
+        if initial_state.isket:
+            final_state = U * initial_state
+        else:
+            final_state = U * initial_state * U.dag()
+        
+        # Create intermediate states for visualization
+        n_gates = len(self.gates)
+        if n_gates > 0:
+            # Create n_gates + 1 time points
+            times = np.linspace(0, self.total_time, n_gates + 1)
+            
+            # Initialize states list with initial state
+            states = [initial_state]
+            
+            # Apply gates one by one to create intermediate states
+            current_state = initial_state
+            for i in range(n_gates):
+                # Build circuit up to this gate
+                partial_circuit = QubitCircuit(self.num_qubits)
+                for j in range(i + 1):
+                    gate_type, qubits, params, angle = self.gates[j]
+                    if gate_type == "RZ":
+                        partial_circuit.add_gate("RZ", targets=[qubits[0]], arg_value=angle)
+                    elif gate_type == "CNOT":
+                        partial_circuit.add_gate("CNOT", targets=[qubits[1]], controls=[qubits[0]])
+                    else:
+                        partial_circuit.add_gate(gate_type, targets=qubits, arg_value=angle)
+                
+                # Get unitary for partial circuit
+                U_partial = partial_circuit.compute_unitary()
+                
+                # Apply to initial state
+                if initial_state.isket:
+                    current_state = U_partial * initial_state
+                else:
+                    current_state = U_partial * initial_state * U_partial.dag()
+                
+                states.append(current_state)
+        else:
+            # No gates, just initial and final states (which are the same)
+            times = [0, self.total_time]
+            states = [initial_state, initial_state]
+        
+        # Create result object
+        result = EvolutionResult(states, times)
+        result.e_ops = []
+        result.options = {}
+        
+        return result
+    
+    def evolve_open(self, initial_state, c_ops):
+        """
+        Evolve the initial state through the circuit with noise.
+        
+        Parameters:
+        -----------
+        initial_state : Qobj
+            Initial quantum state
+        c_ops : list
+            List of collapse operators for noise
+            
+        Returns:
+        --------
+        EvolutionResult
+            Result object containing states and times
+        """
+        # Convert to density matrix if needed
+        if initial_state.isket:
+            rho0 = ket2dm(initial_state)
+        else:
+            rho0 = initial_state
+        
+        # Create time list
+        tlist = np.linspace(0, self.total_time, self.n_steps + 1)
+        
+        # Create effective Hamiltonian from the circuit
+        # This is a simplification - in a real implementation, we would
+        # need to create a time-dependent Hamiltonian that implements the gates
+        U = self.circuit.compute_unitary()
+        H_eff = -1j * U.dag() * U.logm()  # Effective Hamiltonian
+        
+        # Solve master equation
+        mesolve_result = mesolve(
+            H_eff,
+            rho0,
+            tlist,
+            c_ops,
+            options=Options(store_states=True)
+        )
+        
+        # Create result object
+        result = EvolutionResult(mesolve_result.states, tlist)
+        result.e_ops = []
+        result.options = {}
+        
+        return result
+
 class ScaledCircuit(QuantumCircuit):
     """
     Geometrically-scaled circuit evolution using qutip's features.

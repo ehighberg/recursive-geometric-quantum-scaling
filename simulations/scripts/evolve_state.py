@@ -16,6 +16,7 @@ import numpy as np
 from qutip import sigmaz, tensor, qeye, sesolve, mesolve, sigmax, Options
 from constants import PHI
 from simulations.scaled_unitary import get_phi_recursive_unitary
+from tqdm import tqdm
 
 def construct_nqubit_hamiltonian(num_qubits, interaction_strength=0.5, transverse_field=0.3):
     """
@@ -185,6 +186,7 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     Returns:
     - qutip.Result: Result object containing evolution data
     """
+    print(f"Running state evolution with scaling factor {scaling_factor:.6f}...")
     
     # Construct appropriate n-qubit Hamiltonian
     H0 = construct_nqubit_hamiltonian(num_qubits)
@@ -307,6 +309,7 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     e_ops = [sigmaz()] if num_qubits == 1 else [tensor([sigmaz() if i == j else qeye(2) for i in range(num_qubits)]) for j in range(num_qubits)]
     
     # Run evolution with noise if configured
+    print("Simulating quantum evolution...")
     result = simulate_evolution(H_effective, psi_init, times, noise_config, e_ops)
     result.times = times  # Store times for visualization
     
@@ -324,6 +327,8 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     if analyze_fractal:
         from analyses.fractal_analysis import compute_wavefunction_profile, estimate_fractal_dimension
         
+        print("Performing fractal analysis...")
+        
         # Generate rich energy spectrum data
         k_values = np.linspace(0, 4*np.pi, 400)  # Extended k-range to see more bands
         result.parameter_values = k_values
@@ -338,7 +343,8 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
         # Initialize energy array with proper shape
         energies = np.zeros((len(k_values), num_levels))
         
-        for k_idx, k in enumerate(k_values):
+        print("Computing energy spectrum...")
+        for k_idx, k in enumerate(tqdm(k_values, desc="Computing energy spectrum", unit="k-point")):
             # Create k-dependent Hamiltonian with richer structure
             if num_qubits == 1:
                 H_k = (k * H0 + 
@@ -381,7 +387,8 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
         errors = np.zeros(num_depths)
         
         # Compute fractal dimensions with improved statistics
-        for depth_idx, depth in enumerate(recursion_depths):
+        print("Computing fractal dimensions...")
+        for depth_idx, depth in enumerate(tqdm(recursion_depths, desc="Analyzing fractal dimensions", unit="depth")):
             # Generate denser grid for higher depths
             points = 2**depth
             x_array = np.linspace(0, 1, points)
@@ -429,6 +436,7 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
         
         result.scaling_function = theoretical_scaling
     
+    print("State evolution complete.")
     return result
 
 
@@ -447,6 +455,8 @@ def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor
     Returns:
     - qutip.Result: Result object containing evolution data
     """
+    print(f"Running phi-recursive evolution with scaling factor {scaling_factor:.6f}...")
+    
     # Construct appropriate n-qubit Hamiltonian
     H0 = construct_nqubit_hamiltonian(num_qubits)
     
@@ -487,16 +497,18 @@ def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor
     e_ops = [sigmaz()] if num_qubits == 1 else [tensor([sigmaz() if i == j else qeye(2) for i in range(num_qubits)]) for j in range(num_qubits)]
     
     # Create phi-recursive unitary for each time step
+    print("Creating phi-recursive unitaries...")
     unitaries = []
-    for t in times:
+    for t in tqdm(times, desc="Creating unitaries", unit="time step"):
         U = get_phi_recursive_unitary(H0, t, scaling_factor, recursion_depth)
         unitaries.append(U)
     
     # Manually evolve the state using the unitaries
+    print("Evolving quantum state...")
     states = []  # Initialize states list
     current_state = psi_init
     
-    for i, U in enumerate(unitaries):
+    for i, U in enumerate(tqdm(unitaries, desc="Applying unitaries", unit="step")):
         # Apply unitary evolution
         evolved_state = U * current_state
         
@@ -511,11 +523,11 @@ def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor
                 dephasing = noise_config['dephasing']
                 # For each element in the density matrix
                 data = evolved_state.full()
-                for i in range(data.shape[0]):
-                    for j in range(data.shape[1]):
-                        if i != j:  # Off-diagonal elements
+                for j in range(data.shape[0]):
+                    for k in range(data.shape[1]):
+                        if j != k:  # Off-diagonal elements
                             # Apply exponential decay to off-diagonal elements
-                            data[i, j] *= np.exp(-dephasing * times[i])
+                            data[j, k] *= np.exp(-dephasing * times[i])
                 
                 # Create new density matrix with decayed elements
                 from qutip import Qobj
@@ -527,13 +539,13 @@ def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor
                 # For each element in the density matrix
                 data = evolved_state.full()
                 # Diagonal elements decay toward ground state
-                for i in range(1, data.shape[0]):  # Skip ground state
+                for j in range(1, data.shape[0]):  # Skip ground state
                     # Population decay
                     decay_factor = np.exp(-relaxation * times[i])
                     # Population transfers to ground state
-                    ground_transfer = (1 - decay_factor) * data[i, i]
+                    ground_transfer = (1 - decay_factor) * data[j, j]
                     # Update diagonal elements
-                    data[i, i] *= decay_factor
+                    data[j, j] *= decay_factor
                     data[0, 0] += ground_transfer
                 
                 # Create new density matrix with decayed populations
@@ -558,9 +570,10 @@ def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor
     result.e_ops = e_ops
     
     # Compute expectation values
+    print("Computing expectation values...")
     for op in e_ops:
         expect_values = []
-        for state in states:
+        for state in tqdm(states, desc=f"Computing <{op}>", unit="state", leave=False):
             # Handle the case where the result is already a complex number
             expectation = state.dag() * op * state
             if hasattr(expectation, 'tr'):
@@ -582,15 +595,19 @@ def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor
         from analyses.fractal_analysis import phi_sensitive_dimension, compute_multifractal_spectrum
         from analyses.topological_invariants import compute_phi_sensitive_winding, compute_phi_resonant_berry_phase
         
+        print("Performing phi-sensitive analysis...")
+        
         # Compute phi-sensitive fractal dimension
         final_state = states[-1]
         wf_data = np.abs(final_state.full().flatten())**2
         
         # Compute phi-sensitive dimension
+        print("Computing phi-sensitive dimension...")
         phi_dim = phi_sensitive_dimension(wf_data, scaling_factor=scaling_factor)
         result.phi_dimension = phi_dim
         
         # Compute multifractal spectrum
+        print("Computing multifractal spectrum...")
         mf_spectrum = compute_multifractal_spectrum(wf_data, scaling_factor=scaling_factor)
         result.multifractal_spectrum = mf_spectrum
         
@@ -599,8 +616,9 @@ def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor
         k_points = np.linspace(0, 2*np.pi, 100)
         
         # Generate eigenstates along the path
+        print("Generating eigenstates for topological analysis...")
         eigenstates = []
-        for k in k_points:
+        for k in tqdm(k_points, desc="Generating eigenstates", unit="k-point"):
             # Create k-dependent Hamiltonian
             H_k = H0 + k * sigmax() if num_qubits == 1 else H0
             
@@ -608,55 +626,57 @@ def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor
             U_k = get_phi_recursive_unitary(H_k, 1.0, scaling_factor, recursion_depth)
             
             # Apply to initial state
-            state_k = U_k * psi_init
-            eigenstates.append(state_k)
+            evolved_state = U_k * psi_init
+            eigenstates.append(evolved_state)
         
         # Compute phi-sensitive winding number
-        winding = compute_phi_sensitive_winding(eigenstates, k_points, scaling_factor)
+        print("Computing phi-sensitive winding number...")
+        winding = compute_phi_sensitive_winding(eigenstates, scaling_factor=scaling_factor, k_points=k_points)
         result.phi_winding = winding
         
         # Compute phi-resonant Berry phase
+        print("Computing phi-resonant Berry phase...")
         berry_phase = compute_phi_resonant_berry_phase(eigenstates, scaling_factor)
         result.phi_berry_phase = berry_phase
     
+    print("Phi-recursive evolution complete.")
     return result
 
 
-def run_comparative_analysis(scaling_factors=None, num_qubits=1, state_label="plus", n_steps=100):
+def run_comparative_analysis(scaling_factors, num_qubits=1, state_label="phi_sensitive", n_steps=100, recursion_depth=3, noise_config=None):
     """
-    Run comparative analysis of standard vs. phi-recursive evolution.
+    Run comparative analysis between standard and phi-recursive quantum evolution.
     
     Parameters:
-    - scaling_factors (list): List of scaling factors to analyze
+    - scaling_factors (list or ndarray): List of scaling factors to analyze
     - num_qubits (int): Number of qubits in the system
     - state_label (str): Label for initial state
     - n_steps (int): Number of evolution steps
+    - recursion_depth (int): Depth of recursion for phi-based patterns
+    - noise_config (dict): Noise configuration dictionary
     
     Returns:
-    - dict: Dictionary containing analysis results
+    - dict: Dictionary containing comparative analysis results
     """
-    if scaling_factors is None:
-        # Include phi and nearby values for comparison
-        phi = PHI
-        scaling_factors = [0.5, 1.0, 1.5, phi, 2.0, 2.5, 3.0]
+    print(f"Running comparative analysis with {len(scaling_factors)} scaling factors...")
     
-    results = {
-        'scaling_factors': scaling_factors,
-        'standard_results': {},
-        'phi_recursive_results': {},
-        'comparative_metrics': {}
-    }
+    # Initialize results dictionaries
+    standard_results = {}
+    phi_recursive_results = {}
+    comparative_metrics = {}
     
-    # Run standard and phi-recursive evolution for each scaling factor
-    for factor in scaling_factors:
+    # Run evolution for each scaling factor
+    for factor in tqdm(scaling_factors, desc="Processing scaling factors", unit="factor"):
         # Run standard evolution
         std_result = run_state_evolution(
             num_qubits=num_qubits,
             state_label=state_label,
             n_steps=n_steps,
             scaling_factor=factor,
+            noise_config=noise_config,
             analyze_fractal=True
         )
+        standard_results[factor] = std_result
         
         # Run phi-recursive evolution
         phi_result = run_phi_recursive_evolution(
@@ -664,72 +684,63 @@ def run_comparative_analysis(scaling_factors=None, num_qubits=1, state_label="pl
             state_label=state_label,
             n_steps=n_steps,
             scaling_factor=factor,
-            analyze_phi=True
+            recursion_depth=recursion_depth,
+            analyze_phi=True,
+            noise_config=noise_config
         )
-        
-        # Store results
-        results['standard_results'][factor] = std_result
-        results['phi_recursive_results'][factor] = phi_result
+        phi_recursive_results[factor] = phi_result
         
         # Compute comparative metrics
-        from analyses.fractal_analysis import estimate_fractal_dimension
-        
-        # Get final states
-        std_final = std_result.states[-1]
-        phi_final = phi_result.states[-1]
+        metrics = {}
         
         # Compute state overlap
-        overlap = abs((std_final.dag() * phi_final).tr())
+        std_final_state = std_result.states[-1]
+        phi_final_state = phi_result.states[-1]
+        
+        # Ensure states are in the same format (ket or density matrix)
+        if std_final_state.isket and phi_final_state.isket:
+            # Both are kets, compute overlap directly
+            overlap = abs(std_final_state.overlap(phi_final_state))**2
+        elif not std_final_state.isket and not phi_final_state.isket:
+            # Both are density matrices, compute fidelity
+            from qutip import fidelity
+            overlap = fidelity(std_final_state, phi_final_state)
+        else:
+            # Convert to density matrices if needed
+            if std_final_state.isket:
+                std_dm = std_final_state * std_final_state.dag()
+            else:
+                std_dm = std_final_state
+                
+            if phi_final_state.isket:
+                phi_dm = phi_final_state * phi_final_state.dag()
+            else:
+                phi_dm = phi_final_state
+                
+            from qutip import fidelity
+            overlap = fidelity(std_dm, phi_dm)
+        
+        metrics['state_overlap'] = overlap
         
         # Compute fractal dimension difference
-        std_wf = np.abs(std_final.full().flatten())**2
-        phi_wf = np.abs(phi_final.full().flatten())**2
+        if hasattr(std_result, 'fractal_dimensions') and hasattr(phi_result, 'phi_dimension'):
+            std_dim = np.nanmean(std_result.fractal_dimensions)
+            phi_dim = phi_result.phi_dimension
+            metrics['dimension_difference'] = phi_dim - std_dim
+        else:
+            metrics['dimension_difference'] = np.nan
         
-        std_dim, _ = estimate_fractal_dimension(std_wf)
-        phi_dim = phi_result.phi_dimension if hasattr(phi_result, 'phi_dimension') else 0.0
+        # Compute phi proximity
+        phi = PHI
+        metrics['phi_proximity'] = np.exp(-(factor - phi)**2 / 0.1)  # Gaussian centered at phi
         
-        dim_diff = abs(std_dim - phi_dim)
-        
-        # Store comparative metrics
-        results['comparative_metrics'][factor] = {
-            'state_overlap': float(overlap),
-            'dimension_difference': float(dim_diff),
-            'phi_proximity': float(np.exp(-(factor - PHI)**2 / 0.1))
-        }
+        # Store metrics
+        comparative_metrics[factor] = metrics
     
-    return results
-
-
-if __name__=="__main__":
-    # Run comparative analysis with phi-recursive evolution
-    phi = PHI
-    
-    print(f"Running comparative analysis with phi = {phi:.6f}...")
-    
-    # Run standard evolution
-    std_result = run_state_evolution(
-        num_qubits=1,
-        state_label="plus",
-        n_steps=100,
-        scaling_factor=phi,
-        analyze_fractal=True
-    )
-    
-    # Run phi-recursive evolution
-    phi_result = run_phi_recursive_evolution(
-        num_qubits=1,
-        state_label="phi_sensitive",
-        n_steps=100,
-        scaling_factor=phi,
-        recursion_depth=3,
-        analyze_phi=True
-    )
-    
-    print("\nAnalysis complete.")
-    print(f"Standard final state: {std_result.states[-1]}")
-    print(f"Phi-recursive final state: {phi_result.states[-1]}")
-    
-    # Compare fractal dimensions
-    if hasattr(std_result, 'fractal_dimensions') and hasattr(phi_result, 'phi_dimension'):
-        print(f"Standard fractal dimension: {np.mean(std_result.fractal_dimensions):.6f}")
-        print(f"Phi-sensitive dimension: {phi_result.phi_dimension:.6f}")
+    # Return all results
+    return {
+        'scaling_factors': scaling_factors,
+        'standard_results': standard_results,
+        'phi_recursive_results': phi_recursive_results,
+        'comparative_metrics': comparative_metrics
+    }

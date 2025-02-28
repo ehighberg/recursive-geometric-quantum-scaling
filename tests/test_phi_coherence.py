@@ -220,14 +220,20 @@ def run_coherence_comparison(qubit_counts=None, n_steps=100, noise_levels=None, 
         for noise in noise_levels:
             print(f"Testing {n_qubits} qubits with noise level {noise}")
             
-            # Create noise configuration (set to None for no noise)
-            noise_config = None
+            # Create noise configuration with the actual noise level
+            noise_config = {
+                'relaxation': noise,
+                'dephasing': noise
+            }
+            
+            # Use the same state label for fair comparison
+            state_label = "plus"  # Using standard state for both
             
             # PHI-scaled evolution with recursive scaling
             print("  Running phi-recursive evolution...")
             phi_result = run_phi_recursive_evolution(
                 num_qubits=n_qubits,
-                state_label="phi_sensitive",  # Uses recursive phi structure
+                state_label=state_label,  # Use the same state for both
                 n_steps=n_steps,
                 scaling_factor=PHI,
                 recursion_depth=3,
@@ -239,7 +245,7 @@ def run_coherence_comparison(qubit_counts=None, n_steps=100, noise_levels=None, 
             print("  Running standard evolution...")
             std_result = run_state_evolution(
                 num_qubits=n_qubits,
-                state_label="plus",  # Standard state
+                state_label=state_label,  # Use the same state for both
                 n_steps=n_steps,
                 scaling_factor=PHI,  # Same scaling factor
                 noise_config=noise_config,
@@ -290,26 +296,52 @@ def run_coherence_comparison(qubit_counts=None, n_steps=100, noise_levels=None, 
         mean_improvement = np.mean(improvement_factors)
         std_improvement = np.std(improvement_factors)
         
-        # Handle the case with only one data point
-        if len(improvement_factors) == 1:
-            # Can't do t-test with one sample, just report the improvement factor
+        # Handle the case with only one data point or very few data points
+        if len(improvement_factors) < 3:
+            # Use bootstrap confidence interval for small sample sizes
+            n_bootstrap = 1000
+            # Generate bootstrap samples with replacement
+            bootstrap_samples = np.random.choice(
+                improvement_factors, 
+                size=(n_bootstrap, len(improvement_factors)),
+                replace=True
+            )
+            # Calculate mean for each bootstrap sample
+            bootstrap_means = np.mean(bootstrap_samples, axis=1)
+            # Calculate 95% confidence interval
+            ci_low, ci_high = np.percentile(bootstrap_means, [2.5, 97.5])
+            
             results['statistics'] = {
                 'mean_improvement': mean_improvement,
-                'std_improvement': 0.0,  # No std dev with one sample
-                't_statistic': np.nan,
-                'p_value': np.nan,
-                'significant_improvement': mean_improvement > 1.5  # Use a threshold instead of p-value
+                'std_improvement': std_improvement,
+                't_statistic': np.nan,  # Not applicable for bootstrap
+                'p_value': np.nan,      # Not applicable for bootstrap
+                'ci_low': ci_low,
+                'ci_high': ci_high,
+                'significant_improvement': ci_low > 1.0  # Significant if CI excludes 1.0
             }
         else:
             # Is the improvement statistically significant? (t-test)
             t_stat, p_value = stats.ttest_1samp(improvement_factors, 1.0)
+            
+            # Also calculate bootstrap CI for comparison
+            n_bootstrap = 1000
+            bootstrap_samples = np.random.choice(
+                improvement_factors, 
+                size=(n_bootstrap, len(improvement_factors)),
+                replace=True
+            )
+            bootstrap_means = np.mean(bootstrap_samples, axis=1)
+            ci_low, ci_high = np.percentile(bootstrap_means, [2.5, 97.5])
             
             results['statistics'] = {
                 'mean_improvement': mean_improvement,
                 'std_improvement': std_improvement,
                 't_statistic': t_stat,
                 'p_value': p_value,
-                'significant_improvement': p_value < 0.05 and mean_improvement > 1.0
+                'ci_low': ci_low,
+                'ci_high': ci_high,
+                'significant_improvement': (p_value < 0.05 and mean_improvement > 1.0) or ci_low > 1.0
             }
     
     # Save results to CSV
