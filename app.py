@@ -73,6 +73,7 @@ def main():
                 ["zero", "one", "plus", "ghz", "w"],
                 index=2  # "plus" as default
             )
+            params['scaling_factor'] = st.slider("Scaling Factor", 0.01, 2.00, PHI)
             params['n_steps'] = st.slider("Steps", 1, 100, 50)
             params['pulse_type'] = st.selectbox(
                 "Pulse Type",
@@ -81,7 +82,7 @@ def main():
             
         elif mode == "Amplitude-Scaled Evolution":
             params['num_qubits'] = st.slider("Number of Qubits", 1, 4, 2)
-            params['scaling_factor'] = st.slider("Amplitude Scale", 0.01, 2.0, 1.0)
+            params['scaling_factor'] = st.slider("Amplitude Scale", 0.01, 2.00, 1.00)
             params['n_steps'] = st.slider("Steps", 1, 100, 50)
             params['hamiltonian_type'] = st.selectbox(
                 "Hamiltonian",
@@ -171,7 +172,7 @@ def main():
                         num_qubits=params['num_qubits'],
                         state_label=params['state_label'],
                         n_steps=params['n_steps'],
-                        scaling_factor=1.0,
+                        scaling_factor=params['scaling_factor'],
                         noise_config=params.get('noise_config')
                     )
                 elif mode == "Amplitude-Scaled Evolution":
@@ -233,7 +234,7 @@ def main():
                 fig_evolution = plot_state_evolution(
                     result.states,
                     result.times,
-                    title=f"{mode} Evolution"
+                    title=f"{mode}"
                 )
                 st.pyplot(fig_evolution)
                 
