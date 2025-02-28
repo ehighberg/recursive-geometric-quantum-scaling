@@ -195,9 +195,13 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
         sample_indices = np.linspace(0, len(result.states)-1, 5, dtype=int)
         for idx in sample_indices:
             state = result.states[idx]
-            wf_profile = compute_wavefunction_profile(state, x_array)
+            wf_profile, options = compute_wavefunction_profile(state, x_array)
             
             # Normalize profile to avoid numerical issues
+            print(type(wf_profile))
+            print(wf_profile)
+            print(type(np.max(wf_profile)))
+            print(np.max(wf_profile))
             wf_profile = wf_profile / np.max(wf_profile)
             
             # Use multiple box size ranges for robust dimension estimation
