@@ -95,7 +95,7 @@ def negativity(state: Union[Qobj, List[Qobj]]) -> float:
     # Perform partial transpose
     try:
         rho_pt = partial_transpose(rho, mask)
-    except ValueError as e:
+    except ValueError:
         # If partial transpose fails, try converting to full matrix first
         rho_full = rho.full()
         rho_qobj = Qobj(rho_full, dims=rho.dims)
@@ -151,7 +151,7 @@ def log_negativity(state: Union[Qobj, List[Qobj]]) -> float:
     # Perform partial transpose
     try:
         rho_pt = partial_transpose(rho, mask)
-    except ValueError as e:
+    except ValueError:
         # If partial transpose fails, try converting to full matrix first
         rho_full = rho.full()
         rho_qobj = Qobj(rho_full, dims=rho.dims)

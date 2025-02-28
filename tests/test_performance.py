@@ -8,6 +8,8 @@ import unittest
 import timeit
 import numpy as np
 from qutip import Qobj, basis, sigmaz, qeye, tensor
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend for testing
 import matplotlib.pyplot as plt
 
 from analyses.visualization.state_plots import plot_state_evolution, plot_bloch_sphere, plot_state_matrix
@@ -148,13 +150,13 @@ class TestEvolutionPerformance(unittest.TestCase):
         """Benchmark scaled evolution performance with different scale factors."""
         results = {}
         
-        for sf in self.scale_factors:
-            def task():
-                circuit = ScaledCircuit(self.H0, scaling_factor=sf)
-                result = circuit.evolve_closed(self.psi_init, n_steps=100)
-                return len(result.states)
+        def run_scaled_evolution(scale_factor):
+            circuit = ScaledCircuit(self.H0, scaling_factor=scale_factor)
+            result = circuit.evolve_closed(self.psi_init, n_steps=100)
+            return len(result.states)
             
-            execution_time = timeit.timeit(task, number=10)
+        for sf in self.scale_factors:
+            execution_time = timeit.timeit(lambda: run_scaled_evolution(sf), number=10)
             results[sf] = execution_time
             print(f"Scaled evolution (sf={sf}, 100 steps) executed 10 times in {execution_time:.2f} seconds.")
             self.assertLess(execution_time, 5.0, f"Scaled evolution with sf={sf} is too slow.")
@@ -174,21 +176,18 @@ class TestEvolutionPerformance(unittest.TestCase):
         
         for n in n_qubits_range:
             # Create n-qubit initial state and Hamiltonian
-            psi = state_zero(num_qubits=n)
-            # Create list of operators for tensor product
-            op_list = [qeye(2) for _ in range(n)]
-            H = 0
+            initial_state = state_zero(num_qubits=n)
+            # Create n-qubit Hamiltonian
+            hamiltonian = 0
             for i in range(n):
                 op_list_i = [qeye(2) for _ in range(n)]
                 op_list_i[i] = sigmaz()
-                H += tensor(op_list_i)
+                hamiltonian += tensor(op_list_i)
             
-            def task():
-                circuit = ScaledCircuit(H, scaling_factor=1.0)
-                result = circuit.evolve_closed(psi, n_steps=50)
-                return len(result.states)
-            
-            execution_time = timeit.timeit(task, number=5)
+            execution_time = timeit.timeit(
+                lambda: ScaledCircuit(hamiltonian, scaling_factor=1.0).evolve_closed(initial_state, n_steps=50).states.__len__(),
+                number=5
+            )
             results[n] = execution_time
             print(f"{n}-qubit evolution (50 steps) executed 5 times in {execution_time:.2f} seconds.")
             
@@ -203,17 +202,16 @@ class TestEvolutionPerformance(unittest.TestCase):
         scale_factors = [0.1, 1.0, 2.0]  # Use more reasonable scale factors
         n_steps = 100
         
+        def run_stability_test(circuit, n_steps):
+            result = circuit.evolve_closed(self.psi_init, n_steps=n_steps)
+            # Check unitarity preservation
+            for state in result.states:
+                tr = state.tr()
+                assert np.allclose(tr, 1.0, atol=1e-10)
+        
         for sf in scale_factors:
             circuit = ScaledCircuit(self.H0, scaling_factor=sf)
-            
-            def task():
-                result = circuit.evolve_closed(self.psi_init, n_steps=n_steps)
-                # Check unitarity preservation
-                for state in result.states:
-                    tr = state.tr()
-                    assert np.allclose(tr, 1.0, atol=1e-10)
-            
-            execution_time = timeit.timeit(task, number=5)
+            execution_time = timeit.timeit(lambda: run_stability_test(circuit, n_steps), number=5)
             print(f"Stability test (sf={sf}, {n_steps} steps) executed 5 times in {execution_time:.2f} seconds.")
             self.assertLess(execution_time, 5.0, 
                 f"Numerical stability checks too slow for sf={sf}")

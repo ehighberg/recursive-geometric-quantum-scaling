@@ -1,7 +1,7 @@
 # tests/test_evolve_state.py
 
-import pytest
 import numpy as np
+from qutip import sigmaz
 from constants import PHI
 from simulations.scripts.evolve_state import run_state_evolution
 
@@ -31,12 +31,10 @@ def test_run_state_evolution_phi_scaled():
 
 def test_run_state_evolution_with_noise():
     """Test evolution with noise configuration"""
-    noise_config = {
-        'relaxation': 0.01,
-        'dephasing': 0.01,
-        'thermal': 0.0,
-        'measurement': 0.0
-    }
+    # Add dephasing noise
+    c_ops = [np.sqrt(0.01) * sigmaz()]
+    noise_config = {'c_ops': c_ops}
+    
     res = run_state_evolution(
         num_qubits=1,
         state_label="plus",
@@ -49,6 +47,7 @@ def test_run_state_evolution_with_noise():
 
 def test_run_state_evolution_multiqubit():
     """Test evolution with multiple qubits"""
+    # Create a 2-qubit GHZ state
     res = run_state_evolution(
         num_qubits=2,
         state_label="ghz",
@@ -57,7 +56,8 @@ def test_run_state_evolution_multiqubit():
         noise_config=None
     )
     assert len(res.states) == 5
-    assert res.states[0].dims == [[2, 2], [1]]  # Should be 2-qubit state
+    # Check dimensions for 2-qubit state
+    assert res.states[0].dims == [[2, 2], [1]]
 
 def test_noise_effects():
     """Test that noise properly affects state purity"""
@@ -71,12 +71,8 @@ def test_noise_effects():
     )
     
     # Run with noise
-    noise_config = {
-        'relaxation': 0.1,
-        'dephasing': 0.1,
-        'thermal': 0.0,
-        'measurement': 0.0
-    }
+    c_ops = [np.sqrt(0.1) * sigmaz()]  # Dephasing noise
+    noise_config = {'c_ops': c_ops}
     res_noisy = run_state_evolution(
         num_qubits=1,
         state_label="plus",
@@ -87,7 +83,8 @@ def test_noise_effects():
     
     # Convert final states to density matrices
     rho_clean = res_clean.states[-1] * res_clean.states[-1].dag()
-    rho_noisy = res_noisy.states[-1]
+    # For noisy state, convert to density matrix if it's a ket
+    rho_noisy = res_noisy.states[-1] if not res_noisy.states[-1].isket else res_noisy.states[-1] * res_noisy.states[-1].dag()
     
     # Calculate purities
     purity_clean = (rho_clean * rho_clean).tr().real

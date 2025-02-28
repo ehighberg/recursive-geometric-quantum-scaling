@@ -2,9 +2,10 @@
 Tests for animated visualization functionality.
 """
 
-import pytest
 import numpy as np
-from qutip import basis, sigmax, sigmay, sigmaz
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend for testing
+from qutip import sigmaz
 from simulations.quantum_state import state_plus, state_zero
 from simulations.quantum_circuit import StandardCircuit
 from analyses.visualization.state_plots import (
@@ -95,18 +96,11 @@ def test_metric_evolution_animation():
 def test_animation_with_noise():
     """Test animations with noisy evolution"""
     # Create test states with noise
-    noise_config = {
-        'noise': {
-            'dephasing': {
-                'enabled': True,
-                'rate': 0.1
-            }
-        }
-    }
-    
     psi = state_plus()
     H = sigmaz()
-    circuit = StandardCircuit(H, total_time=5.0, n_steps=50, noise_config=noise_config)
+    # Add dephasing noise collapse operator
+    c_ops = [np.sqrt(0.1) * sigmaz()]  # Dephasing rate = 0.1
+    circuit = StandardCircuit(H, total_time=5.0, n_steps=50, c_ops=c_ops)
     result = circuit.evolve_open(psi)
     
     # Create animations

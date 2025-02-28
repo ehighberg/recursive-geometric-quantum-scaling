@@ -177,7 +177,8 @@ def plot_state_evolution(
     plt.rcParams.update(PLOT_STYLE)
     
     # Handle empty or invalid input
-    if not states or not times or len(states) == 0 or len(times) == 0:
+    if (states is None or len(states) == 0 or 
+        times is None or len(times) == 0):
         # Create empty figure with message
         fig = plt.figure(figsize=figsize)
         plt.text(0.5, 0.5, 'No data to plot',

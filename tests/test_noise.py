@@ -2,7 +2,6 @@
 Tests for noise models and their effects on quantum state evolution.
 """
 
-import pytest
 import numpy as np
 from qutip import basis, sigmax, sigmaz
 from simulations.scripts.evolve_state import simulate_evolution

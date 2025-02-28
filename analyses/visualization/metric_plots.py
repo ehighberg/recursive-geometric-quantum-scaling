@@ -11,6 +11,33 @@ from qutip import Qobj
 from .style_config import set_style, configure_axis, get_color_cycle, COLORS
 from analyses import run_analyses
 
+def calculate_metrics(states):
+    """
+    Calculate quantum metrics for a list of states.
+    
+    Parameters:
+        states: List of quantum states to analyze
+        
+    Returns:
+        Dictionary of metric names to lists of values
+    """
+    metrics = {
+        'coherence': [],
+        'entropy': [],
+        'purity': []
+    }
+    
+    initial_state = states[0]  # Use first state as reference
+    for state in states:
+        analysis_results = run_analyses(initial_state, state)
+        for metric_name in metrics.keys():
+            if metric_name in analysis_results:
+                metrics[metric_name].append(analysis_results[metric_name])
+            else:
+                metrics[metric_name].append(0.0)  # Default value if metric not available
+    
+    return metrics
+
 def animate_metric_evolution(
     metrics: Dict[str, List[float]],
     times: List[float],
@@ -317,13 +344,14 @@ def plot_metric_distribution(
     # Create distribution plots
     colors = itertools.cycle(get_color_cycle())  # Use itertools.cycle to prevent StopIteration
     for ax, (metric, values) in zip(axes, metrics.items()):
-        # For small datasets, use fewer bins
-        n_points = len(values)
-        if n_points < 10:
-            bins = min(n_points, 3)  # Use at most 3 bins for small datasets
+        # For small datasets, just plot points
+        values = np.array(values)
+        if len(values) < 10:
+            ax.plot(np.zeros_like(values), values, 'o', color=next(colors), alpha=0.7)
+            ax.set_xlim(-0.5, 0.5)
         else:
-            bins = 'auto'
-        ax.hist(values, bins=bins, color=next(colors), alpha=0.7)
+            # For larger datasets, use histogram
+            ax.hist(values, bins='auto', color=next(colors), alpha=0.7)
         
         configure_axis(ax,
                       title=metric.replace('_', ' ').title(),

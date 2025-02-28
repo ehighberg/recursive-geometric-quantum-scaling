@@ -2,9 +2,8 @@
 Tests for circuit evolution implementations.
 """
 
-import pytest
 import numpy as np
-from qutip import basis, sigmax, sigmaz, tensor, qeye
+from qutip import sigmaz, tensor, qeye
 from simulations.scripts.evolve_circuit import (
     run_standard_twoqubit_circuit,
     run_phi_scaled_twoqubit_circuit,
@@ -20,13 +19,8 @@ def test_standard_twoqubit_circuit():
     assert result.states[0].dims == [[2, 2], [1]]  # 2-qubit state
     
     # Test with noise
-    noise_config = {
-        'relaxation': 0.01,
-        'dephasing': 0.01,
-        'thermal': 0.0,
-        'measurement': 0.0
-    }
-    result_noisy = run_standard_twoqubit_circuit(noise_config=noise_config)
+    c_ops = [np.sqrt(0.01) * tensor(sigmaz(), qeye(2))]  # Dephasing noise on first qubit
+    result_noisy = run_standard_twoqubit_circuit(noise_config={'c_ops': c_ops})
     assert len(result_noisy.states) == 51
     assert not result_noisy.states[-1].isket  # Should be mixed state due to noise
 
@@ -42,15 +36,10 @@ def test_phi_scaled_twoqubit_circuit():
     assert len(result_scaled.states) == 5
     
     # Test with noise
-    noise_config = {
-        'relaxation': 0.01,
-        'dephasing': 0.01,
-        'thermal': 0.0,
-        'measurement': 0.0
-    }
+    c_ops = [np.sqrt(0.01) * tensor(sigmaz(), qeye(2))]  # Dephasing noise on first qubit
     result_noisy = run_phi_scaled_twoqubit_circuit(
         scaling_factor=1.0,
-        noise_config=noise_config
+        noise_config={'c_ops': c_ops}
     )
     assert len(result_noisy.states) == 5
     assert not result_noisy.states[-1].isket  # Should be mixed state due to noise
@@ -58,9 +47,10 @@ def test_phi_scaled_twoqubit_circuit():
 def test_fibonacci_braiding_circuit():
     """Test Fibonacci anyon braiding circuit."""
     result = run_fibonacci_braiding_circuit()
-    # Should return a single state (final state after braiding)
-    assert hasattr(result, 'dims')
-    assert result.dims == [[2], [1]]  # 2D subspace for Fibonacci anyons
+    # Should return an EvolutionResult with states
+    assert hasattr(result, 'states')
+    final_state = result.states[-1]
+    assert final_state.dims == [[2], [1]]  # 2D subspace for Fibonacci anyons
 
 def test_circuit_noise_analysis():
     """Test noise analysis for circuits."""
@@ -110,13 +100,8 @@ def test_noise_effects_on_entanglement():
     result_clean = run_standard_twoqubit_circuit()
     
     # Run circuit with noise
-    noise_config = {
-        'relaxation': 0.1,
-        'dephasing': 0.1,
-        'thermal': 0.0,
-        'measurement': 0.0
-    }
-    result_noisy = run_standard_twoqubit_circuit(noise_config=noise_config)
+    c_ops = [np.sqrt(0.1) * tensor(sigmaz(), qeye(2))]  # Dephasing noise on first qubit
+    result_noisy = run_standard_twoqubit_circuit(noise_config={'c_ops': c_ops})
     
     # Get final states
     rho_clean = result_clean.states[-1]

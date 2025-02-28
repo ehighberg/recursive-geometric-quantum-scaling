@@ -5,7 +5,6 @@ Unit tests for the visualization components of the Quantum Simulation Codebase.
 """
 
 import unittest
-import numpy as np
 from qutip import Qobj, basis
 import matplotlib.pyplot as plt
 
