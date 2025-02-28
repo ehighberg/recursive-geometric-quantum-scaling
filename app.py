@@ -6,6 +6,7 @@ evolution, phi-scaled evolution, and Fibonacci anyon braiding circuits.
 # pylint: disable=wrong-import-position
 # Add the project root to Python path
 import sys
+import traceback
 from pathlib import Path
 from constants import PHI
 sys.path.insert(0, str(Path(__file__).parent))
@@ -197,8 +198,17 @@ def main():
                 st.session_state['simulation_results'] = result
                 st.success("Simulation completed successfully!")
             
-            except Exception as e:
-                st.error(f"Simulation failed: {str(e)}")
+            except Exception:
+                # Get the full traceback
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                trace_details = traceback.format_exception(exc_type, exc_value, exc_traceback)
+                
+                # Display error in Streamlit
+                st.error("Simulation failed with the following error:")
+                st.code(''.join(trace_details), language='python')
+                
+                # Also print to terminal for debugging
+                print(''.join(trace_details), file=sys.stderr)
                 return
     
     # Display results if available
