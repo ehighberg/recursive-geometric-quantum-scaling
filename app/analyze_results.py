@@ -144,9 +144,6 @@ def analyze_simulation_results(result, mode: str = "Evolution"):  # Added mode p
         st.warning("No valid quantum states found in the results.")
         return
 
-    # Create tabs for different analyses
-    metrics_tab, evolution_tab, fractal_tab = st.tabs(["Quantum Metrics", "State Evolution", "Fractal Analysis"])
-    
     if len(states) > 1:
         # Calculate metrics for all states
         metrics = {}
@@ -160,76 +157,36 @@ def analyze_simulation_results(result, mode: str = "Evolution"):  # Added mode p
             for metric in metric_names:
                 metrics[metric].append(analysis_results[metric])
         
-        with metrics_tab:
-            st.subheader("Quantum Metrics Evolution")
-            # Metric evolution plot
-            fig_metrics = plot_metric_evolution(
-                states,
-                times,
-    
-            title=f"Metrics Evolution - {mode}"
-            )
-            st.pyplot(fig_metrics)
-            # Metric comparisons
-            st.subheader("Metric Correlations")
-            fig_comparison = plot_metric_comparison(
-               states,
-               metric_pairs=[
-                    ('vn_entropy', 'l1_coherence'),
-                    ('vn_entropy', 'negativity'),
-                    ('l1_coherence', 'negativity'),
-                    ('purity', 'fidelity')
-                ],
-                title="Metric Correlations"
-           )
-            st.pyplot(fig_comparison)
-            # Metric distributions
-            st.subheader("Metric Distributions")
-            fig_dist = plot_metric_distribution(
-                metrics,
-                title="Metric Distributions"
-            )
-            st.pyplot(fig_dist)
-            
-        with evolution_tab:
-            st.subheader("State Evolution")
-            fig_evolution = plot_state_evolution(states, times)
-            st.pyplot(fig_evolution)
-            
-        with fractal_tab:
-            st.subheader("Fractal Analysis")
-            
-            # Load configuration
-            config = load_fractal_config()
-            
-            # Energy spectrum analysis
-            st.subheader("Energy Spectrum Analysis")
-            if hasattr(result, 'hamiltonian'):
-                parameter_values = np.linspace(0, 1, 100)
-                parameter_values, energies, analysis = compute_energy_spectrum(result.hamiltonian, config=config)
-                fig_spectrum = plot_energy_spectrum(parameter_values, energies, analysis)
-                st.pyplot(fig_spectrum)
-            else:
-                st.info("No Hamiltonian available for energy spectrum analysis.")
-            
-            # Wavefunction profile
-            st.subheader("Wavefunction Profile Analysis")
-            fig_wavefunction = plot_wavefunction_profile(states[-1], config=config)
-            st.pyplot(fig_wavefunction)
-            
-            # Fractal dimension analysis
-            st.subheader("Fractal Dimension Analysis")
-            if hasattr(result, 'recursion_depths') and hasattr(result, 'fractal_dimensions'):
-                fig_dimension = plot_fractal_dimension(
-                    result.recursion_depths,
-                    result.fractal_dimensions,
-                    error_bars=getattr(result, 'dimension_errors', None),
-                    config=config
-                )
-                st.pyplot(fig_dimension)
-            else:
-                st.info("No fractal dimension data available. Run a fractal analysis first.")
-                
+        st.subheader("Quantum Metrics Evolution")
+        # Metric evolution plot
+        fig_metrics = plot_metric_evolution(
+            states,
+            times,
+
+        title=f"Metrics Evolution - {mode}"
+        )
+        st.pyplot(fig_metrics)
+        # Metric comparisons
+        st.subheader("Metric Correlations")
+        fig_comparison = plot_metric_comparison(
+            states,
+            metric_pairs=[
+                ('vn_entropy', 'l1_coherence'),
+                ('vn_entropy', 'negativity'),
+                ('l1_coherence', 'negativity'),
+                ('purity', 'fidelity')
+            ],
+            title="Metric Correlations"
+        )
+        st.pyplot(fig_comparison)
+        # Metric distributions
+        st.subheader("Metric Distributions")
+        fig_dist = plot_metric_distribution(
+            metrics,
+            title="Metric Distributions"
+        )
+        st.pyplot(fig_dist)
+        
     else:
         # For single-state results, show metrics as cards
         analysis_results = run_analyses(states[0], final_state)
