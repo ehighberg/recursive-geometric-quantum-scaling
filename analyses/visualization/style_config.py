@@ -4,7 +4,6 @@ Provides consistent styling across all plots.
 """
 
 import matplotlib.pyplot as plt
-import numpy as np
 
 # Color schemes
 COLORS = {
@@ -58,12 +57,15 @@ def format_complex_number(z):
 
 def configure_axis(ax, title=None, xlabel=None, ylabel=None):
     """Configure axis with consistent styling."""
-    if title:
-        ax.set_title(title, pad=20)
-    if xlabel:
-        ax.set_xlabel(xlabel)
-    if ylabel:
-        ax.set_ylabel(ylabel)
+    if isinstance(title, (str, type(None))):
+        if title:
+            ax.set_title(title, pad=20)
+    if isinstance(xlabel, (str, type(None))):
+        if xlabel:
+            ax.set_xlabel(xlabel)
+    if isinstance(ylabel, (str, type(None))):
+        if ylabel:
+            ax.set_ylabel(ylabel)
     ax.grid(True, alpha=0.3)
     ax.set_facecolor(COLORS['background'])
     return ax

@@ -28,3 +28,6 @@ statsmodels>=0.13.0
 
 # Dev
 pydantic>=2.10.6
+
+# Optional dependencies
+psutil>=5.9.0  # For memory usage tracking in performance tables

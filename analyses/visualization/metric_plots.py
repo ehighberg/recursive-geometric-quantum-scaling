@@ -2,7 +2,7 @@
 Visualization functions for quantum metrics including entropy, coherence, and entanglement measures.
 """
 
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Union
 import itertools
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,6 +10,33 @@ import matplotlib.animation as animation
 from qutip import Qobj
 from .style_config import set_style, configure_axis, get_color_cycle, COLORS
 from analyses import run_analyses
+
+def calculate_metrics(states):
+    """
+    Calculate quantum metrics for a list of states.
+    
+    Parameters:
+        states: List of quantum states to analyze
+        
+    Returns:
+        Dictionary of metric names to lists of values
+    """
+    metrics = {
+        'coherence': [],
+        'entropy': [],
+        'purity': []
+    }
+    
+    initial_state = states[0]  # Use first state as reference
+    for state in states:
+        analysis_results = run_analyses(initial_state, state)
+        for metric_name in metrics.keys():
+            if metric_name in analysis_results:
+                metrics[metric_name].append(analysis_results[metric_name])
+            else:
+                metrics[metric_name].append(0.0)  # Default value if metric not available
+    
+    return metrics
 
 def animate_metric_evolution(
     metrics: Dict[str, List[float]],
@@ -293,7 +320,7 @@ def plot_noise_metrics(
     return fig
 
 def plot_metric_distribution(
-    metrics: Dict[str, List[float]],
+    metrics_or_states,  # Type: Union[Dict[str, List[float]], List[Qobj]]
     title: Optional[str] = None,
     figsize: Tuple[int, int] = (15, 5)
 ) -> plt.Figure:
@@ -301,7 +328,8 @@ def plot_metric_distribution(
     Create distribution plots (histograms) for quantum metrics.
     
     Parameters:
-        metrics: Dictionary of metric names to lists of values
+        metrics_or_states: Either a dictionary of metric names to lists of values,
+                          or a list of quantum states to analyze
         title: Optional plot title
         figsize: Figure size tuple
         
@@ -309,6 +337,19 @@ def plot_metric_distribution(
         matplotlib Figure object
     """
     set_style()
+    
+    # Convert states to metrics if needed
+    if isinstance(metrics_or_states, list) and len(metrics_or_states) > 0 and hasattr(metrics_or_states[0], 'dims'):
+        # Calculate metrics from states
+        metrics = calculate_metrics(metrics_or_states)
+    else:
+        # Assume it's already a metrics dictionary
+        metrics = metrics_or_states
+    
+    # Ensure metrics is a dictionary
+    if not isinstance(metrics, dict):
+        raise ValueError("metrics_or_states must be either a list of Qobj states or a dictionary of metrics")
+    
     n_metrics = len(metrics)
     fig, axes = plt.subplots(1, n_metrics, figsize=figsize)
     if n_metrics == 1:
@@ -317,13 +358,27 @@ def plot_metric_distribution(
     # Create distribution plots
     colors = itertools.cycle(get_color_cycle())  # Use itertools.cycle to prevent StopIteration
     for ax, (metric, values) in zip(axes, metrics.items()):
-        # For small datasets, use fewer bins
-        n_points = len(values)
-        if n_points < 10:
-            bins = min(n_points, 3)  # Use at most 3 bins for small datasets
+        # For small datasets, just plot points
+        values = np.array(values)
+        if len(values) < 10:
+            ax.plot(np.zeros_like(values), values, 'o', color=next(colors), alpha=0.7)
+            ax.set_xlim(-0.5, 0.5)
         else:
-            bins = 'auto'
-        ax.hist(values, bins=bins, color=next(colors), alpha=0.7)
+            # For larger datasets, use histogram
+            # Check if all values are nearly identical
+            value_range = np.max(values) - np.min(values)
+            if value_range < 1e-6:
+                # If values are nearly identical, plot as points with small jitter
+                jitter = np.random.normal(0, 0.01, size=len(values))
+                ax.plot(jitter, values, 'o', color=next(colors), alpha=0.7)
+                ax.set_xlim(-0.5, 0.5)
+            else:
+                # Use fixed number of bins if range is small
+                if value_range < 0.1:
+                    bins = 5  # Use fewer bins for small ranges
+                else:
+                    bins = 'auto'
+                ax.hist(values, bins=bins, color=next(colors), alpha=0.7)
         
         configure_axis(ax,
                       title=metric.replace('_', ' ').title(),

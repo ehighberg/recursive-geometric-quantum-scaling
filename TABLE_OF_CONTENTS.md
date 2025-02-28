@@ -1,63 +1,314 @@
-# Table of Contents
+# Quantum Simulation Framework Documentation
 
-* [README.md](README.md)
-* [requirements.txt](requirements.txt)
-* [app.py](app.py)
-* [constants.py](constants.py)
-* [audit_plan.md](audit_plan.md)
+## Overview
+This framework provides tools for quantum simulation with a focus on fractal properties, topological features, and visualization capabilities.
 
-## analyses/
-* [analyses/__init__.py](analyses/__init__.py)
-* [analyses/coherence.py](analyses/coherence.py)
-* [analyses/entanglement.py](analyses/entanglement.py)
-* [analyses/entropy.py](analyses/entropy.py)
+## Core Components
 
-### analyses/visualization/
-* [analyses/visualization/__init__.py](analyses/visualization/__init__.py)
-* [analyses/visualization/circuit_diagrams.py](analyses/visualization/circuit_diagrams.py)
-* [analyses/visualization/metric_plots.py](analyses/visualization/metric_plots.py)
-* [analyses/visualization/state_plots.py](analyses/visualization/state_plots.py)
-* [analyses/visualization/style_config.py](analyses/visualization/style_config.py)
+### 1. Simulation Modules
+- `simulations/quantum_state.py`: Core quantum state evolution
+- `simulations/anyon_symbols.py`: Anyon representation and manipulation
+- `simulations/amplitude_scaling.py`: Amplitude scaling implementations
+- `simulations/quantum_circuit.py`: Quantum circuit operations
 
-## app/
-* [app/__init__.py](app/__init__.py)
-* [app/analyze_results.py](app/analyze_results.py)
+### 2. Analysis Tools
+- `analyses/coherence.py`: Quantum coherence measurements
+- `analyses/entropy.py`: Entropy calculations
+- `analyses/entanglement.py`: Entanglement metrics
+- `analyses/fractal_analysis.py`: Fractal property analysis
+  - Energy spectrum computation with f_s parameter sweeps
+  - Wavefunction profile analysis with zoom capabilities
+  - Fractal dimension estimation with error analysis
+  - Automatic detection of self-similar regions
 
-## config/
-* [config/evolution_config.yaml](config/evolution_config.yaml)
+### 3. Visualization Components
+- `analyses/visualization/circuit_diagrams.py`: Circuit visualization
+- `analyses/visualization/state_plots.py`: State evolution plots
+- `analyses/visualization/fractal_plots.py`: Fractal visualization suite
+  - Energy spectrum plots with self-similarity detection
+  - Wavefunction profile plots with configurable zoom regions
+  - Fractal dimension analysis plots with error bars
+  - Publication-ready summary figures
 
-## docs/
-### docs/references/
-* [docs/references/academic.txt](docs/references/academic.txt)
-* [docs/references/libraries.txt](docs/references/libraries.txt)
+## Configuration
 
-## simulations/
-* [simulations/__init__.py](simulations/__init__.py)
-* [simulations/config.py](simulations/config.py)
-* [simulations/quantum_circuit.py](simulations/quantum_circuit.py)
-* [simulations/quantum_state.py](simulations/quantum_state.py)
+### Evolution Configuration (config/evolution_config.yaml)
+1. Base Parameters
+   - Hamiltonian settings
+   - Time evolution parameters
+   - System dimensionality
 
-### simulations/scripts/
-* [simulations/scripts/__init__.py](simulations/scripts/__init__.py)
-* [simulations/scripts/evolve_circuit.py](simulations/scripts/evolve_circuit.py)
-* [simulations/scripts/evolve_state.py](simulations/scripts/evolve_state.py)
-* [simulations/scripts/fibonacci_anyon_braiding.py](simulations/scripts/fibonacci_anyon_braiding.py)
-* [simulations/scripts/topological_placeholders.py](simulations/scripts/topological_placeholders.py)
+2. Noise Parameters
+   - Depolarizing noise
+   - Dephasing noise
+   - Amplitude damping
+   - Thermal noise
 
-#### simulations/scripts/braid_generators/
-* [simulations/scripts/braid_generators/abstract_braid_generator.py](simulations/scripts/braid_generators/abstract_braid_generator.py)
-* [simulations/scripts/braid_generators/braid_generator_2d.py](simulations/scripts/braid_generators/braid_generator_2d.py)
-* [simulations/scripts/braid_generators/braid_generator_factory.py](simulations/scripts/braid_generators/braid_generator_factory.py)
+3. Fractal Analysis Parameters
+   - Energy spectrum analysis
+     ```yaml
+     energy_spectrum:
+       f_s_range: [min, max]    # Range for scaling parameter
+       resolution: integer      # Number of points in sweep
+       correlation_threshold: float  # For self-similarity detection
+     ```
+   - Wavefunction visualization
+     ```yaml
+     wavefunction_zoom:
+       default_windows: [[x1, x2], ...]  # Default zoom regions
+       std_dev_threshold: float  # For region detection
+     ```
+   - Fractal dimension analysis
+     ```yaml
+     fractal_dimension:
+       recursion_depths: [depths]  # Analysis depths
+       fit_parameters:
+         box_size_range: [min, max]
+         points: integer
+     ```
 
-## tests/
-* [tests/__init__.py](tests/__init__.py)
-* [tests/test_coherence.py](tests/test_coherence.py)
-* [tests/test_entanglement.py](tests/test_entanglement.py)
-* [tests/test_entropy.py](tests/test_entropy.py)
-* [tests/test_evolve_circuit.py](tests/test_evolve_circuit.py)
-* [tests/test_evolve_state.py](tests/test_evolve_state.py)
-* [tests/test_fibonacci.py](tests/test_fibonacci.py)
-* [tests/test_performance.py](tests/test_performance.py)
-* [tests/test_quantum_circuit.py](tests/test_quantum_circuit.py)
-* [tests/test_quantum_state.py](tests/test_quantum_state.py)
-* [tests/test_visualization.py](tests/test_visualization.py)
+## Usage Examples
+
+### 1. Fractal Analysis Pipeline
+```python
+from analyses.fractal_analysis import (
+    compute_energy_spectrum,
+    compute_wavefunction_profile,
+    estimate_fractal_dimension
+)
+from analyses.visualization.fractal_plots import (
+    plot_energy_spectrum,
+    plot_wavefunction_profile,
+    plot_fractal_dimension,
+    plot_fractal_analysis_summary
+)
+
+# Load configuration
+config = load_fractal_config()
+
+# Compute energy spectrum
+f_s_values, energies, analysis = compute_energy_spectrum(
+    H_func,
+    config=config
+)
+
+# Analyze wavefunction
+density, details = compute_wavefunction_profile(
+    wavefunction,
+    x_array,
+    zoom_factor=2.0,
+    log_details=True
+)
+
+# Generate publication plots
+fig_spectrum = plot_energy_spectrum(
+    f_s_values,
+    energies,
+    analysis,
+    config=config
+)
+
+fig_wavefunction = plot_wavefunction_profile(
+    wavefunction,
+    config=config
+)
+
+fig_summary = plot_fractal_analysis_summary(
+    f_s_values,
+    energies,
+    analysis,
+    wavefunction,
+    recursion_depths,
+    fractal_dimensions,
+    error_bars,
+    config=config
+)
+```
+
+### 2. Dynamical Evolution Analysis
+```python
+from simulations.scripts.evolve_state import run_state_evolution
+from analyses.visualization.wavepacket_plots import (
+    plot_wavepacket_evolution,
+    plot_wavepacket_spacetime,
+    animate_wavepacket_evolution
+)
+from analyses.entanglement_dynamics import (
+    compute_entanglement_entropy_vs_time,
+    plot_entanglement_entropy_vs_time,
+    plot_entanglement_spectrum,
+    plot_entanglement_growth_rate
+)
+
+# Run quantum state evolution
+result = run_state_evolution(
+    num_qubits=2,
+    state_label="ghz",  # Use entangled state
+    n_steps=50,
+    scaling_factor=1.0
+)
+
+# Create coordinates for wavepacket visualization
+coordinates = np.linspace(0, 1, 2**result.states[0].dims[0][0])
+
+# Visualize wavepacket evolution
+fig_wavepacket = plot_wavepacket_evolution(
+    result.states,
+    result.times,
+    coordinates=coordinates,
+    title="Wavepacket Evolution"
+)
+
+# Create spacetime diagram
+fig_spacetime = plot_wavepacket_spacetime(
+    result.states,
+    result.times,
+    coordinates=coordinates,
+    title="Wavepacket Spacetime"
+)
+
+# Analyze entanglement dynamics
+entropies = compute_entanglement_entropy_vs_time(result.states)
+
+# Plot entanglement entropy evolution
+fig_entropy = plot_entanglement_entropy_vs_time(
+    result.states,
+    result.times,
+    title="Entanglement Entropy Evolution"
+)
+
+# Visualize entanglement spectrum
+fig_spectrum = plot_entanglement_spectrum(
+    result.states,
+    result.times,
+    title="Entanglement Spectrum"
+)
+
+# Analyze entanglement growth rate
+fig_growth = plot_entanglement_growth_rate(
+    result.states,
+    result.times,
+    title="Entanglement Growth Rate"
+)
+```
+
+### 3. Generating Publication Figures
+1. Configure visualization parameters in evolution_config.yaml:
+   ```yaml
+   visualization:
+     dpi: 300  # Resolution for saved figures
+     scaling_function_text: "D(n) ~ n^(-α)"
+     color_scheme:
+       primary: "#1f77b4"
+       accent: "#ff7f0e"
+   ```
+
+2. Generate high-resolution plots:
+   ```python
+   fig.savefig('figure_name.png', dpi=300, bbox_inches='tight')
+   ```
+
+### 4. Reference Tables for Publication
+```python
+from analyses.tables.parameter_tables import (
+    generate_parameter_overview_table,
+    export_table_to_latex
+)
+from analyses.tables.phase_tables import (
+    generate_phase_diagram_table,
+    generate_phase_transition_table
+)
+from analyses.tables.performance_tables import (
+    generate_performance_table,
+    generate_convergence_table
+)
+
+# Generate parameter overview table
+parameter_table = generate_parameter_overview_table()
+
+# Export to LaTeX for paper
+latex_table = export_table_to_latex(
+    parameter_table,
+    "Comprehensive overview of model parameters.",
+    "tab:parameters"
+)
+
+# Generate phase diagram table from scaling results
+phase_table = generate_phase_diagram_table(
+    fs_ranges=[(0.5, 1.0), (1.0, 1.5), (1.5, 2.0)],
+    results=scaling_results
+)
+
+# Generate performance table from simulation results
+performance_table = generate_performance_table(results=simulation_results)
+```
+
+## Testing
+- `tests/test_fractal_analysis.py`: Validates fractal analysis functions
+- `tests/test_visualization.py`: Ensures correct plot generation
+- `tests/test_tables.py`: Tests table generation functions
+
+## Dependencies
+- NumPy: Numerical computations
+- QuTiP: Quantum mechanics toolkit
+- Matplotlib: Visualization
+- SciPy: Scientific computing tools
+- PyYAML: Configuration file handling
+- Streamlit: Web interface for interactive analysis
+
+## Core Components
+
+### 1. Simulation Modules
+- `simulations/quantum_state.py`: Core quantum state evolution
+- `simulations/anyon_symbols.py`: Anyon representation and manipulation
+- `simulations/amplitude_scaling.py`: Amplitude scaling implementations
+- `simulations/quantum_circuit.py`: Quantum circuit operations
+
+### 2. Analysis Tools
+- `analyses/coherence.py`: Quantum coherence measurements
+- `analyses/entropy.py`: Entropy calculations
+- `analyses/entanglement.py`: Entanglement metrics
+- `analyses/fractal_analysis.py`: Fractal property analysis
+  - Energy spectrum computation with f_s parameter sweeps
+  - Wavefunction profile analysis with zoom capabilities
+  - Fractal dimension estimation with error analysis
+  - Automatic detection of self-similar regions
+- `analyses/entanglement_dynamics.py`: Entanglement dynamics analysis
+  - Time-dependent entanglement entropy calculation
+  - Entanglement spectrum analysis
+  - Entanglement growth rate computation
+  - System size scaling analysis
+  - Boundary condition comparison
+- `analyses/tables/`: Reference tables for publication
+  - `parameter_tables.py`: Parameter overview tables
+  - `phase_tables.py`: Phase diagram and transition tables
+  - `performance_tables.py`: Computational performance tables
+
+### 3. Visualization Components
+- `analyses/visualization/circuit_diagrams.py`: Circuit visualization
+- `analyses/visualization/state_plots.py`: State evolution plots
+- `analyses/visualization/fractal_plots.py`: Fractal visualization suite
+  - Energy spectrum plots with self-similarity detection
+  - Wavefunction profile plots with configurable zoom regions
+  - Fractal dimension analysis plots with error bars
+  - Publication-ready summary figures
+- `analyses/visualization/wavepacket_plots.py`: Wavepacket visualization
+  - Wavepacket evolution snapshots
+  - Wavepacket spacetime diagrams
+  - Wavepacket animations
+  - Comparative analysis between topologically trivial and non-trivial cases
+
+### 4. Application Interface
+- `app/analyze_results.py`: Analysis and visualization of simulation results
+- `app/scaling_analysis.py`: Scaling analysis functionality
+- `app/reference_tables.py`: Reference tables for publication
+  - Parameter overview tables
+  - Phase diagram tables
+  - Computational performance tables
+
+## Contributing
+1. Follow the established code structure
+2. Document new features in this TABLE_OF_CONTENTS.md
+3. Add appropriate tests
+4. Ensure visualization outputs meet publication standards
+5. Follow the coding style in .pylintrc
