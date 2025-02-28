@@ -659,9 +659,9 @@ def compute_multifractal_spectrum(
             partition_values_q1.append((box, entropy))
     
     # Compute information dimension D_1
-    if len(partition_values) >= 5:
-        log_boxes = np.log([1.0/p[0] for p in partition_values])
-        entropies = [p[1] for p in partition_values]
+    if len(partition_values_q1) >= 5:
+        log_boxes = np.log([1.0/p[0] for p in partition_values_q1])
+        entropies = [p[1] for p in partition_values_q1]
         
         # Apply phi-resonant correction
         if abs(scaling_factor - phi) < 0.1:
