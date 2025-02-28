@@ -134,6 +134,7 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     result = simulate_evolution(H_scaled, psi_init, times, noise_config, e_ops)
     result.times = times  # Store times for visualization
     
+    # TODO: remove the following analysis code, all the things this is supposed to do are covered by other functions, and don't need to be part of the Result
     # Store Hamiltonian function for fractal analysis
     def hamiltonian(f_s):
         return f_s * H0
