@@ -229,6 +229,7 @@ def compute_energy_spectrum(
     config: Optional[Dict] = None,
     eigen_index: int = 0
 ) -> Tuple[np.ndarray, np.ndarray, Dict]:
+    #TODO: refactor to make the application of f_s meaningful. currently this scales the hamiltonian from the end of the evolution by a range of f_s values, even though the hamiltonian is based on the initial choice of the scaling factor.
     """
     Compute energy spectrum over f_s parameter range with enhanced analysis of
     self-similar regions.

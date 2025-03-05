@@ -148,6 +148,7 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     result = simulate_evolution(H_effective, psi_init, times, noise_config, e_ops)
     result.times = times  # Store times for visualization
     
+    # TODO: extract the following analysis code to an analysis script, they don't need to be part of the Result.
     # Store Hamiltonian function for fractal analysis
     def hamiltonian(f_s):
         return f_s * H0
@@ -209,7 +210,7 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
         sample_indices = np.linspace(0, len(result.states)-1, 5, dtype=int)
         for idx in sample_indices:
             state = result.states[idx]
-            wf_profile = compute_wavefunction_profile(state, x_array)
+            wf_profile, options = compute_wavefunction_profile(state, x_array)
             
             # Normalize profile to avoid numerical issues
             wf_profile = wf_profile / np.max(wf_profile)

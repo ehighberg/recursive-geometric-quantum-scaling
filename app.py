@@ -6,6 +6,7 @@ evolution, phi-scaled evolution, and Fibonacci anyon braiding circuits.
 # pylint: disable=wrong-import-position
 # Add the project root to Python path
 import sys
+import traceback
 from pathlib import Path
 from constants import PHI
 sys.path.insert(0, str(Path(__file__).parent))
@@ -72,6 +73,7 @@ def main():
                 ["zero", "one", "plus", "ghz", "w"],
                 index=2  # "plus" as default
             )
+            params['scaling_factor'] = st.slider("Scaling Factor", 0.01, 2.00, PHI)
             params['n_steps'] = st.slider("Steps", 1, 100, 50)
             params['pulse_type'] = st.selectbox(
                 "Pulse Type",
@@ -80,7 +82,7 @@ def main():
             
         elif mode == "Amplitude-Scaled Evolution":
             params['num_qubits'] = st.slider("Number of Qubits", 1, 4, 2)
-            params['scaling_factor'] = st.slider("Amplitude Scale", 0.01, 2.0, 1.0)
+            params['scaling_factor'] = st.slider("Amplitude Scale", 0.01, 2.00, 1.00)
             params['n_steps'] = st.slider("Steps", 1, 100, 50)
             params['hamiltonian_type'] = st.selectbox(
                 "Hamiltonian",
@@ -170,7 +172,7 @@ def main():
                         num_qubits=params['num_qubits'],
                         state_label=params['state_label'],
                         n_steps=params['n_steps'],
-                        scaling_factor=1.0,
+                        scaling_factor=params['scaling_factor'],
                         noise_config=params.get('noise_config')
                     )
                 elif mode == "Amplitude-Scaled Evolution":
@@ -197,8 +199,17 @@ def main():
                 st.session_state['simulation_results'] = result
                 st.success("Simulation completed successfully!")
             
-            except Exception as e:
-                st.error(f"Simulation failed: {str(e)}")
+            except Exception:
+                # Get the full traceback
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                trace_details = traceback.format_exception(exc_type, exc_value, exc_traceback)
+                
+                # Display error in Streamlit
+                st.error("Simulation failed with the following error:")
+                st.code(''.join(trace_details), language='python')
+                
+                # Also print to terminal for debugging
+                print(''.join(trace_details), file=sys.stderr)
                 return
     
     # Display results if available
@@ -224,7 +235,7 @@ def main():
                 fig_evolution = plot_state_evolution(
                     result.states,
                     result.times,
-                    title=f"{mode} Evolution"
+                    title=f"{mode}"
                 )
                 st.pyplot(fig_evolution)
                 
