@@ -349,6 +349,7 @@ def main():
         
         with tab5:
             st.header("Topological Analysis")
+            #TODO: add spinner or progress bar
             control_range = st.slider("Topological Control Parameter Range", 0.0, 10.0, (0.0, 5.0))
             from analyses.topology_plots import plot_invariants, plot_protection_metrics
             # Generate invariant plot using placeholder functions
