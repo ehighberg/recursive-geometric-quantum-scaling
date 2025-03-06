@@ -56,10 +56,6 @@ def analyze_simulation_results(result, mode: str = "Evolution"):
         st.warning("No valid quantum states found in the results.")
         return
 
-    # Create tabs for different analyses
-    tab_names = ["Quantum Metrics", "State Evolution", "Fractal Analysis", "Topological Analysis"]
-    metrics_tab, evolution_tab, fractal_tab, topo_tab = st.tabs(tab_names)
-
     if len(states) > 1:
         # Calculate metrics for all states
         metrics = {}
@@ -73,96 +69,31 @@ def analyze_simulation_results(result, mode: str = "Evolution"):
             for metric in metric_names:
                 metrics[metric].append(analysis_results[metric])
         
-        with metrics_tab:
-            st.subheader("Quantum Metrics Evolution")
-            # Metric evolution plot
-            fig_metrics = plot_metric_evolution(states, times, title=f"Metrics Evolution - {mode}")
-            st.pyplot(fig_metrics)
-            
-            # Metric comparisons
-            st.subheader("Metric Correlations")
-            fig_comparison = plot_metric_comparison(
-                states,
-                metric_pairs=[
-                    ('vn_entropy', 'l1_coherence'),
-                    ('vn_entropy', 'negativity'),
-                    ('l1_coherence', 'negativity'),
-                    ('purity', 'fidelity')
-                ],
-                title="Metric Correlations"
-            )
-            st.pyplot(fig_comparison)
-            
-            # Metric distributions
-            st.subheader("Metric Distributions")
-            fig_dist = plot_metric_distribution(metrics, title="Metric Distributions")
-            st.pyplot(fig_dist)
-            
-        with evolution_tab:
-            st.subheader("State Evolution")
-            fig_evolution = plot_state_evolution(states, times)
-            st.pyplot(fig_evolution)
-            
-        with fractal_tab:
-            st.subheader("Fractal Analysis")
-            
-            # Load configuration
-            config = load_fractal_config()
-            
-            # Energy spectrum analysis
-            st.subheader("Energy Spectrum Analysis")
-            if hasattr(result, 'hamiltonian'):
-                parameter_values = np.linspace(0, 1, 100)
-                parameter_values, energies, analysis = compute_energy_spectrum(result.hamiltonian, config=config)
-                fig_spectrum = plot_energy_spectrum(parameter_values, energies, analysis)
-                st.pyplot(fig_spectrum)
-            else:
-                st.info("No Hamiltonian available for energy spectrum analysis.")
-            
-            # Wavefunction profile
-            st.subheader("Wavefunction Profile Analysis")
-            fig_wavefunction = plot_wavefunction_profile(states[-1], config=config)
-            st.pyplot(fig_wavefunction)
-            
-            # Fractal dimension analysis
-            st.subheader("Fractal Dimension Analysis")
-            if hasattr(result, 'recursion_depths') and hasattr(result, 'fractal_dimensions'):
-                fig_dimension = plot_fractal_dimension(
-                    result.recursion_depths,
-                    result.fractal_dimensions,
-                    error_bars=getattr(result, 'dimension_errors', None),
-                    config=config
-                )
-                st.pyplot(fig_dimension)
-            else:
-                st.info("No fractal dimension data available. Run a fractal analysis first.")
-
-        with topo_tab:
-            st.subheader("Topological Analysis")
-            if mode == "Topological Braiding":
-                # Display topological invariants
-                if hasattr(result, 'chern_number'):
-                    st.metric("Chern Number", result.chern_number)
-                if hasattr(result, 'winding_number'):
-                    st.metric("Winding Number", result.winding_number)
-                if hasattr(result, 'z2_index'):
-                    st.metric("Z₂ Index", result.z2_index)
-                
-                # Display combined metrics
-                if hasattr(result, 'fractal_chern_correlation'):
-                    st.metric("Fractal-Chern Correlation", result.fractal_chern_correlation)
-                if hasattr(result, 'protection_dimension'):
-                    st.metric("Protection Dimension", result.protection_dimension)
-                
-                # Add interactive controls
-                time_range = st.slider("Time Range", min_value=float(times[0]), max_value=float(times[-1]))
-                
-                # Add export functionality
-                if hasattr(result, 'computation_times'):
-                    total_time = sum(result.computation_times.values())
-                    st.metric("Computation Time", f"{total_time:.2f}s")
-                    st.download_button("Export Analysis Results", data=str(result.__dict__), file_name="topological_analysis.txt")
-                
+        st.subheader("Quantum Metrics Evolution")
+        # Metric evolution plot
+        fig_metrics = plot_metric_evolution(states, times, title=f"Metrics Evolution - {mode}")
+        st.pyplot(fig_metrics)
+        
+        # Metric comparisons
+        st.subheader("Metric Correlations")
+        fig_comparison = plot_metric_comparison(
+            states,
+            metric_pairs=[
+                ('vn_entropy', 'l1_coherence'),
+                ('vn_entropy', 'negativity'),
+                ('l1_coherence', 'negativity'),
+                ('purity', 'fidelity')
+            ],
+            title="Metric Correlations"
+        )
+        st.pyplot(fig_comparison)
+        
+        # Metric distributions
+        st.subheader("Metric Distributions")
+        fig_dist = plot_metric_distribution(metrics, title="Metric Distributions")
+        st.pyplot(fig_dist)
+        
+        
     else:
         # For single-state results, show metrics as cards
         analysis_results = run_analyses(states[0], final_state)
