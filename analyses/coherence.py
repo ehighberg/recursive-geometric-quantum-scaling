@@ -5,7 +5,7 @@ Functions for calculating quantum coherence measures.
 import numpy as np
 from qutip import Qobj
 from typing import Union, List
-from .entropy import compute_vn_entropy
+from .entropy import von_neumann_entropy
 
 def l1_coherence(state: Qobj, dim: int = None) -> float:
     """
@@ -63,7 +63,7 @@ def relative_entropy_coherence(state: Qobj, dim: int = None) -> float:
     diag_state = Qobj(np.diag(diag_elements))
     
     # Calculate relative entropy
-    return compute_vn_entropy(diag_state) - compute_vn_entropy(rho)
+    return von_neumann_entropy(diag_state) - von_neumann_entropy(rho)
 
 def robustness_coherence(state: Qobj) -> float:
     """

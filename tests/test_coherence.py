@@ -4,7 +4,7 @@ import pytest
 import numpy as np
 from qutip import Qobj, basis, ket2dm
 from analyses.coherence import (
-    coherence_metric, relative_entropy_coherence
+    l1_coherence, relative_entropy_coherence
 )
 
 def test_l1_coherence_single_qubit_offdiag():
@@ -17,7 +17,7 @@ def test_l1_coherence_single_qubit_offdiag():
     # |+> = 1/sqrt(2) (|0> + |1>)
     psi_plus = (basis(2,0) + basis(2,1)).unit()
     rho = ket2dm(psi_plus)
-    c_l1 = coherence_metric(rho)
+    c_l1 = l1_coherence(rho)
     assert abs(c_l1 - 1.0) < 1e-6, f"L1 coherence ~ 1.0 for single qubit +"
 
 def test_relative_entropy_coherence_single_qubit():

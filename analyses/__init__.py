@@ -3,7 +3,7 @@ Module for quantum analyses including entanglement, entropy, and coherence metri
 """
 
 from .entanglement import negativity, log_negativity, concurrence
-from .entropy import compute_vn_entropy, compute_linear_entropy, compute_mutual_information
+from .entropy import von_neumann_entropy, linear_entropy, compute_mutual_information
 from .coherence import l1_coherence
 from .fractal_analysis import compute_energy_spectrum, estimate_fractal_dimension
 from .topological_invariants import compute_chern_number, compute_winding_number, compute_z2_index
@@ -35,7 +35,7 @@ def run_analyses(initial_state, current_state):
     fid = fidelity(rho_init, rho_current)
     
     neg_val = negativity(rho_current, sysA=[0])
-    vn_ent = compute_vn_entropy(rho_current, base=2)
+    vn_ent = von_neumann_entropy(rho_current, base=2)
     co_val = l1_coherence(rho_current, dim=rho_current.shape[0])
     purity = (rho_current * rho_current).tr().real
     
@@ -68,8 +68,8 @@ __all__ = [
     'concurrence',
     'negativity',
     'log_negativity',
-    'compute_vn_entropy',
-    'compute_linear_entropy',
+    'von_neumann_entropy',
+    'linear_entropy',
     'compute_mutual_information',
     'compute_energy_spectrum',
     'estimate_fractal_dimension',
