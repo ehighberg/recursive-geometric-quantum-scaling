@@ -9,7 +9,6 @@ on a single or multi-qubit state.
 
 import numpy as np
 from qutip import sigmaz, tensor, qeye, sesolve, mesolve, sigmax, Options
-from analyses.fractal_analysis import estimate_fractal_dimension
 
 def construct_nqubit_hamiltonian(num_qubits):
     """
@@ -95,18 +94,19 @@ def simulate_evolution(H, psi0, times, noise_config=None, e_ops=None):
 
 # Import quantum states at module level
 from simulations.quantum_state import state_zero, state_one, state_plus, state_ghz, state_w
-from analyses.fractal_analysis import compute_wavefunction_profile  # Used in loop below
 
-def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, noise_config=None, pulse_type="Square"):
+def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, noise_config=None, pulse_type="Square", analyze_fractal=False):
     """
     N-qubit evolution under H = Σi σzi with scale_factor and configurable noise.
     
     Parameters:
     - num_qubits (int): Number of qubits in the system
     - state_label (str): Label for initial state ("zero", "one", "plus", "ghz", "w")
-    - phi_steps (int): Number of evolution steps
+    - n_steps (int): Number of evolution steps
     - scaling_factor (float): Factor to scale the Hamiltonian (default: 1)
     - noise_config (dict): Noise configuration dictionary (see simulate_evolution docstring)
+    - pulse_type (str): Type of pulse shape ("Square", "Gaussian", "DRAG")
+    - analyze_fractal (bool): Whether to perform fractal analysis (computationally expensive)
     
     Returns:
     - qutip.Result: Result object containing evolution data
@@ -154,98 +154,114 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
         return f_s * H0
     result.hamiltonian = hamiltonian
     
-    # Generate rich energy spectrum data
-    k_values = np.linspace(0, 4*np.pi, 400)  # Extended k-range to see more bands
-    result.parameter_values = k_values
-    
-    # Compute energy spectrum with multiple bands and avoided crossings
-    energies = []
-    for k in k_values:
-        # Create k-dependent Hamiltonian with richer structure
+    # Only perform fractal analysis if explicitly requested
+    if analyze_fractal:
+        from analyses.fractal_analysis import compute_wavefunction_profile, estimate_fractal_dimension
+
+        # Generate rich energy spectrum data
+        k_values = np.linspace(0, 4*np.pi, 400)  # Extended k-range to see more bands
+        result.parameter_values = k_values
+
+        # Compute energy spectrum with multiple bands and avoided crossings
+        # First determine the number of energy levels
         if num_qubits == 1:
-            H_k = (k * H0 + 
-                   0.1 * k**2 * sigmaz() + 
-                   0.05 * k**3 * sigmax() +
-                   0.02 * np.sin(k) * sigmaz() +  # Add periodic modulation
-                   0.015 * np.cos(2*k) * sigmax()  # Add band mixing terms
-                  )
+            num_levels = 2
         else:
-            # For multi-qubit systems, use tensor products
-            sx_list = [qeye(2) for _ in range(num_qubits)]
-            sz_list = [qeye(2) for _ in range(num_qubits)]
-            for i in range(num_qubits):
-                sx_list[i] = sigmax()
-                sz_list[i] = sigmaz()
-            
-            H_k = k * H0
-            for i in range(num_qubits):
-                H_k += (0.1 * k**2 * tensor(sz_list) + 
-                       0.05 * k**3 * tensor(sx_list) +
-                       0.02 * np.sin(k) * tensor(sz_list) +
-                       0.015 * np.cos(2*k) * tensor(sx_list))
-        evals = np.sort(H_k.eigenenergies())  # Sort eigenvalues for consistent band structure
-        energies.append(evals)
-    result.energies = np.array(energies)
-    
-    # Store final wavefunction
-    result.wavefunction = result.states[-1]
-    
-    # Compute fractal dimensions across multiple scales
-    max_depth = 4  # TODO: refactor to take magic number from config. should be done when extracting this code to an analysis script.
-    recursion_depths = np.arange(2, max_depth + 1)
-    dimensions = []
-    errors = []
-    
-    # Compute fractal dimensions with improved statistics
-    for depth in recursion_depths:
-        # Generate denser grid for higher depths
-        points = 2**depth
-        x_array = np.linspace(0, 1, points)
-        
-        # Analyze multiple states for better statistics
-        depth_dimensions = []
-        depth_errors = []
-        
-        # Sample states across the evolution
-        sample_indices = np.linspace(0, len(result.states)-1, 5, dtype=int)
-        for idx in sample_indices:
-            state = result.states[idx]
-            wf_profile, options = compute_wavefunction_profile(state, x_array)
-            
-            # Normalize profile to avoid numerical issues
-            wf_profile = wf_profile / np.max(wf_profile)
-            
-            # Use multiple box size ranges for robust dimension estimation
-            box_sizes = np.logspace(-depth, 0, depth * 10)
-            dimension, info = estimate_fractal_dimension(wf_profile, box_sizes)
-            
-            if not np.isnan(dimension):  # Filter out invalid results
-                depth_dimensions.append(dimension)
-                depth_errors.append(info['std_error'])
-        
-        # Average dimensions and propagate errors
-        if depth_dimensions:
-            avg_dimension = np.mean(depth_dimensions)
-            avg_error = np.sqrt(np.mean(np.array(depth_errors)**2))
-            dimensions.append(avg_dimension)
-            errors.append(avg_error)
-        else:
-            dimensions.append(np.nan)
-            errors.append(np.nan)
-    
-    result.fractal_dimensions = np.array(dimensions)
-    result.recursion_depths = recursion_depths
-    result.dimension_errors = np.array(errors)
-    
-    # Define theoretical scaling function based on renormalization group analysis
-    def theoretical_scaling(n):
-        """D(n) = D_∞ - c₁/n - c₂/n²"""
-        D_inf = 1.738  # Theoretical asymptotic dimension (e.g., from RG analysis)
-        c1 = 0.5      # First-order correction
-        c2 = 0.2      # Second-order correction
-        return D_inf - c1/n - c2/(n*n)
-    
-    result.scaling_function = theoretical_scaling
+            num_levels = 2**num_qubits
+
+        # Initialize energy array with proper shape
+        energies = np.zeros((len(k_values), num_levels))
+
+        for k_idx, k in enumerate(k_values):
+            # Create k-dependent Hamiltonian with richer structure
+            if num_qubits == 1:
+                H_k = (k * H0 + 
+                       0.1 * k**2 * sigmaz() + 
+                       0.05 * k**3 * sigmax() +
+                       0.02 * np.sin(k) * sigmaz() +  # Add periodic modulation
+                       0.015 * np.cos(2*k) * sigmax()  # Add band mixing terms
+                      )
+            else:
+                # For multi-qubit systems, use tensor products
+                sx_list = [qeye(2) for _ in range(num_qubits)]
+                sz_list = [qeye(2) for _ in range(num_qubits)]
+                for i in range(num_qubits):
+                    sx_list[i] = sigmax()
+                    sz_list[i] = sigmaz()
+
+                H_k = k * H0
+                for i in range(num_qubits):
+                    H_k += (0.1 * k**2 * tensor(sz_list) + 
+                           0.05 * k**3 * tensor(sx_list) +
+                           0.02 * np.sin(k) * tensor(sz_list) +
+                           0.015 * np.cos(2*k) * tensor(sx_list))
+
+            # Get eigenvalues and ensure consistent shape
+            evals = np.sort(H_k.eigenenergies())
+            energies[k_idx, :] = evals
+
+        result.energies = energies
+
+        # Store final wavefunction
+        result.wavefunction = result.states[-1]
+
+        # Compute fractal dimensions across multiple scales
+        max_depth = 15  # Increased depth for better scaling analysis
+        recursion_depths = np.arange(2, max_depth + 1)
+        num_depths = len(recursion_depths)
+
+        # Initialize arrays with proper shapes
+        dimensions = np.zeros(num_depths)
+        errors = np.zeros(num_depths)
+
+        # Compute fractal dimensions with improved statistics
+        for depth_idx, depth in enumerate(recursion_depths):
+            # Generate denser grid for higher depths
+            points = 2**depth
+            x_array = np.linspace(0, 1, points)
+
+            # Analyze multiple states for better statistics
+            sample_indices = np.linspace(0, len(result.states)-1, 5, dtype=int)
+            valid_dimensions = []
+            valid_errors = []
+
+            for idx in sample_indices:
+                state = result.states[idx]
+                wf_profile, _ = compute_wavefunction_profile(state, x_array)  # Ensure we get the profile
+
+                if wf_profile is not None and len(wf_profile) > 0:
+                    # Normalize profile to avoid numerical issues
+                    wf_profile = wf_profile / (np.max(wf_profile) if np.max(np.abs(wf_profile)) > 0 else 1.0)
+
+                    # Use multiple box size ranges for robust dimension estimation
+                    box_sizes = np.logspace(-depth, 0, depth * 10)
+                    dimension, info = estimate_fractal_dimension(wf_profile, box_sizes)
+
+                    if not np.isnan(dimension):  # Filter out invalid results
+                        valid_dimensions.append(dimension)
+                        valid_errors.append(info['std_error'])
+
+            # Average dimensions and propagate errors
+            if valid_dimensions:
+                dimensions[depth_idx] = np.mean(valid_dimensions)
+                errors[depth_idx] = np.sqrt(np.mean(np.array(valid_errors)**2))
+            else:
+                dimensions[depth_idx] = np.nan
+                errors[depth_idx] = np.nan
+
+        result.fractal_dimensions = dimensions
+        result.recursion_depths = recursion_depths
+        result.dimension_errors = errors
+
+        # Define theoretical scaling function based on renormalization group analysis
+        def theoretical_scaling(n):
+            """D(n) = D_∞ - c₁/n - c₂/n²"""
+            D_inf = 1.738  # Theoretical asymptotic dimension (e.g., from RG analysis)
+            c1 = 0.5      # First-order correction
+            c2 = 0.2      # Second-order correction
+            return D_inf - c1/n - c2/(n*n)
+
+        result.scaling_function = theoretical_scaling
     
     return result
 
@@ -257,7 +273,8 @@ if __name__=="__main__":
         num_qubits=1,
         state_label="plus",
         n_steps=400,  # High temporal resolution
-        scaling_factor=2.0  # Strong scaling to enhance geometric effects
+        scaling_factor=2.0,  # Strong scaling to enhance geometric effects
+        analyze_fractal=True  # Enable fractal analysis
     )
     
     # Analyze results and generate visualizations

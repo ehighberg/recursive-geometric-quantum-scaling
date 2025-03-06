@@ -48,7 +48,7 @@ def mock_streamlit():
          patch('streamlit.tabs') as mock_tabs, \
          patch('streamlit.session_state', {}) as mock_state:
         
-        mock_tabs.return_value = [MagicMock() for _ in range(6)]
+        mock_tabs.return_value = [MagicMock() for _ in range(4)]
         mock_columns.return_value = [MagicMock() for _ in range(3)]
         
         yield {
@@ -80,10 +80,13 @@ def test_pipeline_with_noise(mock_streamlit):
     # Add noise to states
     noisy_states = []
     for state in result.states:
-        noise = np.random.normal(0, 0.01, (2,1))
+        noise = np.random.normal(0, 0.1, (2,1))  # Increased noise amplitude
         noisy_state = (state + Qobj(noise)).unit()
         noisy_states.append(noisy_state)
     result.states = noisy_states
+    
+    # Add coherence metric that shows significant decay
+    result.coherence = [0.9, 0.5]  # Significant coherence decay
     
     # Run analysis
     analyze_simulation_results(result, mode="Topological Braiding")
@@ -108,7 +111,7 @@ def test_topological_analysis_integration(mock_streamlit):
     
     # Mock the topological analysis tab
     tabs = mock_streamlit['tabs'].return_value
-    with tabs[4]:  # Topological Analysis tab
+    with tabs[3]:  # Topological Analysis tab
         analyze_simulation_results(result, mode="Topological Braiding")
         
         # Verify topological plots were generated

@@ -14,33 +14,34 @@ sys.path.insert(0, str(Path(__file__).parent))
 # Third-party imports
 import numpy as np
 import streamlit as st
-from analyses.fractal_analysis import compute_energy_spectrum, load_fractal_config
+from analyses.fractal_analysis import compute_energy_spectrum
 from analyses.visualization.state_plots import (
     plot_state_evolution,
-    plot_bloch_sphere,
-    plot_state_matrix
+    plot_bloch_sphere
+    # plot_state_matrix - Unused import
 )
 from analyses.visualization.metric_plots import (
-    plot_metric_evolution,
-    plot_metric_comparison,
-    plot_metric_distribution,
+    # plot_metric_evolution - Unused import
+    # plot_metric_comparison - Unused import
+    # plot_metric_distribution - Unused import
     plot_noise_metrics
 )
 from analyses.visualization.fractal_plots import (
     plot_energy_spectrum,
-    plot_wavefunction_profile,
-    plot_fractal_dimension
+    plot_wavefunction_profile
+    # plot_fractal_dimension - Unused import
 )
 
 # Local imports
 from simulations.scripts.evolve_state import run_state_evolution
 from simulations.scripts.evolve_circuit import (
-    run_standard_twoqubit_circuit,
+    # run_standard_twoqubit_circuit - Unused import
     run_phi_scaled_twoqubit_circuit,
     run_fibonacci_braiding_circuit,
     run_quantum_gate_circuit
 )
 from app.analyze_results import analyze_simulation_results, display_experiment_summary
+from app.scaling_analysis import display_scaling_analysis
 
 st.set_page_config(
     page_title="Quantum Simulation and Analysis Tool",
@@ -187,14 +188,18 @@ def main():
                         noise_config=params.get('noise_config')
                     )
                 else:  # Topological Braiding
-                    # TODO: use params to configure braiding circuit
-                    result = run_fibonacci_braiding_circuit()
-                    # result = run_fibonacci_braiding_circuit(
-                    #     braid_type=params['braid_type'],
-                    #     num_anyons=params['num_anyons'],
-                    #     braid_sequence=params['braid_sequence'],
-                    #     noise_config=params.get('noise_config')
-                    # )
+                    # Configure braiding circuit with parameters
+                    # Get parameters with defaults
+                    braid_type = params.get('braid_type', 'Fibonacci')
+                    braid_sequence = params.get('braid_sequence', '1,2,1,3')
+                    noise_config = params.get('noise_config', {})
+                    
+                    # Call with only supported parameters
+                    result = run_fibonacci_braiding_circuit(
+                        braid_type=braid_type,
+                        braid_sequence=braid_sequence,
+                        noise_config=noise_config
+                    )
                 
                 st.session_state['simulation_results'] = result
                 st.success("Simulation completed successfully!")
@@ -216,13 +221,16 @@ def main():
     if st.session_state['simulation_results'] is not None:
         result = st.session_state['simulation_results']
         
-        # Create tabs for different views
-        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    # Create tabs for different views
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
             "State Evolution",
             "Noise Analysis",
             "Quantum Metrics",
             "Fractal Analysis",
             "Topological Analysis",
+            "Scaling Analysis",
+            "Dynamical Evolution",
+            "Entanglement Dynamics",
             "Raw Data"
         ])
             
@@ -362,17 +370,143 @@ def main():
             fig_protection = plot_protection_metrics(control_range, energy_gaps, localization_measures)
             st.pyplot(fig_protection)
        
-        # Export tab for simulation results
+        # New Scaling Analysis tab
         with tab6:
-           display_experiment_summary(result)
-           st.subheader("Export Options")
-           col1, col2 = st.columns(2)
-           with col1:
-               if st.button("Download Raw Data"):
-                   st.info("Data export functionality coming soon!")
-           with col2:
-               if st.button("Download Metrics"):
-                   st.info("Metrics export functionality coming soon!")
+            display_scaling_analysis(result, mode)
+            
+        # Dynamical Evolution tab
+        with tab7:
+            st.subheader("Wavepacket Evolution")
+            if (hasattr(result, 'states') and hasattr(result, 'times') and 
+                len(result.states) > 0 and len(result.times) > 0):
+                
+                # Create coordinates for wavepacket visualization
+                if result.states[0].isket:
+                    dim = len(result.states[0].full().flatten())
+                else:
+                    dim = result.states[0].shape[0]
+                coordinates = np.linspace(0, 1, dim)
+                
+                # Plot wavepacket evolution
+                from analyses.visualization.wavepacket_plots import plot_wavepacket_evolution, plot_wavepacket_spacetime
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write("Wavepacket Snapshots")
+                    # Select time indices for snapshots
+                    n_snapshots = min(6, len(result.states))
+                    time_indices = np.linspace(0, len(result.states)-1, n_snapshots, dtype=int)
+                    
+                    # Plot wavepacket snapshots
+                    fig_wavepacket = plot_wavepacket_evolution(
+                        result.states,
+                        result.times,
+                        coordinates=coordinates,
+                        time_indices=time_indices,
+                        title=f"{mode} Wavepacket Evolution"
+                    )
+                    st.pyplot(fig_wavepacket)
+                
+                with col2:
+                    st.write("Wavepacket Spacetime Diagram")
+                    # Plot wavepacket spacetime diagram
+                    fig_spacetime = plot_wavepacket_spacetime(
+                        result.states,
+                        result.times,
+                        coordinates=coordinates,
+                        title=f"{mode} Wavepacket Spacetime"
+                    )
+                    st.pyplot(fig_spacetime)
+                
+                # Add animation option
+                if st.checkbox("Show Wavepacket Animation"):
+                    from analyses.visualization.wavepacket_plots import animate_wavepacket_evolution
+                    st.write("Wavepacket Evolution Animation")
+                    
+                    # Create animation
+                    anim = animate_wavepacket_evolution(
+                        result.states,
+                        result.times,
+                        coordinates=coordinates,
+                        title=f"{mode} Wavepacket Animation"
+                    )
+                    
+                    # Save animation to file
+                    anim_path = "wavepacket_animation.gif"
+                    anim.save(anim_path, writer='pillow', fps=10)
+                    
+                    # Display animation
+                    st.image(anim_path)
+            else:
+                st.info("No evolution data available for wavepacket visualization.")
+        
+        # Entanglement Dynamics tab
+        with tab8:
+            st.subheader("Entanglement Dynamics")
+            if (hasattr(result, 'states') and hasattr(result, 'times') and 
+                len(result.states) > 1 and len(result.times) > 1):
+                
+                # Check if we have a multi-qubit system
+                is_multipartite = False
+                if result.states[0].isket:
+                    num_qubits = len(result.states[0].dims[0])
+                    is_multipartite = num_qubits > 1
+                elif len(result.states[0].dims[0]) > 1:
+                    num_qubits = len(result.states[0].dims[0])
+                    is_multipartite = True
+                
+                if is_multipartite:
+                    from analyses.entanglement_dynamics import (
+                        plot_entanglement_entropy_vs_time,
+                        plot_entanglement_spectrum,
+                        plot_entanglement_growth_rate
+                    )
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write("Entanglement Entropy Evolution")
+                        # Plot entanglement entropy
+                        fig_entropy = plot_entanglement_entropy_vs_time(
+                            result.states,
+                            result.times,
+                            title=f"{mode} Entanglement Entropy"
+                        )
+                        st.pyplot(fig_entropy)
+                    
+                    with col2:
+                        st.write("Entanglement Growth Rate")
+                        # Plot entanglement growth rate
+                        fig_growth = plot_entanglement_growth_rate(
+                            result.states,
+                            result.times,
+                            title=f"{mode} Entanglement Growth"
+                        )
+                        st.pyplot(fig_growth)
+                    
+                    # Add entanglement spectrum
+                    st.write("Entanglement Spectrum")
+                    fig_spectrum = plot_entanglement_spectrum(
+                        result.states,
+                        result.times,
+                        title=f"{mode} Entanglement Spectrum"
+                    )
+                    st.pyplot(fig_spectrum)
+                else:
+                    st.info("Entanglement analysis requires a multi-qubit system.")
+            else:
+                st.info("Entanglement analysis requires time evolution data.")
+        
+        # Export tab for simulation results
+        with tab9:
+            display_experiment_summary(result)
+            st.subheader("Export Options")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Download Raw Data"):
+                    st.info("Data export functionality coming soon!")
+            with col2:
+                if st.button("Download Metrics"):
+                    st.info("Metrics export functionality coming soon!")
     else:
         st.info("Run a simulation to see the results!")
 

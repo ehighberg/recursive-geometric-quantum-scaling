@@ -186,6 +186,6 @@ def test_performance_monitoring(mock_streamlit):
     
     # Verify performance metrics display
     mock_streamlit['metric'].assert_any_call(
-        "Computation Time",
+        "Total Computation Time",
         f"{sum(result.computation_times.values()):.2f}s"
     )
