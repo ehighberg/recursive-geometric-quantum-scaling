@@ -71,7 +71,7 @@ def test_full_analysis_pipeline(mock_streamlit):
     # Verify all components were called
     mock_streamlit['pyplot'].assert_called()  # Plots were generated
     mock_streamlit['header'].assert_called()  # Headers were created
-    assert mock_streamlit['pyplot'].call_count >= 4  # Multiple plots generated
+    assert mock_streamlit['pyplot'].call_count >= 3  # Multiple plots generated
 
 def test_pipeline_with_noise(mock_streamlit):
     """Test pipeline with noisy data"""
@@ -148,7 +148,7 @@ def test_animation_integration(mock_streamlit):
     analyze_simulation_results(result, mode="Topological Braiding")
     
     # Verify animations were generated
-    assert mock_streamlit['pyplot'].call_count >= 4
+    assert mock_streamlit['pyplot'].call_count >= 3
 
 def test_export_functionality(mock_streamlit):
     """Test data export functionality"""

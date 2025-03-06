@@ -7,6 +7,7 @@ from qutip import Qobj, propagator, sigmax, sigmaz
 from qutip_qip.operations import Gate
 from qutip_qip.circuit import QubitCircuit
 
+#TODO: use these functions instead of existing code with the same purpose, or remove them
 def get_scaled_unitary(H, time, scaling_factor=1.0):
     """
     Get the scaled unitary operator for a given Hamiltonian.

@@ -69,7 +69,7 @@ def test_multi_qubit_ghz_state():
     rho_ghz = ket2dm(psi_ghz)
     
     # Test different subsystem partitions
-    neg1 = negativity([rho_ghz, [0, 1]])  # Treat first 2 qubits as sysA
+    neg1 = negativity(rho_ghz, sysA=[0, 1])  # Treat first 2 qubits as sysA
     assert abs(neg1 - 0.5) < 1e-5, f"GHZ 3-qubit negativity should be 0.5, got {neg1}"
 
 def test_error_handling():
@@ -82,7 +82,7 @@ def test_error_handling():
     # Test invalid dimension specification
     rho_bell = ket2dm((tensor(basis(2, 0), basis(2, 0))).unit())
     with pytest.raises(ValueError):
-        negativity([rho_bell, [3, 3]])  # Incompatible dimensions
+        negativity(rho_bell, sysA=[3, 3])  # Incompatible dimensions
 
 def test_separable_state_zero_negativity():
     """Product state should have zero entanglement"""

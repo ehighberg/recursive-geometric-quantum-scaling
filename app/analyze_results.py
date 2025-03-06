@@ -148,10 +148,16 @@ def analyze_simulation_results(result, mode: str = "Evolution"):
             # Display topological invariants
             if hasattr(result, 'chern_number'):
                 st.metric("Chern Number", result.chern_number)
+            else:
+                st.info("Chern number not available for this simulation.")
             if hasattr(result, 'winding_number'):
                 st.metric("Winding Number", result.winding_number)
+            else:
+                st.info("Winding number not available for this simulation.")
             if hasattr(result, 'z2_index'):
                 st.metric("Z₂ Index", result.z2_index)
+            else:
+                st.info("Z₂ index not available for this simulation.")
             
             # Display combined metrics
             if hasattr(result, 'fractal_chern_correlation'):
