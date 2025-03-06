@@ -5,7 +5,7 @@ import pytest
 import numpy as np
 from qutip import basis, ket2dm, tensor
 from analyses.entanglement import (
-    compute_negativity, compute_log_negativity, bipartite_partial_trace
+    negativity, log_negativity
 )
 
 
@@ -19,7 +19,7 @@ def test_negativity_bell_state():
     rho_bell = ket2dm(psi_bell)
 
     # negativity is 0.5 for a maximally entangled 2-qubit pure state
-    neg = compute_negativity(rho_bell)  # default sysA=None
+    neg = negativity(rho_bell)  # default sysA=None
     assert abs(neg - 0.5) < 1e-5, f"Negativity of Bell state ~ 0.5, got {neg}"
 
 
@@ -32,28 +32,10 @@ def test_log_negativity_bell_state():
     from qutip import ket2dm
     psi_bell = (tensor(basis(2, 0), basis(2, 0)) + tensor(basis(2, 1), basis(2, 1))).unit()
     rho_bell = ket2dm(psi_bell)
-    ln_val = compute_log_negativity(rho_bell)
+    ln_val = log_negativity(rho_bell)
 
     # With natural log, LN(2) ~ 0.693147
     assert abs(ln_val - 0.693147) < 1e-3, f"Log-neg of Bell ~ ln(2), got {ln_val}"
-
-
-def test_bipartite_partial_trace():
-    """
-    For a 2-qubit system in the Bell state, partial trace over one qubit => a maximally mixed 1-qubit.
-    """
-    from qutip import ket2dm
-    psi_bell = (tensor(basis(2, 0), basis(2, 0)) + tensor(basis(2, 1), basis(2, 1))).unit()
-    rho_bell = ket2dm(psi_bell)
-
-    # partial trace => a 2x2 identity/2
-    rhoA = bipartite_partial_trace(rho_bell, keep=0, dims=[2, 2])
-    # should be identity/2
-    arrA = rhoA.full()
-    # check close to 0.5 diag
-    assert abs(arrA[0, 0] - 0.5) < 1e-6
-    assert abs(arrA[1, 1] - 0.5) < 1e-6
-    assert abs(arrA[0, 1]) < 1e-7
 
 
 def test_negativity_werner_state():
@@ -72,7 +54,7 @@ def test_negativity_werner_state():
 
     for p, exp in zip(p_values, expected_neg):
         rho = p*rho_bell + (1-p)*Qobj(np.eye(4), dims=rho_bell.dims)/4  # Mixed state
-        neg = compute_negativity(rho, sysA=[0])
+        neg = negativity(rho, sysA=[0])
         assert abs(neg - exp) < 1e-6, f"Failed at p={p}: expected {exp}, got {neg}"
 
 
@@ -87,7 +69,7 @@ def test_multi_qubit_ghz_state():
     rho_ghz = ket2dm(psi_ghz)
     
     # Test different subsystem partitions
-    neg1 = compute_negativity(rho_ghz, sysA=[0, 1])  # Treat first 2 qubits as sysA
+    neg1 = negativity(rho_ghz, sysA=[0, 1])  # Treat first 2 qubits as sysA
     assert abs(neg1 - 0.5) < 1e-5, f"GHZ 3-qubit negativity should be 0.5, got {neg1}"
 
 
@@ -96,12 +78,12 @@ def test_error_handling():
     # Test non-density matrix input
     with pytest.raises(ValueError):
         psi = (tensor(basis(2, 0), basis(2, 0))).unit()
-        compute_negativity(psi)  # Should fail - needs density matrix
+        negativity(psi)  # Should fail - needs density matrix
 
     # Test invalid dimension specification
     rho_bell = ket2dm((tensor(basis(2, 0), basis(2, 0))).unit())
     with pytest.raises(ValueError):
-        compute_negativity(rho_bell, sysA=[3, 3])  # Incompatible dimensions
+        negativity(rho_bell, sysA=[3, 3])  # Incompatible dimensions
 
 
 def test_separable_state_zero_negativity():
@@ -110,19 +92,6 @@ def test_separable_state_zero_negativity():
     psi_prod = tensor(basis(2, 0), (basis(2, 0) + basis(2, 1)).unit())
     rho_prod = ket2dm(psi_prod)
     
-    neg = compute_negativity(rho_prod)
+    neg = negativity(rho_prod)
     assert abs(neg) < 1e-7, f"Product state should have zero negativity, got {neg}"
 
-
-def test_partial_trace_multi_qubit():
-    """Test partial trace on 3-qubit system"""
-    # Create |000> state
-    psi = tensor(basis(2, 0), basis(2, 0), basis(2, 0))
-    rho = ket2dm(psi)
-    
-    # Trace out qubits 1 and 2, keep qubit 0
-    rho_reduced = bipartite_partial_trace(rho, keep=0, dims=[2, 2, 2])
-    
-    # Should be |0><0|
-    assert np.allclose(rho_reduced.full(), basis(2, 0).proj().full()), \
-        "Partial trace failed for multi-qubit system"
