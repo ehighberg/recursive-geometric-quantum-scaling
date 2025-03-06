@@ -250,7 +250,7 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     return result
 
 if __name__=="__main__":
-    from app.analyze_results import analyze_quantum_simulation
+    from app.analyze_results import analyze_simulation_results
     
     # Run evolution simulation with parameters tuned for fractal analysis
     evolution_result = run_state_evolution(
@@ -261,7 +261,7 @@ if __name__=="__main__":
     )
     
     # Analyze results and generate visualizations
-    analysis_results = analyze_quantum_simulation(evolution_result)
+    analysis_results = analyze_simulation_results(evolution_result)
     
     print("\nAnalysis complete. Results summary:")
     print(f"Visualizations saved to: {', '.join(analysis_results['visualizations'].values())}")

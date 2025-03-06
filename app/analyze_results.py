@@ -93,6 +93,7 @@ def analyze_simulation_results(result, mode: str = "Evolution"):
         fig_dist = plot_metric_distribution(metrics, title="Metric Distributions")
         st.pyplot(fig_dist)
         
+        return metrics
         
     else:
         # For single-state results, show metrics as cards
@@ -108,6 +109,8 @@ def analyze_simulation_results(result, mode: str = "Evolution"):
             st.metric("Purity", f"{analysis_results['purity']:.4f}")
         with col5:
             st.metric("Fidelity", f"{analysis_results['fidelity']:.4f}")
+            
+        return analysis_results
 
 def display_experiment_summary(result):
     """
