@@ -2,7 +2,7 @@
 Module for quantum analyses including entanglement, entropy, and coherence metrics.
 """
 
-from .entanglement import compute_negativity, compute_log_negativity, concurrence
+from .entanglement import negativity, log_negativity, concurrence
 from .entropy import compute_vn_entropy, compute_linear_entropy, compute_mutual_information
 from .coherence import l1_coherence
 from .fractal_analysis import compute_energy_spectrum, estimate_fractal_dimension
@@ -34,7 +34,7 @@ def run_analyses(initial_state, current_state):
     
     fid = fidelity(rho_init, rho_current)
     
-    neg_val = compute_negativity(rho_current, sysA=[0])
+    neg_val = negativity(rho_current, sysA=[0])
     vn_ent = compute_vn_entropy(rho_current, base=2)
     co_val = l1_coherence(rho_current, dim=rho_current.shape[0])
     purity = (rho_current * rho_current).tr().real
@@ -57,8 +57,8 @@ def run_analyses(initial_state, current_state):
     elif num_qubits > 2:
         # For multi-qubit states, use negativity and log_negativity
         results.update({
-            'negativity': compute_negativity(current_state, sysA=[0]),
-            'log_negativity': compute_log_negativity(current_state)
+            'negativity': negativity(current_state, sysA=[0]),
+            'log_negativity': log_negativity(current_state)
         })
     
     return results
@@ -66,8 +66,8 @@ def run_analyses(initial_state, current_state):
 __all__ = [
     'l1_coherence',
     'concurrence',
-    'compute_negativity',
-    'compute_log_negativity',
+    'negativity',
+    'log_negativity',
     'compute_vn_entropy',
     'compute_linear_entropy',
     'compute_mutual_information',

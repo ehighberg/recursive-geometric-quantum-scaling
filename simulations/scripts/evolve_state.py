@@ -148,6 +148,7 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     result = simulate_evolution(H_effective, psi_init, times, noise_config, e_ops)
     result.times = times  # Store times for visualization
     
+    # TODO: extract the following analysis code to an analysis script, they don't need to be part of the Result.
     # Store Hamiltonian function for fractal analysis
     def hamiltonian(f_s):
         return f_s * H0
@@ -156,21 +157,21 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     # Only perform fractal analysis if explicitly requested
     if analyze_fractal:
         from analyses.fractal_analysis import compute_wavefunction_profile, estimate_fractal_dimension
-        
+
         # Generate rich energy spectrum data
         k_values = np.linspace(0, 4*np.pi, 400)  # Extended k-range to see more bands
         result.parameter_values = k_values
-        
+
         # Compute energy spectrum with multiple bands and avoided crossings
         # First determine the number of energy levels
         if num_qubits == 1:
             num_levels = 2
         else:
             num_levels = 2**num_qubits
-        
+
         # Initialize energy array with proper shape
         energies = np.zeros((len(k_values), num_levels))
-        
+
         for k_idx, k in enumerate(k_values):
             # Create k-dependent Hamiltonian with richer structure
             if num_qubits == 1:
@@ -187,59 +188,59 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
                 for i in range(num_qubits):
                     sx_list[i] = sigmax()
                     sz_list[i] = sigmaz()
-                
+
                 H_k = k * H0
                 for i in range(num_qubits):
                     H_k += (0.1 * k**2 * tensor(sz_list) + 
                            0.05 * k**3 * tensor(sx_list) +
                            0.02 * np.sin(k) * tensor(sz_list) +
                            0.015 * np.cos(2*k) * tensor(sx_list))
-            
+
             # Get eigenvalues and ensure consistent shape
             evals = np.sort(H_k.eigenenergies())
             energies[k_idx, :] = evals
-        
+
         result.energies = energies
-        
+
         # Store final wavefunction
         result.wavefunction = result.states[-1]
-        
+
         # Compute fractal dimensions across multiple scales
         max_depth = 15  # Increased depth for better scaling analysis
         recursion_depths = np.arange(2, max_depth + 1)
         num_depths = len(recursion_depths)
-        
+
         # Initialize arrays with proper shapes
         dimensions = np.zeros(num_depths)
         errors = np.zeros(num_depths)
-        
+
         # Compute fractal dimensions with improved statistics
         for depth_idx, depth in enumerate(recursion_depths):
             # Generate denser grid for higher depths
             points = 2**depth
             x_array = np.linspace(0, 1, points)
-            
+
             # Analyze multiple states for better statistics
             sample_indices = np.linspace(0, len(result.states)-1, 5, dtype=int)
             valid_dimensions = []
             valid_errors = []
-            
+
             for idx in sample_indices:
                 state = result.states[idx]
                 wf_profile, _ = compute_wavefunction_profile(state, x_array)  # Ensure we get the profile
-                
+
                 if wf_profile is not None and len(wf_profile) > 0:
                     # Normalize profile to avoid numerical issues
                     wf_profile = wf_profile / (np.max(wf_profile) if np.max(np.abs(wf_profile)) > 0 else 1.0)
-                    
+
                     # Use multiple box size ranges for robust dimension estimation
                     box_sizes = np.logspace(-depth, 0, depth * 10)
                     dimension, info = estimate_fractal_dimension(wf_profile, box_sizes)
-                    
+
                     if not np.isnan(dimension):  # Filter out invalid results
                         valid_dimensions.append(dimension)
                         valid_errors.append(info['std_error'])
-            
+
             # Average dimensions and propagate errors
             if valid_dimensions:
                 dimensions[depth_idx] = np.mean(valid_dimensions)
@@ -247,11 +248,11 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
             else:
                 dimensions[depth_idx] = np.nan
                 errors[depth_idx] = np.nan
-        
+
         result.fractal_dimensions = dimensions
         result.recursion_depths = recursion_depths
         result.dimension_errors = errors
-        
+
         # Define theoretical scaling function based on renormalization group analysis
         def theoretical_scaling(n):
             """D(n) = D_∞ - c₁/n - c₂/n²"""
@@ -259,12 +260,14 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
             c1 = 0.5      # First-order correction
             c2 = 0.2      # Second-order correction
             return D_inf - c1/n - c2/(n*n)
-        
+
         result.scaling_function = theoretical_scaling
     
     return result
 
 if __name__=="__main__":
+    from app.analyze_results import analyze_simulation_results
+    
     # Run evolution simulation with parameters tuned for fractal analysis
     evolution_result = run_state_evolution(
         num_qubits=1,
@@ -274,5 +277,12 @@ if __name__=="__main__":
         analyze_fractal=True  # Enable fractal analysis
     )
     
-    print("\nAnalysis complete.")
-    print(f"Final state: {evolution_result.states[-1]}")
+    # Analyze results and generate visualizations
+    analysis_results = analyze_simulation_results(evolution_result)
+    
+    print("\nAnalysis complete. Results summary:")
+    print(f"Visualizations saved to: {', '.join(analysis_results['visualizations'].values())}")
+    print(f"Final state: {analysis_results['final_state']}")
+    print("\nQuantum metrics:")
+    for metric, value in analysis_results['metrics'].items():
+        print(f"- {metric}: {value:.4f}")

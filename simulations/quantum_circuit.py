@@ -55,6 +55,7 @@ class QuantumCircuit:
             return U * initial_state * U.dag()
 
 class StandardCircuit(QuantumCircuit):
+    #TODO: refactor to remove this in favor of ScaledCircuit
     """
     Standard circuit evolution using qutip's solvers.
     """
