@@ -191,7 +191,7 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     result.wavefunction = result.states[-1]
     
     # Compute fractal dimensions across multiple scales
-    max_depth = 15  # Increased depth for better scaling analysis
+    max_depth = 4  # TODO: refactor to take magic number from config. should be done when extracting this code to an analysis script.
     recursion_depths = np.arange(2, max_depth + 1)
     dimensions = []
     errors = []
