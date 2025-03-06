@@ -97,7 +97,7 @@ def simulate_evolution(H, psi0, times, noise_config=None, e_ops=None):
 from simulations.quantum_state import state_zero, state_one, state_plus, state_ghz, state_w
 from analyses.fractal_analysis import compute_wavefunction_profile  # Used in loop below
 
-def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, noise_config=None):
+def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, noise_config=None, pulse_type="Square"):
     """
     N-qubit evolution under H = Σi σzi with scale_factor and configurable noise.
     
@@ -116,7 +116,21 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     H0 = construct_nqubit_hamiltonian(num_qubits)
     
     # Scale Hamiltonian by factor
-    H_scaled = scaling_factor * H0
+    # Determine effective Hamiltonian based on pulse_type
+    if pulse_type == "Square":
+        H_effective = scaling_factor * H0
+    elif pulse_type == "Gaussian":
+        T = 10.0
+        def gaussian_envelope(t, args):
+            return np.exp(-((t - T/2)**2)/((T/4)**2))
+        H_effective = lambda t, args: scaling_factor * gaussian_envelope(t, args) * H0
+    elif pulse_type == "DRAG":
+        T = 10.0
+        def drag_envelope(t, args):
+            return np.exp(-((t - T/2)**2)/((T/4)**2)) * (1 + 0.1*(t - T/2))
+        H_effective = lambda t, args: scaling_factor * drag_envelope(t, args) * H0
+    else:
+        H_effective = scaling_factor * H0
     
     # Initialize state with correct dimensions
     psi_init = eval(f"state_{state_label}")(num_qubits=num_qubits)
@@ -131,7 +145,7 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     e_ops = [sigmaz()] if num_qubits == 1 else [tensor([sigmaz() if i == j else qeye(2) for i in range(num_qubits)]) for j in range(num_qubits)]
     
     # Run evolution with noise if configured
-    result = simulate_evolution(H_scaled, psi_init, times, noise_config, e_ops)
+    result = simulate_evolution(H_effective, psi_init, times, noise_config, e_ops)
     result.times = times  # Store times for visualization
     
     # TODO: extract the following analysis code to an analysis script, they don't need to be part of the Result.
@@ -177,7 +191,7 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     result.wavefunction = result.states[-1]
     
     # Compute fractal dimensions across multiple scales
-    max_depth = 15  # Increased depth for better scaling analysis
+    max_depth = 4  # TODO: refactor to take magic number from config. should be done when extracting this code to an analysis script.
     recursion_depths = np.arange(2, max_depth + 1)
     dimensions = []
     errors = []
@@ -236,7 +250,7 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     return result
 
 if __name__=="__main__":
-    from app.analyze_results import analyze_quantum_simulation
+    from app.analyze_results import analyze_simulation_results
     
     # Run evolution simulation with parameters tuned for fractal analysis
     evolution_result = run_state_evolution(
@@ -247,7 +261,7 @@ if __name__=="__main__":
     )
     
     # Analyze results and generate visualizations
-    analysis_results = analyze_quantum_simulation(evolution_result)
+    analysis_results = analyze_simulation_results(evolution_result)
     
     print("\nAnalysis complete. Results summary:")
     print(f"Visualizations saved to: {', '.join(analysis_results['visualizations'].values())}")

@@ -55,6 +55,7 @@ class QuantumCircuit:
             return U * initial_state * U.dag()
 
 class StandardCircuit(QuantumCircuit):
+    #TODO: refactor to remove this in favor of ScaledCircuit
     """
     Standard circuit evolution using qutip's solvers.
     """
@@ -67,7 +68,7 @@ class StandardCircuit(QuantumCircuit):
         
         # Initialize noise channels
         noise_config = self.config.get('noise', {})
-        self._noise = Noise(noise_config)
+        self._noise = Noise()
         self.c_ops = c_ops if c_ops is not None else self.config.get('c_ops', [])
         
     @property
