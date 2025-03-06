@@ -67,7 +67,8 @@ class StandardCircuit(QuantumCircuit):
         
         # Initialize noise channels
         noise_config = self.config.get('noise', {})
-        self._noise = Noise(noise_config)
+        #TODO: refactor to feed the selected noise parameters to RandomNoise to generate desired noise
+        self._noise = Noise()
         self.c_ops = c_ops if c_ops is not None else self.config.get('c_ops', [])
         
     @property
