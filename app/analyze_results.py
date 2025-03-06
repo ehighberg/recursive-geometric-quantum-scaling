@@ -122,7 +122,7 @@ def display_experiment_summary(result):
     st.subheader("Parameters")
     if hasattr(result, '__dict__'):
         for key, value in result.__dict__.items():
-            if key != 'states':  # Skip the states array
+            if key != 'states' and not key.startswith('_'):  # Skip the states array and private attributes
                 if isinstance(value, np.ndarray):
                     st.write(f"{key}: Array of shape {value.shape}")
                 else:
