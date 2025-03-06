@@ -13,7 +13,7 @@ def test_vn_entropy_pure_state():
     """
     psi = tensor(basis(2,0), basis(2,0))  # |00>
     rho = ket2dm(psi)
-    S_rho = von_neumann_entropy(rho, base=2)
+    S_rho = von_neumann_entropy(rho)
     assert abs(S_rho - 0.0) < 1e-10
 
 def test_linear_entropy_pure_state():
