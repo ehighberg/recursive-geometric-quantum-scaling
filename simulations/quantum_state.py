@@ -78,6 +78,7 @@ def positivity_projection(rho):
     return rho_fixed
 
 # Toy states for fibonacci anyons:
+#TODO: replace with actual anyon states
 def fib_anyon_state_2d():
     """
     2D subspace for 3 anyons => dimension=2. 
