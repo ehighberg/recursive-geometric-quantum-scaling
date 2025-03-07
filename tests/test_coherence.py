@@ -17,7 +17,7 @@ def test_l1_coherence_single_qubit_offdiag():
     # |+> = 1/sqrt(2) (|0> + |1>)
     psi_plus = (basis(2,0) + basis(2,1)).unit()
     rho = ket2dm(psi_plus)
-    c_l1 = l1_coherence(rho, dim=2)
+    c_l1 = l1_coherence(rho)
     assert abs(c_l1 - 1.0) < 1e-6, f"L1 coherence ~ 1.0 for single qubit +"
 
 def test_relative_entropy_coherence_single_qubit():
@@ -29,6 +29,6 @@ def test_relative_entropy_coherence_single_qubit():
     from qutip import ket2dm
     plus = (basis(2,0) + basis(2,1)).unit()
     rho = ket2dm(plus)
-    rec = relative_entropy_coherence(rho, dim=2)
+    rec = relative_entropy_coherence(rho)
     # ln(2) ~ 0.693147
     assert abs(rec - 0.693147) < 1e-4, f"REL. ENT. coherence ~ ln(2). got {rec}"

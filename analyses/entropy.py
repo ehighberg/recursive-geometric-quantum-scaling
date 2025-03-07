@@ -6,7 +6,7 @@ import numpy as np
 from qutip import Qobj
 from typing import Union, List
 
-def compute_vn_entropy(state: Qobj, base: int = 2) -> float:
+def von_neumann_entropy(state: Qobj, base: int = 2) -> float:
     """
     Calculate the von Neumann entropy of a quantum state.
     S = -Tr(ρ log_base(ρ))
@@ -57,7 +57,7 @@ def renyi_entropy(state: Union[Qobj, List[Qobj]], alpha: float = 2.0) -> float:
     if alpha <= 0:
         raise ValueError("Alpha must be positive")
     if abs(alpha - 1.0) < 1e-10:
-        return compute_vn_entropy(state)
+        return von_neumann_entropy(state)
     
     # Convert to density matrix if needed
     if state.isket:
@@ -72,7 +72,7 @@ def renyi_entropy(state: Union[Qobj, List[Qobj]], alpha: float = 2.0) -> float:
     # Calculate Rényi entropy
     return float(1.0 / (1.0 - alpha) * np.log2(np.sum(eigs**alpha)))
 
-def compute_linear_entropy(state: Qobj) -> float:
+def linear_entropy(state: Qobj) -> float:
     """
     Calculate the linear entropy (special case of Rényi entropy with α=2).
     S_L = 1 - Tr(ρ^2)
@@ -126,9 +126,9 @@ def compute_mutual_information(state: Qobj, subsysA: int, subsysB: int, dims: Li
     rhoB = rho.ptrace(subsysB)
     
     # Calculate entropies using natural log to match test expectations
-    SA = compute_vn_entropy(rhoA)
-    SB = compute_vn_entropy(rhoB)
-    SAB = compute_vn_entropy(rho)
+    SA = von_neumann_entropy(rhoA)
+    SB = von_neumann_entropy(rhoB)
+    SAB = von_neumann_entropy(rho)
     
     # Return mutual information
     return SA + SB - SAB
@@ -151,7 +151,7 @@ def tsallis_entropy(state: Qobj, q: float = 2.0) -> float:
     if q <= 0:
         raise ValueError("q must be positive")
     if abs(q - 1.0) < 1e-10:
-        return compute_vn_entropy(state)
+        return von_neumann_entropy(state)
     
     # Convert to density matrix if needed
     if state.isket:

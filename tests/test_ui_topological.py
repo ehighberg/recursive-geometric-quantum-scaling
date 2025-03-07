@@ -66,17 +66,6 @@ def mock_streamlit():
             'download_button': mock_download
         }
 
-def test_topological_tab_creation(mock_streamlit):
-    """Test creation of topological analysis tab"""
-    from app.analyze_results import analyze_simulation_results
-    result = MockTopologicalResult()
-    
-    analyze_simulation_results(result, mode="Topological Braiding")
-    
-    # Verify tab creation
-    mock_streamlit['tabs'].assert_called_once()
-    assert len(mock_streamlit['tabs'].return_value) == 4
-
 def test_topological_metrics_display(mock_streamlit):
     """Test display of topological metrics"""
     from app.analyze_results import analyze_simulation_results

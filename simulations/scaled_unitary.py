@@ -14,6 +14,7 @@ from qutip_qip.operations import Gate
 from qutip_qip.circuit import QubitCircuit
 from constants import PHI
 
+#TODO: use these functions instead of existing code with the same purpose, or remove them
 def get_scaled_unitary(H, time, scaling_factor=1.0):
     """
     Get the linearly scaled unitary operator for a given Hamiltonian.
@@ -99,13 +100,6 @@ def simulate_scaled_unitary(scaling_factor=1.0):
     U = get_scaled_unitary(H, time, 1.0)
     U_scaled = get_scaled_unitary(H, time, scaling_factor)
     
-    # Create a Result object to store the data
-    result = Result()
-    result.times = [0.0, time]
-    result.states = [U, U_scaled]
-    result.e_ops = []
-    result.options = {}
-    
     return U, U_scaled
 
 def create_scaled_gate(H, time, scaling_factor=1.0):
@@ -176,13 +170,6 @@ def simulate_scaled_sequence(H, time, scaling_factors, initial_state):
         current_state = U * current_state
         states.append(current_state)
     
-    # Create a Result object to store the data
-    result = Result()
-    result.times = [0.0] + [time * i for i in range(1, len(states))]
-    result.states = states
-    result.e_ops = []
-    result.options = {}
-    
     return states
 
 def analyze_scaling_properties(H, time, scaling_factors):
@@ -210,14 +197,7 @@ def analyze_scaling_properties(H, time, scaling_factors):
         results['traces'].append(U.tr())
         results['eigenvalues'].append(U.eigenenergies())
         results['determinants'].append(U.det())
-    
-    # Create a Result object to store the data
-    result = Result()
-    result.times = scaling_factors
-    result.expect = [results['traces'], results['determinants']]
-    result.e_ops = []
-    result.options = {}
-    
+
     return results
 
 
@@ -271,16 +251,6 @@ def analyze_phi_recursion_properties(H, time, scaling_factors, recursion_depths=
             # (Higher value means more sensitive to being at phi)
             phi_sensitivity = np.abs(U.tr() - get_scaled_unitary(H, time, factor).tr())
             results['phi_sensitivity'][depth].append(float(phi_sensitivity))
-    
-    # Create a Result object to store the data
-    result = Result()
-    result.times = scaling_factors
-    result.expect = []
-    for depth in recursion_depths:
-        result.expect.append(results['traces'][depth])
-        result.expect.append(results['phi_sensitivity'][depth])
-    result.e_ops = []
-    result.options = {}
     
     return results
 
@@ -401,12 +371,5 @@ def simulate_phi_sequence(H, time, initial_state, recursion_depth=2):
         std_final_state = get_scaled_unitary(H, time, factor) * initial_state
         state_diff = (final_state - std_final_state).norm()
         results['phi_sensitivity'].append(float(state_diff))
-    
-    # Create a Result object to store the data
-    result = Result()
-    result.times = scaling_factors
-    result.expect = [list(results['expectation_values'].values()), results['phi_sensitivity']]
-    result.e_ops = []
-    result.options = {}
     
     return results

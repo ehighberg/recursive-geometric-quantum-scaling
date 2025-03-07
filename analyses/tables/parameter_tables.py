@@ -141,8 +141,8 @@ def generate_simulation_parameters_table(result) -> pd.DataFrame:
     # Extract parameters from result object
     if hasattr(result, '__dict__'):
         for key, value in result.__dict__.items():
-            # Skip large arrays and objects
-            if key in ['states', 'times', 'hamiltonian']:
+            # Skip large arrays and objects and private attributes
+            if key in ['states', 'times', 'hamiltonian'] or key.startswith('_'):
                 continue
                 
             # Format value based on type

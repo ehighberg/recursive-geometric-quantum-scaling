@@ -51,7 +51,7 @@ def concurrence(state: Union[Qobj, List[Qobj]]) -> float:
     c = float(max(0, evals[0] - evals[1] - evals[2] - evals[3]))
     return c
 
-def compute_negativity(state: Qobj, sysA: Optional[List[int]] = None) -> float:
+def negativity(state: Qobj, sysA: Optional[List[int]] = None) -> float:
     """
     Calculate the negativity of a bipartite quantum state.
     N = (||ρ^(TA)||_1 - 1)/2 where ρ^(TA) is partial transpose.
@@ -122,7 +122,7 @@ def compute_negativity(state: Qobj, sysA: Optional[List[int]] = None) -> float:
     negativity = float((trace_norm - 1) / 2)
     return max(0.0, negativity)  # Ensure non-negative
 
-def compute_log_negativity(state: Qobj) -> float:
+def log_negativity(state: Qobj) -> float:
     """
     Calculate the logarithmic negativity of a bipartite quantum state.
     EN = log2(||ρ^(TA)||_1)
