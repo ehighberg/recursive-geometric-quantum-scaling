@@ -126,12 +126,14 @@ def run_fibonacci_braiding_circuit(braid_type='Fibonacci', braid_sequence='1,2,1
         B1_2 = braid_b1_2d()
         B2_2 = braid_b2_2d()
     elif braid_type == 'Ising':
+        #TODO: implement Ising braids or remove Ising option
         # For now, use Fibonacci braids as placeholder
         # In a real implementation, these would be different
         B1_2 = braid_b1_2d()
         B2_2 = braid_b2_2d()
         print(f"Warning: Using Fibonacci braids as placeholder for {braid_type} anyons")
     elif braid_type == 'Majorana':
+        #TODO: implement Majorana braids or remove Majorana option
         # For now, use Fibonacci braids as placeholder
         # In a real implementation, these would be different
         B1_2 = braid_b1_2d()
@@ -305,6 +307,7 @@ def run_quantum_gate_circuit(circuit_type="Single Qubit", optimization=None, noi
         
         # Store Hamiltonian function for fractal analysis
         # Use identity matrix as placeholder since we don't have direct access to the Hamiltonian
+        #TODO: replace with actual Hamiltonian
         H_placeholder = tensor([qeye(2) for _ in range(2)])
         def hamiltonian(f_s):
             return float(f_s) * H_placeholder

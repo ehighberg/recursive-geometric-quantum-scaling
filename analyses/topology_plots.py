@@ -29,6 +29,7 @@ def plot_invariants(control_range):
     # For demonstration, generate placeholder data.
     # In practice, these values should be computed using functions
     # from analyses/topological_invariants.py.
+    #TODO: replace with actual invariant computation
     x = np.linspace(control_range[0], control_range[1], 100)
     # Example: pretend invariants vary sinusoidally (for demonstration purposes)
     chern_values = np.sin(x) * 1.5  # e.g., range -1.5 to 1.5

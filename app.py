@@ -399,9 +399,11 @@ def main():
             control_range = st.slider("Topological Control Parameter Range", 0.0, 10.0, (0.0, 5.0))
             from analyses.topology_plots import plot_invariants, plot_protection_metrics
             # Generate invariant plot using placeholder functions
+            #TODO: replace with actual invariant computation
             fig_invariants = plot_invariants(control_range)
             st.pyplot(fig_invariants)
             # For demonstration, generate dummy protection metrics data
+            #TODO: replace with actual protection metrics computation
             x_demo = np.linspace(control_range[0], control_range[1], 100)
             energy_gaps = np.abs(np.sin(x_demo))
             localization_measures = np.abs(np.cos(x_demo))

@@ -8,6 +8,7 @@ This module provides functions to map φ-scaled unitary operators to braid seque
 It employs a brute-force search over a given set of elementary braid operators to 
 approximate a target unitary operator up to a specified tolerance.
 """
+#TODO: remove after placeholders are replaced
 
 import numpy as np
 from qutip import Qobj
