@@ -111,8 +111,21 @@ def analyze_phi_significance(fine_resolution=True, save_results=True):
             band_gap = np.nan
         
         # Compute fractal dimension from energy spectrum
-        flat_energies = np.array(energies).flatten()
-        fractal_dim, dim_info = estimate_fractal_dimension(flat_energies)
+        # Calculate fractal dimension for each energy level separately
+        fractal_dims = []
+        for level_energies in energies:
+            if len(level_energies) > 10:  # Ensure enough points for meaningful calculation
+                dim, info = estimate_fractal_dimension(level_energies)
+                if not np.isnan(dim):
+                    fractal_dims.append(dim)
+        
+        # Use the mean of the individual dimensions if available
+        if fractal_dims:
+            fractal_dim = np.nanmean(fractal_dims)
+        else:
+            # Fallback to flattened approach if individual calculations fail
+            flat_energies = np.array(energies).flatten()
+            fractal_dim, dim_info = estimate_fractal_dimension(flat_energies)
         
         # Create k-points for topological analysis
         k_points = np.linspace(0, 2*np.pi, 100)
@@ -248,21 +261,72 @@ def create_phi_significance_plots(results, output_dir=None):
     fs_values = results['fs_values']
     h = np.diff(fs_values)
     
-    # Function to calculate numerical derivative
-    def numerical_derivative(y):
-        if len(y) != len(fs_values):
-            return np.zeros_like(fs_values)
-        dy = np.diff(y)
-        derivative = np.zeros_like(fs_values)
-        derivative[:-1] = dy / h
-        derivative[-1] = derivative[-2]  # Extend last value
-        return derivative
+    # Function to calculate smoothed numerical derivative
+    def smooth_derivative(y, window_length=5, polyorder=2):
+        """
+        Calculate smoothed derivative using Savitzky-Golay filter.
+        
+        Parameters:
+        -----------
+        y : numpy.ndarray
+            Input data
+        window_length : int, optional
+            Length of the filter window (must be odd)
+        polyorder : int, optional
+            Order of the polynomial used for filtering
+            
+        Returns:
+        --------
+        numpy.ndarray
+            Smoothed derivative
+        """
+        from scipy.signal import savgol_filter
+        
+        # Ensure window_length is odd
+        if window_length % 2 == 0:
+            window_length += 1
+        
+        # Ensure window_length is not larger than data length
+        if window_length > len(y):
+            window_length = min(len(y) - (len(y) % 2 == 0), 5)
+            polyorder = min(polyorder, window_length - 1)
+        
+        if len(y) < window_length:
+            # Not enough points for smoothing, use simple differences
+            if len(y) != len(fs_values):
+                return np.zeros_like(fs_values)
+            dy = np.diff(y)
+            derivative = np.zeros_like(fs_values)
+            derivative[:-1] = dy / h
+            derivative[-1] = derivative[-2]  # Extend last value
+            return derivative
+        
+        try:
+            # First smooth the data
+            y_smooth = savgol_filter(y, window_length, polyorder)
+            
+            # Then calculate derivative
+            dy = np.diff(y_smooth)
+            derivative = np.zeros_like(fs_values)
+            derivative[:-1] = dy / h
+            derivative[-1] = derivative[-2]  # Extend last value
+            return derivative
+        except Exception as e:
+            print(f"Warning: Smoothing failed with error: {e}. Using simple differences.")
+            # Fallback to simple differences
+            if len(y) != len(fs_values):
+                return np.zeros_like(fs_values)
+            dy = np.diff(y)
+            derivative = np.zeros_like(fs_values)
+            derivative[:-1] = dy / h
+            derivative[-1] = derivative[-2]  # Extend last value
+            return derivative
     
-    # Calculate derivatives
-    d_gap = numerical_derivative(results['band_gaps'])
-    d_dim = numerical_derivative(results['fractal_dimensions'])
-    d_topo = numerical_derivative(results['topological_invariants'])
-    d_corr = numerical_derivative(results['correlation_lengths'])
+    # Calculate derivatives using the smooth derivative function
+    d_gap = smooth_derivative(results['band_gaps'])
+    d_dim = smooth_derivative(results['fractal_dimensions'])
+    d_topo = smooth_derivative(results['topological_invariants'])
+    d_corr = smooth_derivative(results['correlation_lengths'])
     
     # Plot derivatives
     axs[0, 0].plot(fs_values, d_gap, 'o-', color='#1f77b4')

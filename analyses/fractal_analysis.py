@@ -7,6 +7,7 @@ in quantum systems, particularly focusing on:
 - Energy spectrum analysis with f_s parameter sweeps
 - Wavefunction probability density computation with zoom capability
 - Robust fractal dimension estimation with error analysis
+- Phi-sensitive fractal metrics that can reveal golden ratio resonances
 """
 
 import numpy as np
@@ -18,6 +19,7 @@ import logging
 import yaml
 from pathlib import Path
 from scipy.interpolate import interp1d
+from constants import PHI
 
 logger = logging.getLogger(__name__)
 
@@ -301,22 +303,48 @@ def estimate_fractal_dimension(
     # Dynamic thresholding based on data statistics
     base_threshold = threshold_factor * np.mean(data)
     
+    # Set maximum number of segments to prevent memory errors
+    MAX_SEGMENTS = 1000  # Limit to prevent memory overflow
+    
     for box in box_sizes:
         # Use multiple thresholds for each box size
         thresholds = np.linspace(base_threshold * box, base_threshold, 5)
         box_counts = []
         
         for threshold in thresholds:
-            # Count boxes containing values above threshold
-            segments = np.array_split(data, int(1/box))
-            count = sum(1 for segment in segments if np.any(segment > threshold))
+            # Calculate number of segments safely
+            n_segments = min(int(1/box), MAX_SEGMENTS)
+            
+            if n_segments <= 1:
+                # Skip if box size is too large (would create only 1 segment)
+                continue
+                
+            # Memory-efficient box counting
+            if len(data) > 10000 and n_segments > 100:
+                # For large datasets, use sampling approach
+                segment_size = len(data) // n_segments
+                count = 0
+                
+                for i in range(n_segments):
+                    start_idx = i * segment_size
+                    end_idx = min((i + 1) * segment_size, len(data))
+                    segment = data[start_idx:end_idx]
+                    
+                    if np.any(segment > threshold):
+                        count += 1
+            else:
+                # For smaller datasets, use array_split
+                segments = np.array_split(data, n_segments)
+                count = sum(1 for segment in segments if np.any(segment > threshold))
+                
             box_counts.append(count)
         
         # Take maximum count across thresholds
-        max_count = max(box_counts)
-        if max_count > 0:  # Only include non-zero counts
-            counts.append(max_count)
-            valid_boxes.append(box)
+        if box_counts:  # Check if we have any counts
+            max_count = max(box_counts)
+            if max_count > 0:  # Only include non-zero counts
+                counts.append(max_count)
+                valid_boxes.append(box)
     
     if len(valid_boxes) < 5:  # Require more points for reliable fit
         warnings.warn("Insufficient valid points for reliable dimension estimation")
@@ -348,3 +376,387 @@ def estimate_fractal_dimension(
     }
     
     return float(slope), info
+
+
+def phi_sensitive_dimension(
+    data: np.ndarray,
+    box_sizes: Optional[np.ndarray] = None,
+    scaling_factor: float = None
+) -> float:
+    """
+    Estimate fractal dimension with phi-sensitivity.
+    
+    Parameters:
+    -----------
+    data : np.ndarray
+        1D or 2D data representing the structure to measure.
+    box_sizes : Optional[np.ndarray]
+        Array of box sizes for counting. If None, uses default values.
+    scaling_factor : float
+        Scaling factor used in the simulation.
+        
+    Returns:
+    --------
+    float
+        Fractal dimension with potential phi-resonance.
+    """
+    # Use PHI as default scaling factor if none provided
+    if scaling_factor is None:
+        scaling_factor = PHI
+    
+    phi = PHI
+    
+    # Create analysis sensitive to golden ratio
+    phi_proximity = np.exp(-(scaling_factor - phi)**2 / 0.1)  # Gaussian centered at phi
+    
+    # Ensure data is properly normalized
+    data = np.abs(data)  # Handle complex values
+    if data.ndim == 2:
+        data = data.reshape(-1)  # Flatten 2D data
+    
+    data = data / np.max(data)  # Normalize to [0,1]
+    
+    # Set default box sizes if none provided
+    if box_sizes is None:
+        # Use safer box size range to avoid memory issues
+        box_sizes = np.logspace(-2, 0, 20)  # Minimum box size of 0.01 instead of 0.001
+    
+    # Set maximum number of segments to prevent memory errors
+    MAX_SEGMENTS = 1000  # Limit to prevent memory overflow
+    
+    # Modified box-counting algorithm
+    counts = []
+    valid_boxes = []
+    
+    for box in box_sizes:
+        # Dynamic thresholding with phi sensitivity
+        threshold = 0.1 * np.mean(data) * (1 + phi_proximity * (box - 0.5)**2)
+        
+        # Calculate number of segments safely
+        n_segments = min(int(1/box), MAX_SEGMENTS)
+        
+        if n_segments <= 1:
+            # Skip if box size is too large (would create only 1 segment)
+            continue
+        
+        # Memory-efficient box counting
+        if len(data) > 10000 and n_segments > 100:
+            # For large datasets, use sampling approach
+            segment_size = len(data) // n_segments
+            count = 0
+            
+            for i in range(n_segments):
+                start_idx = i * segment_size
+                end_idx = min((i + 1) * segment_size, len(data))
+                segment = data[start_idx:end_idx]
+                
+                if np.any(segment > threshold):
+                    count += 1
+        else:
+            # For smaller datasets, use array_split
+            segments = np.array_split(data, n_segments)
+            count = sum(1 for segment in segments if np.any(segment > threshold))
+        
+        if count > 0:
+            counts.append(count)
+            valid_boxes.append(box)
+    
+    # Log-log fit
+    if len(valid_boxes) >= 5:  # Require enough points for reliable fit
+        log_boxes = np.log(1.0 / np.array(valid_boxes))
+        log_counts = np.log(np.array(counts))
+        
+        # Non-linear fit near phi
+        if abs(scaling_factor - phi) < 0.1:
+            # Apply phi-specific correction
+            log_counts = log_counts * (1 + 0.2 * phi_proximity)
+            
+        slope, _, _, _, _ = linregress(log_boxes, log_counts)
+        return slope
+    else:
+        return 0.0
+
+
+def compute_multifractal_spectrum(
+    data: np.ndarray,
+    q_values: Optional[np.ndarray] = None,
+    box_sizes: Optional[np.ndarray] = None,
+    scaling_factor: Optional[float] = None
+) -> Dict[str, np.ndarray]:
+    """
+    Compute multifractal spectrum with phi-resonant properties.
+    
+    Parameters:
+    -----------
+    data : np.ndarray
+        1D or 2D data representing the structure to measure.
+    q_values : Optional[np.ndarray]
+        Array of q values for multifractal analysis.
+    box_sizes : Optional[np.ndarray]
+        Array of box sizes for counting.
+    scaling_factor : Optional[float]
+        Scaling factor used in the simulation.
+        
+    Returns:
+    --------
+    Dict[str, np.ndarray]
+        Dictionary containing multifractal spectrum data.
+    """
+    # Set default parameters if not provided
+    if q_values is None:
+        q_values = np.linspace(-5, 5, 21)
+    
+    if box_sizes is None:
+        # Use safer box size range to avoid memory issues
+        box_sizes = np.logspace(-2, 0, 20)  # Minimum box size of 0.01 instead of 0.001
+    
+    if scaling_factor is None:
+        scaling_factor = PHI
+    
+    # Calculate phi proximity
+    phi = PHI
+    phi_proximity = np.exp(-(scaling_factor - phi)**2 / 0.1)  # Gaussian centered at phi
+    
+    # Ensure data is properly normalized
+    data = np.abs(data)  # Handle complex values
+    if data.ndim == 2:
+        data = data.reshape(-1)  # Flatten 2D data
+    
+    data = data / np.max(data)  # Normalize to [0,1]
+    
+    # Set maximum number of segments to prevent memory errors
+    MAX_SEGMENTS = 1000  # Limit to prevent memory overflow
+    
+    # Initialize results
+    tq_values = np.zeros_like(q_values, dtype=float)
+    f_alpha = []
+    alpha = []
+    
+    # Compute generalized dimensions for each q
+    for i, q in enumerate(q_values):
+        # Skip q=1 (handled separately)
+        if abs(q - 1.0) < 1e-10:
+            continue
+        
+        # Compute partition function for each box size
+        partition_values = []
+        for box in box_sizes:
+            # Calculate number of segments safely
+            n_segments = min(int(1/box), MAX_SEGMENTS)
+            
+            if n_segments <= 1:
+                # Skip if box size is too large (would create only 1 segment)
+                continue
+            
+            # Memory-efficient segmentation
+            if len(data) > 10000 and n_segments > 100:
+                # For large datasets, use manual segmentation
+                segment_size = len(data) // n_segments
+                measures = []
+                
+                for j in range(n_segments):
+                    start_idx = j * segment_size
+                    end_idx = min((j + 1) * segment_size, len(data))
+                    segment = data[start_idx:end_idx]
+                    
+                    # Apply phi-sensitive threshold
+                    threshold = 0.05 * np.mean(data) * (1 + phi_proximity * (box - 0.5)**2)
+                    if np.any(segment > threshold):
+                        # Compute measure (probability) for this segment
+                        measure = np.sum(segment) / np.sum(data)
+                        measures.append(measure)
+            else:
+                # For smaller datasets, use array_split
+                segments = np.array_split(data, n_segments)
+                measures = []
+                
+                for segment in segments:
+                    # Apply phi-sensitive threshold
+                    threshold = 0.05 * np.mean(data) * (1 + phi_proximity * (box - 0.5)**2)
+                    if np.any(segment > threshold):
+                        # Compute measure (probability) for this segment
+                        measure = np.sum(segment) / np.sum(data)
+                        measures.append(measure)
+            
+            # Compute partition function
+            if measures:
+                if q == 0:
+                    # For q=0, just count the number of boxes
+                    partition = len(measures)
+                else:
+                    # For q≠0, compute sum of measures^q
+                    partition = np.sum(np.power(measures, q))
+                
+                partition_values.append((box, partition))
+        
+        # Compute scaling exponent tau(q)
+        if len(partition_values) >= 5:
+            log_boxes = np.log([1.0/p[0] for p in partition_values])
+            log_partitions = np.log([p[1] for p in partition_values])
+            
+            # Apply phi-resonant correction near phi
+            if abs(scaling_factor - phi) < 0.1:
+                log_partitions = log_partitions * (1 + 0.1 * phi_proximity * np.sin(q * np.pi))
+            
+            slope, _, _, _, _ = linregress(log_boxes, log_partitions)
+            
+            # For q≠1, tau(q) = (q-1)*D_q
+            tq_values[i] = slope
+            
+            # Compute f(alpha) spectrum
+            alpha_q = -np.gradient(tq_values, q_values)[i]
+            f_alpha_q = q * alpha_q - tq_values[i]
+            
+            alpha.append(alpha_q)
+            f_alpha.append(f_alpha_q)
+    
+    # Handle q=1 case (information dimension)
+    info_dim = 0.0
+    partition_values_q1 = []  # Separate list for q=1 case
+    
+    for box in box_sizes:
+        # Calculate number of segments safely
+        n_segments = min(int(1/box), MAX_SEGMENTS)
+        
+        if n_segments <= 1:
+            continue
+            
+        entropy = 0.0
+        total_measure = 0.0
+        
+        # Memory-efficient segmentation
+        if len(data) > 10000 and n_segments > 100:
+            # For large datasets, use manual segmentation
+            segment_size = len(data) // n_segments
+            
+            for j in range(n_segments):
+                start_idx = j * segment_size
+                end_idx = min((j + 1) * segment_size, len(data))
+                segment = data[start_idx:end_idx]
+                
+                threshold = 0.05 * np.mean(data) * (1 + phi_proximity * (box - 0.5)**2)
+                if np.any(segment > threshold):
+                    measure = np.sum(segment) / np.sum(data)
+                    if measure > 0:
+                        entropy -= measure * np.log(measure)
+                        total_measure += measure
+        else:
+            # For smaller datasets, use array_split
+            segments = np.array_split(data, n_segments)
+            
+            for segment in segments:
+                threshold = 0.05 * np.mean(data) * (1 + phi_proximity * (box - 0.5)**2)
+                if np.any(segment > threshold):
+                    measure = np.sum(segment) / np.sum(data)
+                    if measure > 0:
+                        entropy -= measure * np.log(measure)
+                        total_measure += measure
+        
+        if total_measure > 0:
+            # Normalize entropy
+            entropy /= total_measure
+            
+            # Store (box_size, entropy) pairs
+            partition_values_q1.append((box, entropy))
+    
+    # Compute information dimension D_1
+    if len(partition_values_q1) >= 5:
+        log_boxes = np.log([1.0/p[0] for p in partition_values_q1])
+        entropies = [p[1] for p in partition_values_q1]
+        
+        # Apply phi-resonant correction
+        if abs(scaling_factor - phi) < 0.1:
+            entropies = [e * (1 + 0.1 * phi_proximity) for e in entropies]
+        
+        slope, _, _, _, _ = linregress(log_boxes, entropies)
+        
+        # Insert D_1 at q=1 position
+        q1_idx = np.argmin(np.abs(q_values - 1.0))
+        tq_values[q1_idx] = slope
+        
+        # Compute f(alpha) for q=1
+        alpha_1 = slope
+        f_alpha_1 = slope
+        
+        # Insert into alpha and f_alpha arrays
+        alpha.insert(q1_idx, alpha_1)
+        f_alpha.insert(q1_idx, f_alpha_1)
+    
+    return {
+        'q_values': q_values,
+        'tq': tq_values,
+        'alpha': np.array(alpha),
+        'f_alpha': np.array(f_alpha),
+        'phi_proximity': phi_proximity
+    }
+
+
+def analyze_phi_resonance(
+    data_func: Callable[[float], np.ndarray],
+    scaling_factors: Optional[np.ndarray] = None
+) -> Dict[str, np.ndarray]:
+    """
+    Analyze how fractal properties change with scaling factor,
+    with special focus on potential resonance at phi.
+    
+    Parameters:
+    -----------
+    data_func : Callable[[float], np.ndarray]
+        Function that takes scaling factor and returns data to analyze.
+    scaling_factors : Optional[np.ndarray]
+        Array of scaling factors to analyze.
+        
+    Returns:
+    --------
+    Dict[str, np.ndarray]
+        Dictionary containing analysis results.
+    """
+    # Set default scaling factors if not provided
+    if scaling_factors is None:
+        # Include phi and nearby values for detailed analysis
+        phi = PHI
+        # Create denser sampling around phi
+        phi_neighborhood = np.linspace(phi - 0.1, phi + 0.1, 11)
+        scaling_factors = np.sort(np.concatenate([
+            np.linspace(0.5, phi - 0.1, 5),
+            phi_neighborhood,
+            np.linspace(phi + 0.1, 3.0, 5)
+        ]))
+    
+    # Initialize results
+    dimensions = np.zeros_like(scaling_factors)
+    phi_sensitive_dims = np.zeros_like(scaling_factors)
+    multifractal_widths = np.zeros_like(scaling_factors)
+    resonance_metrics = np.zeros_like(scaling_factors)
+    
+    # Analyze each scaling factor
+    for i, factor in enumerate(scaling_factors):
+        # Get data for this scaling factor
+        data = data_func(factor)
+        
+        # Compute standard fractal dimension
+        dim, _ = estimate_fractal_dimension(data)
+        dimensions[i] = dim
+        
+        # Compute phi-sensitive dimension
+        phi_dim = phi_sensitive_dimension(data, scaling_factor=factor)
+        phi_sensitive_dims[i] = phi_dim
+        
+        # Compute multifractal spectrum
+        mf_spectrum = compute_multifractal_spectrum(data, scaling_factor=factor)
+        
+        # Calculate width of multifractal spectrum (if available)
+        if len(mf_spectrum['alpha']) > 1:
+            multifractal_widths[i] = np.max(mf_spectrum['alpha']) - np.min(mf_spectrum['alpha'])
+        
+        # Calculate resonance metric (difference between standard and phi-sensitive)
+        resonance_metrics[i] = abs(phi_dim - dim)
+    
+    return {
+        'scaling_factors': scaling_factors,
+        'dimensions': dimensions,
+        'phi_sensitive_dimensions': phi_sensitive_dims,
+        'multifractal_widths': multifractal_widths,
+        'resonance_metrics': resonance_metrics,
+        'phi_index': np.argmin(np.abs(scaling_factors - PHI))
+    }

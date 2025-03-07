@@ -16,6 +16,7 @@ scikit-image>=0.25.0
 
 # Experiment logging
 sklearn-evaluation>=0.2.12
+tqdm>=4.0.0
 
 
 # Testing
@@ -28,3 +29,6 @@ statsmodels>=0.13.0
 
 # Dev
 pydantic>=2.10.6
+
+# Optional dependencies
+psutil>=5.9.0  # For memory usage tracking in performance tables

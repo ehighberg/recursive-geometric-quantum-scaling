@@ -208,9 +208,45 @@ fig_growth = plot_entanglement_growth_rate(
    fig.savefig('figure_name.png', dpi=300, bbox_inches='tight')
    ```
 
+### 4. Reference Tables for Publication
+```python
+from analyses.tables.parameter_tables import (
+    generate_parameter_overview_table,
+    export_table_to_latex
+)
+from analyses.tables.phase_tables import (
+    generate_phase_diagram_table,
+    generate_phase_transition_table
+)
+from analyses.tables.performance_tables import (
+    generate_performance_table,
+    generate_convergence_table
+)
+
+# Generate parameter overview table
+parameter_table = generate_parameter_overview_table()
+
+# Export to LaTeX for paper
+latex_table = export_table_to_latex(
+    parameter_table,
+    "Comprehensive overview of model parameters.",
+    "tab:parameters"
+)
+
+# Generate phase diagram table from scaling results
+phase_table = generate_phase_diagram_table(
+    fs_ranges=[(0.5, 1.0), (1.0, 1.5), (1.5, 2.0)],
+    results=scaling_results
+)
+
+# Generate performance table from simulation results
+performance_table = generate_performance_table(results=simulation_results)
+```
+
 ## Testing
 - `tests/test_fractal_analysis.py`: Validates fractal analysis functions
 - `tests/test_visualization.py`: Ensures correct plot generation
+- `tests/test_tables.py`: Tests table generation functions
 
 ## Dependencies
 - NumPy: Numerical computations
@@ -243,6 +279,10 @@ fig_growth = plot_entanglement_growth_rate(
   - Entanglement growth rate computation
   - System size scaling analysis
   - Boundary condition comparison
+- `analyses/tables/`: Reference tables for publication
+  - `parameter_tables.py`: Parameter overview tables
+  - `phase_tables.py`: Phase diagram and transition tables
+  - `performance_tables.py`: Computational performance tables
 
 ### 3. Visualization Components
 - `analyses/visualization/circuit_diagrams.py`: Circuit visualization
@@ -257,6 +297,14 @@ fig_growth = plot_entanglement_growth_rate(
   - Wavepacket spacetime diagrams
   - Wavepacket animations
   - Comparative analysis between topologically trivial and non-trivial cases
+
+### 4. Application Interface
+- `app/analyze_results.py`: Analysis and visualization of simulation results
+- `app/scaling_analysis.py`: Scaling analysis functionality
+- `app/reference_tables.py`: Reference tables for publication
+  - Parameter overview tables
+  - Phase diagram tables
+  - Computational performance tables
 
 ## Contributing
 1. Follow the established code structure

@@ -33,7 +33,11 @@ from analyses.visualization.fractal_plots import (
 )
 
 # Local imports
-from simulations.scripts.evolve_state import run_state_evolution
+from simulations.scripts.evolve_state import (
+    run_state_evolution,
+    run_phi_recursive_evolution,
+    run_comparative_analysis
+)
 from simulations.scripts.evolve_circuit import (
     # run_standard_twoqubit_circuit - Unused import
     run_phi_scaled_twoqubit_circuit,
@@ -42,6 +46,7 @@ from simulations.scripts.evolve_circuit import (
 )
 from app.analyze_results import analyze_simulation_results, display_experiment_summary
 from app.scaling_analysis import display_scaling_analysis
+from app.reference_tables import display_reference_tables
 
 st.set_page_config(
     page_title="Quantum Simulation and Analysis Tool",
@@ -89,6 +94,15 @@ def main():
                 "Hamiltonian",
                 ["Ising", "Heisenberg", "Custom"]
             )
+            params['use_phi_recursive'] = st.checkbox("Use Phi-Recursive Evolution", value=False)
+            
+            if params['use_phi_recursive']:
+                params['recursion_depth'] = st.slider("Recursion Depth", 1, 5, 3)
+                params['state_label'] = st.selectbox(
+                    "Initial State",
+                    ["plus", "phi_sensitive", "fractal", "fibonacci", "recursive"],
+                    index=1  # "phi_sensitive" as default
+                )
             
         elif mode == "Quantum Gate Operations":
             params['circuit_type'] = st.selectbox(
@@ -177,10 +191,33 @@ def main():
                         noise_config=params.get('noise_config')
                     )
                 elif mode == "Amplitude-Scaled Evolution":
-                    result = run_phi_scaled_twoqubit_circuit(
-                        scaling_factor=params['scaling_factor'],
-                        noise_config=params.get('noise_config')
-                    )
+                    if params.get('use_phi_recursive', False):
+                        # Use phi-recursive evolution
+                        result = run_phi_recursive_evolution(
+                            num_qubits=params['num_qubits'],
+                            state_label=params['state_label'],
+                            n_steps=params['n_steps'],
+                            scaling_factor=params['scaling_factor'],
+                            recursion_depth=params['recursion_depth'],
+                            analyze_phi=True
+                        )
+                    else:
+                        # Use standard amplitude-scaled evolution
+                        if params['num_qubits'] == 2:
+                            # Use circuit-based implementation for 2 qubits
+                            result = run_phi_scaled_twoqubit_circuit(
+                                scaling_factor=params['scaling_factor'],
+                                noise_config=params.get('noise_config')
+                            )
+                        else:
+                            # Use state-based implementation for other qubit counts
+                            result = run_state_evolution(
+                                num_qubits=params['num_qubits'],
+                                state_label="plus",
+                                n_steps=params['n_steps'],
+                                scaling_factor=params['scaling_factor'],
+                                noise_config=params.get('noise_config')
+                            )
                 elif mode == "Quantum Gate Operations":
                     result = run_quantum_gate_circuit(
                         circuit_type=params['circuit_type'],
@@ -222,7 +259,7 @@ def main():
         result = st.session_state['simulation_results']
         
     # Create tabs for different views
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
             "State Evolution",
             "Noise Analysis",
             "Quantum Metrics",
@@ -231,6 +268,7 @@ def main():
             "Scaling Analysis",
             "Dynamical Evolution",
             "Entanglement Dynamics",
+            "Reference Tables",
             "Raw Data"
         ])
             
@@ -496,8 +534,12 @@ def main():
             else:
                 st.info("Entanglement analysis requires time evolution data.")
         
-        # Export tab for simulation results
+        # Reference Tables tab
         with tab9:
+            display_reference_tables(result)
+            
+        # Export tab for simulation results
+        with tab10:
             display_experiment_summary(result)
             st.subheader("Export Options")
             col1, col2 = st.columns(2)

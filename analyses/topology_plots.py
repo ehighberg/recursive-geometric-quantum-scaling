@@ -8,6 +8,7 @@ Functions:
 
 import numpy as np
 import matplotlib.pyplot as plt
+from qutip.solver import Result
 
 def plot_invariants(control_range):
     """

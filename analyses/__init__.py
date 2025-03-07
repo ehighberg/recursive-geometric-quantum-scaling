@@ -9,6 +9,7 @@ from .fractal_analysis import compute_energy_spectrum, estimate_fractal_dimensio
 from .topological_invariants import compute_chern_number, compute_winding_number, compute_z2_index
 from qutip import fidelity
 from . import scaling
+from . import tables
 
 def run_analyses(initial_state, current_state):
     """
@@ -77,5 +78,6 @@ __all__ = [
     'compute_winding_number',
     'compute_z2_index',
     'run_analyses',
-    'scaling'
+    'scaling',
+    'tables'
 ]
