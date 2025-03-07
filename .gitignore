@@ -58,6 +58,8 @@ results/
 *.h5
 *.npy
 *.npz
+test_*.png
+test_*.gif
 
 # Jupyter Notebook
 .ipynb_checkpoints
