@@ -1,0 +1,11 @@
+{
+  "timestamp": "2025-03-08T10:27:32.666833",
+  "elapsed_time": 1843.798178911209,
+  "tests_run": [
+    "resonance",
+    "coherence",
+    "phi_analysis"
+  ],
+  "test_results": {
+    "resonance": {
+      "phi_index": 
