@@ -30,7 +30,9 @@ def classify_phase(
         return "Topological"
     elif band_gap < 0.01:  # Small gap indicates critical point
         return "Critical"
-    elif np.isclose(fs, PHI, rtol=1e-3) or fractal_dimension > 1.2:  # Special behavior near phi or high fractal dimension
+    elif np.isclose(fs, PHI, rtol=1e-3):  # Special behavior only near phi
+        return "Fractal"
+    elif fractal_dimension > 1.8:  # Only classify as fractal if dimension is very high
         return "Fractal"
     else:
         return "Trivial"

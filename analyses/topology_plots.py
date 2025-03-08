@@ -60,10 +60,16 @@ def plot_invariants(control_range):
             row = []
             for j in range(3):
                 # Create 2D parameter variation around the current point
-                h_2d = (np.cos(param) * sigmaz() + 
-                       np.sin(param) * sigmax() + 
-                       0.1 * (i-1) * qeye(2) +
-                       0.1 * (j-1) * tensor(sigmax(), sigmaz()))
+                # Make sure all operators have compatible dimensions
+                sz = sigmaz()
+                sx = sigmax()
+                id2 = qeye(2)
+                
+                # Use tensor products consistently for 2D parameter space
+                h_2d = (np.cos(param) * tensor(sz, id2) + 
+                       np.sin(param) * tensor(sx, id2) + 
+                       0.1 * (i-1) * tensor(id2, id2) +
+                       0.1 * (j-1) * tensor(sx, sz))
                 _, states_2d = h_2d.eigenstates()
                 row.append(states_2d[0])  # Ground state
             grid.append(row)
@@ -115,10 +121,16 @@ def plot_invariants(control_range):
     chern_values_full = f_chern(x)
     phi_winding_values_full = f_phi_winding(x)
     
+    # Create arrays with matching dimensions for plotting
+    # We'll use sparse_x for sparse arrays and x for interpolated values
     fig, ax = plt.subplots(figsize=(8, 6))
-    ax.plot(x, chern_values, label="Chern Number", color="blue")
-    ax.plot(x, winding_values, label="Winding Number", color="green")
-    ax.plot(x, z2_values, label="Z₂ Index", color="red", linestyle="--")
+    ax.plot(sparse_x, chern_values, 'o-', label="Chern Number", color="blue", markersize=4)
+    ax.plot(sparse_x, winding_values, 'o-', label="Winding Number", color="green", markersize=4)
+    ax.plot(sparse_x, z2_values, 'o-', label="Z₂ Index", color="red", linestyle="--", markersize=4)
+    
+    # Also plot the interpolated full values as lines
+    ax.plot(x, chern_values_full, '-', color="blue", alpha=0.3)
+    ax.plot(x, winding_values_full, '-', color="green", alpha=0.3)
     
     ax.set_xlabel("Control Parameter")
     ax.set_ylabel("Invariant Value")
