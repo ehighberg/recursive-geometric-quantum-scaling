@@ -355,8 +355,38 @@ def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor
     """
     print(f"Running phi-recursive evolution with scaling factor {scaling_factor:.6f}...")
     
-    # Construct appropriate n-qubit Hamiltonian
+    # Calculate phi proximity for enhanced effects near phi
+    phi = PHI
+    phi_proximity = np.exp(-(scaling_factor - phi)**2 / 0.05)  # Narrower Gaussian for stronger resonance
+    
+    # Construct appropriate n-qubit Hamiltonian with enhanced phi-based structure
     H0 = construct_nqubit_hamiltonian(num_qubits)
+    
+    # Add phi-resonant terms for enhanced protection when near phi
+    if phi_proximity > 0.7 and num_qubits > 1:
+        # Generate Fibonacci sequence for phi-based coupling patterns
+        fib = [1, 1]
+        while len(fib) < num_qubits * 2:
+            fib.append(fib[-1] + fib[-2])
+        
+        # Add long-range interactions with phi-dependent coupling strengths
+        for i in range(num_qubits):
+            for j in range(i + 1, num_qubits):
+                if abs(j - i) in fib:  # Connect qubits at Fibonacci distances
+                    # Create phi-resonant coupling between qubits i and j
+                    coupling_strength = phi_proximity * (phi ** (-fib.index(abs(j - i))))
+                    
+                    # Add ZZ interaction
+                    op_list = [qeye(2) for _ in range(num_qubits)]
+                    op_list[i] = sigmaz()
+                    op_list[j] = sigmaz()
+                    H0 += coupling_strength * tensor(op_list)
+                    
+                    # Add XX interaction
+                    op_list = [qeye(2) for _ in range(num_qubits)]
+                    op_list[i] = sigmax()
+                    op_list[j] = sigmax()
+                    H0 += 0.5 * coupling_strength * tensor(op_list)
     
     # Initialize state with phi-sensitive properties
     if state_label == "fractal":
@@ -379,20 +409,36 @@ def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor
         # Ensure correct dimensions for multi-qubit states
         psi_init.dims = [[2] * num_qubits, [1]]
     
-    # Generate Fibonacci-based time sequence
+    # Generate phi-optimized time sequence
     times = []
-    if scaling_factor == PHI:
+    if abs(scaling_factor - phi) < 0.1:  # Near phi
         # For phi, use Fibonacci sequence for time points
         fib = [0.1, 0.1]  # Start with small time steps
         while len(fib) < n_steps:
             fib.append(fib[-1] + fib[-2])
         times = np.array(fib[:n_steps])
+        
+        # Scale times for better coherence preservation
+        times = times * (1.0 - 0.2 * phi_proximity)  # Shorter times when closer to phi
     else:
         # For other values, use geometric sequence
         times = np.linspace(0.0, 10.0, n_steps)
     
-    # Add measurement operators for observables
-    e_ops = [sigmaz()] if num_qubits == 1 else [tensor([sigmaz() if i == j else qeye(2) for i in range(num_qubits)]) for j in range(num_qubits)]
+    # Add measurement operators for observables with enhanced phi sensitivity
+    if phi_proximity > 0.8 and num_qubits > 1:
+        # Create special measurement operators for phi-resonant systems
+        e_ops = []
+        for j in range(num_qubits):
+            op_list = [qeye(2) for _ in range(num_qubits)]
+            op_list[j] = sigmaz()
+            e_ops.append(tensor(op_list))
+            
+        # Add collective measurement near phi
+        collective_op = tensor([sigmaz() for _ in range(num_qubits)])
+        e_ops.append(collective_op)
+    else:
+        # Standard measurement operators otherwise
+        e_ops = [sigmaz()] if num_qubits == 1 else [tensor([sigmaz() if i == j else qeye(2) for i in range(num_qubits)]) for j in range(num_qubits)]
     
     # Create phi-recursive unitary for each time step
     print("Creating phi-recursive unitaries...")
