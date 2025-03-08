@@ -9,6 +9,7 @@ from qutip_qip.circuit import QubitCircuit
 from qutip_qip.noise import Noise
 from qutip_qip.operations import Gate
 from .config import load_config
+from constants import PHI
 
 class EvolutionResult:
     """Result object for quantum evolution containing states and times."""
@@ -55,6 +56,91 @@ class QuantumCircuit:
             return U * initial_state
         else:
             return U * initial_state * U.dag()
+
+def get_scaled_unitary(H, time, scaling_factor=1.0):
+    """
+    Get the linearly scaled unitary operator for a given Hamiltonian.
+    
+    Parameters:
+    - H (Qobj): Hamiltonian operator
+    - time (float): Evolution time
+    - scaling_factor (float): Factor to scale the unitary
+    
+    Returns:
+    - Qobj: Scaled unitary operator
+    """
+    # Use matrix exponentiation directly for time evolution
+    U_base = (-1j * H * time).expm()
+    
+    # Scale the unitary using matrix exponentiation
+    # U^s = exp(s * log(U)) where s is the scaling factor
+    if scaling_factor == 1.0:
+        return U_base
+    else:
+        logU = U_base.logm()  # Matrix logarithm
+        return (scaling_factor * logU).expm()
+
+
+# Import necessary libraries for the get_phi_recursive_unitary function
+from scipy.linalg import polar
+
+def get_phi_recursive_unitary(H, time, scaling_factor=1.0, recursion_depth=3):
+    """
+    Create a unitary with recursive golden-ratio-based structure.
+    
+    Parameters:
+    - H (Qobj): Hamiltonian operator
+    - time (float): Evolution time
+    - scaling_factor (float): Factor to scale the unitary
+    - recursion_depth (int): Depth of recursion for phi-based patterns
+    
+    Returns:
+    - Qobj: Scaled unitary with potential phi-resonance
+    """
+    # Use matrix exponentiation directly instead of propagator to avoid integration issues
+    U_base = (-1j * H * time).expm()
+    
+    # Base case for recursion
+    if recursion_depth <= 0 or scaling_factor == 1.0:
+        return U_base
+    
+    # Create recursive structure based on Fibonacci/golden ratio pattern
+    phi = PHI  # Golden ratio
+    
+    # Calculate proximity to phi for resonance effects
+    phi_proximity = np.exp(-(scaling_factor - phi)**2 / 0.1)  # Gaussian centered at phi
+    
+    if phi_proximity > 0.9:  # Close to phi
+        # At phi, create recursive operator structure with unitarity preservation
+        U_phi1 = get_phi_recursive_unitary(H, time/phi, scaling_factor/phi, recursion_depth-1)
+        U_phi2 = get_phi_recursive_unitary(H, time/phi**2, scaling_factor/phi**2, recursion_depth-1)
+        
+        # Enforce unitarity with polar decomposition
+        product = U_phi1 * U_phi2
+        # Use SVD to ensure unitarity
+        u, p = polar(product.full())
+        return Qobj(u)
+    else:
+        # For non-phi values, use different composition rule with unitarity enforcement
+        logU = U_base.logm()
+        # Ensure the exponent is anti-Hermitian (for unitarity)
+        logU_anti = 0.5 * (logU - logU.dag())
+        U_scaled = (scaling_factor * logU_anti).expm()
+        
+        # Add non-linear term that's most significant near phi
+        correction_factor = scaling_factor/(1 + abs(scaling_factor - phi))
+        
+        if correction_factor > 0.2:
+            # Create a unitary correction
+            logU2 = (logU**2 - (logU**2).dag()) * 0.5j  # Make anti-Hermitian
+            correction = (correction_factor * logU2).expm()
+            result = U_scaled * correction
+            
+            # Final unitarity check
+            u, p = polar(result.full())
+            return Qobj(u)
+        else:
+            return U_scaled
 
 class StandardCircuit(QuantumCircuit):
     #TODO: refactor to remove this in favor of ScaledCircuit
@@ -326,16 +412,18 @@ class ScaledCircuit(QuantumCircuit):
     """
     Geometrically-scaled circuit evolution using qutip's features.
     """
-    def __init__(self, base_hamiltonian, scaling_factor=None, c_ops=None):
+    def __init__(self, base_hamiltonian, scaling_factor=None, c_ops=None, recursion_depth=None):
         super().__init__(base_hamiltonian.dims[0][0] if isinstance(base_hamiltonian.dims[0], list) else 2)
         self.base_hamiltonian = base_hamiltonian
         self.config = load_config()
         
         # Get configuration value with proper type handling
         config_scale_factor = float(self.config.get('scale_factor', 1.0))
+        config_recursion_depth = int(self.config.get('recursion_depth', 3))
         
         # Use provided value or default from config
         self.scale_factor = float(scaling_factor if scaling_factor is not None else config_scale_factor)
+        self.recursion_depth = int(recursion_depth if recursion_depth is not None else config_recursion_depth)
         
         # Initialize noise channels
         self._noise = Noise()  # Initialize without arguments
@@ -359,6 +447,9 @@ class ScaledCircuit(QuantumCircuit):
                 self.c_ops.append(np.sqrt(rate) * sigmax())
         else:
             self.c_ops = c_ops if c_ops is not None else []
+        
+        # Flag for using phi-recursive evolution instead of standard scaling
+        self.use_phi_recursive = False
     
     @property
     def noise(self):
@@ -366,7 +457,7 @@ class ScaledCircuit(QuantumCircuit):
         return self._noise
 
     def get_scaled_hamiltonian(self, step_idx):
-        """Get Hamiltonian scaled by phi^step_idx."""
+        """Get Hamiltonian scaled by scale_factor^step_idx."""
         scale = (self.scale_factor ** step_idx)
         return scale * self.base_hamiltonian
     
@@ -383,6 +474,21 @@ class ScaledCircuit(QuantumCircuit):
         H_scaled = self.get_scaled_hamiltonian(step_idx)
         dt = 1.0  # Unit time step
         return (-1j * dt * H_scaled).expm()
+    
+    def get_phi_recursive_unitary(self, step_idx):
+        """
+        Get a phi-recursive unitary operator for a given scaling step.
+        
+        Args:
+            step_idx (int): The scaling step index
+            
+        Returns:
+            Qobj: The phi-recursive unitary operator
+        """
+        H = self.base_hamiltonian
+        time = 1.0  # Unit time
+        scaling_factor = self.scale_factor ** step_idx
+        return get_phi_recursive_unitary(H, time, scaling_factor, self.recursion_depth)
     
     def evolve_closed(self, initial_state, n_steps=None):
         """
@@ -401,18 +507,22 @@ class ScaledCircuit(QuantumCircuit):
         current_time = 0
         
         for idx in range(steps):
-            H_scaled = self.get_scaled_hamiltonian(idx)
-            dt = 1.0  # Unit time step
-            
-            # Evolve for unit time with scaled Hamiltonian
-            U = (-1j * dt * H_scaled).expm()
+            if self.use_phi_recursive:
+                # Use phi-recursive unitary
+                U = self.get_phi_recursive_unitary(idx)
+            else:
+                # Use standard scaled unitary
+                H_scaled = self.get_scaled_hamiltonian(idx)
+                dt = 1.0  # Unit time step
+                U = (-1j * dt * H_scaled).expm()
+                
             if state.isket:
                 state = U * state
             else:
                 state = U * state * U.dag()
             
             states.append(state)
-            current_time += dt
+            current_time += 1.0  # Unit time step
             times.append(current_time)
         
         result = EvolutionResult(states, times)
@@ -435,11 +545,45 @@ class ScaledCircuit(QuantumCircuit):
         # Use provided c_ops or default to instance c_ops
         collapse_ops = c_ops if c_ops is not None else self.c_ops
         
-        # Build effective Hamiltonian
-        H_eff = sum(self.get_scaled_hamiltonian(idx) for idx in range(steps))
+        # Build effective Hamiltonian based on the evolution type
+        if self.use_phi_recursive:
+            # For phi-recursive evolution, use a simpler approximation 
+            # We can't directly simulate the recursive unitary with mesolve
+            # So we'll use a modified scaled Hamiltonian that approximates it
+            # This is less accurate than the closed system approach
+            
+            # Create a weighted sum of scaled Hamiltonians
+            H_eff = 0
+            phi = PHI
+            
+            for idx in range(steps):
+                # Base scaling with adjustment for phi proximity
+                scale = (self.scale_factor ** idx)
+                phi_proximity = np.exp(-((self.scale_factor - phi) ** 2) / 0.1)
+                
+                # Modify scaling based on phi proximity
+                if phi_proximity > 0.8:
+                    # For values close to phi, add recursive terms
+                    primary_scale = scale * (1 + 0.1 * phi_proximity)
+                    H_eff += primary_scale * self.base_hamiltonian
+                    
+                    # Add secondary scale terms if enough recursion depth
+                    if self.recursion_depth > 1 and idx < steps - 1:
+                        secondary_scale = scale/phi * 0.2 * phi_proximity
+                        H_eff += secondary_scale * self.base_hamiltonian
+                else:
+                    # For values not close to phi, just use regular scaling
+                    H_eff += scale * self.base_hamiltonian
+        else:
+            # For standard scaling, simply sum the scaled Hamiltonians
+            H_eff = sum(self.get_scaled_hamiltonian(idx) for idx in range(steps))
         
+        # Use the effective Hamiltonian for time evolution
+        H_terms = H_eff
+        
+        # Solve master equation
         mesolve_result = mesolve(
-            H_eff,
+            H_terms,
             rho0,
             tlist,
             collapse_ops,
@@ -506,6 +650,9 @@ class FibonacciBraidingCircuit(QuantumCircuit):
         Returns:
         - result: Evolution result containing states and times
         """
+        # Import Options and mesolve from qutip explicitly to ensure they're available
+        from qutip import Options, mesolve, sigmaz
+        
         # Create result object to match other evolution methods
         # Store states and times
         states = [initial_state]

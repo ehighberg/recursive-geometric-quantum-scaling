@@ -6,7 +6,8 @@ Circuit-based approach using qutip-qip features for multi-qubit and braiding ope
 """
 
 import numpy as np
-from qutip import sigmaz, sigmax, qeye, tensor, basis, ket2dm
+# Import all necessary qutip functions at the top level
+from qutip import sigmaz, sigmax, qeye, tensor, basis, ket2dm, Options, mesolve, identity
 from simulations.quantum_state import state_zero, fib_anyon_state_2d
 from simulations.quantum_circuit import StandardCircuit, ScaledCircuit, FibonacciBraidingCircuit
 
@@ -126,19 +127,63 @@ def run_fibonacci_braiding_circuit(braid_type='Fibonacci', braid_sequence='1,2,1
         B1_2 = braid_b1_2d()
         B2_2 = braid_b2_2d()
     elif braid_type == 'Ising':
-        #TODO: implement Ising braids or remove Ising option
-        # For now, use Fibonacci braids as placeholder
-        # In a real implementation, these would be different
-        B1_2 = braid_b1_2d()
-        B2_2 = braid_b2_2d()
-        print(f"Warning: Using Fibonacci braids as placeholder for {braid_type} anyons")
+        # Ising anyon braiding operators
+        # Topological quantum computation using Ising anyons
+        # Ising anyons have sigma (non-Abelian) and psi (fermion) particles
+        from constants import PHI
+        
+        # Ising anyons have special braid matrices based on spin-1/2 representation
+        # with additional phases related to topological properties
+        
+        # Pauli matrices for Ising anyon exchange operations
+        sigma_y = np.array([[0, -1j], [1j, 0]], dtype=complex)
+        sigma_z = np.array([[1, 0], [0, -1]], dtype=complex)
+        
+        # Ising anyon exchange phases - relate to R-matrices in anyon theory
+        phase_r = np.exp(1j * np.pi / 8)  # e^(iπ/8) for Ising model
+        
+        # Construct Ising anyon braid operators
+        B1_2 = phase_r * np.eye(2, dtype=complex)  # R-matrix for Ising anyons
+        B1_2[1, 1] = phase_r * np.exp(1j * np.pi / 2)  # Additional phase for fusion channel
+        
+        B2_2 = phase_r * (np.cos(np.pi/4) * np.eye(2, dtype=complex) + 
+                           1j * np.sin(np.pi/4) * sigma_y)  # Non-trivial braiding
+        
+        # Convert to QuTip Qobj format
+        from qutip import Qobj
+        B1_2 = Qobj(B1_2)
+        B2_2 = Qobj(B2_2)
+        
     elif braid_type == 'Majorana':
-        #TODO: implement Majorana braids or remove Majorana option
-        # For now, use Fibonacci braids as placeholder
-        # In a real implementation, these would be different
-        B1_2 = braid_b1_2d()
-        B2_2 = braid_b2_2d()
-        print(f"Warning: Using Fibonacci braids as placeholder for {braid_type} anyons")
+        # Majorana zero mode braiding operators
+        # Topological quantum computation using Majorana zero modes
+        from constants import PHI
+        
+        # Majorana fermion braiding matrices in 2D representation
+        # These matrices represent the exchange of Majorana zero modes
+        
+        # Pauli matrices for Majorana exchange operations
+        sigma_x = np.array([[0, 1], [1, 0]], dtype=complex)
+        sigma_y = np.array([[0, -1j], [1j, 0]], dtype=complex)
+        sigma_z = np.array([[1, 0], [0, -1]], dtype=complex)
+        
+        # Phase factors for Majorana braiding
+        # Majorana braiding produces π/4 rotations around the z-axis in the Bloch sphere
+        phase_m = np.exp(1j * np.pi / 4)  # e^(iπ/4) phase for Majorana exchange
+        
+        # Construct Majorana braiding operators
+        # B1 represents braiding Majorana modes 1 and 2
+        B1_2 = phase_m * (np.cos(np.pi/4) * np.eye(2, dtype=complex) - 
+                          1j * np.sin(np.pi/4) * sigma_x)
+        
+        # B2 represents braiding Majorana modes 2 and 3
+        B2_2 = phase_m * (np.cos(np.pi/4) * np.eye(2, dtype=complex) - 
+                          1j * np.sin(np.pi/4) * sigma_z)
+        
+        # Convert to QuTip Qobj format
+        from qutip import Qobj
+        B1_2 = Qobj(B1_2)
+        B2_2 = Qobj(B2_2)
     else:
         raise ValueError(f"Unsupported braid type: {braid_type}")
     
@@ -306,11 +351,69 @@ def run_quantum_gate_circuit(circuit_type="Single Qubit", optimization=None, noi
             result = circ.evolve_closed(psi_init)
         
         # Store Hamiltonian function for fractal analysis
-        # Use identity matrix as placeholder since we don't have direct access to the Hamiltonian
-        #TODO: replace with actual Hamiltonian
-        H_placeholder = tensor([qeye(2) for _ in range(2)])
+        # Construct an effective Hamiltonian from the custom gates
+        # This synthesizes a Hamiltonian that would produce the gates in the circuit
+        from qutip import sigmay
+        
+        # Create effective Hamiltonian based on gates
+        # For each gate, we add a contributing term that would generate that gate
+        H_effective = 0
+        for gate in custom_gates:
+            gate_type, qubits, params, angle = gate
+            # Scale angle or use default if None
+            theta = angle if angle is not None else np.pi/2
+            
+            if gate_type == 'RX':
+                # Rotation around X axis with angle theta
+                op_list = [identity(2)] * 2
+                for q in qubits:
+                    op_list[q] = sigmax()
+                H_term = theta * tensor(op_list)
+                H_effective += H_term
+                
+            elif gate_type == 'RY':
+                # Rotation around Y axis with angle theta
+                op_list = [identity(2)] * 2
+                for q in qubits:
+                    op_list[q] = sigmay()
+                H_term = theta * tensor(op_list)
+                H_effective += H_term
+                
+            elif gate_type == 'RZ':
+                # Rotation around Z axis with angle theta
+                op_list = [identity(2)] * 2
+                for q in qubits:
+                    op_list[q] = sigmaz()
+                H_term = theta * tensor(op_list)
+                H_effective += H_term
+                
+            elif gate_type == 'CNOT':
+                # CNOT is generated by an Ising-like interaction
+                # We use a simplified approximation here
+                control, target = qubits[0], qubits[1]
+                op_list1 = [identity(2)] * 2
+                op_list2 = [identity(2)] * 2
+                op_list1[control] = (identity(2) + sigmaz()) / 2  # Projector |1⟩⟨1|
+                op_list2[target] = sigmax()  # X operation on target
+                H_term = np.pi/2 * tensor(op_list1) * tensor(op_list2)
+                H_effective += H_term
+                
+            elif gate_type == 'CZ':
+                # CZ gate contribution to Hamiltonian
+                control, target = qubits[0], qubits[1] 
+                op_list1 = [identity(2)] * 2
+                op_list2 = [identity(2)] * 2
+                op_list1[control] = (identity(2) + sigmaz()) / 2  # Projector |1⟩⟨1|
+                op_list2[target] = sigmaz()  # Z operation on target
+                H_term = np.pi/2 * tensor(op_list1) * tensor(op_list2)
+                H_effective += H_term
+        
+        # If no effective Hamiltonian was created, use a default one
+        if H_effective == 0:
+            H_effective = tensor([sigmaz() for _ in range(2)])
+            
         def hamiltonian(f_s):
-            return float(f_s) * H_placeholder
+            return float(f_s) * H_effective
         result.hamiltonian = hamiltonian
         
         # Ensure e_ops and options are set

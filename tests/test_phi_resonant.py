@@ -18,7 +18,7 @@ from qutip import sigmaz, sigmax, basis
 from constants import PHI
 
 # Import components to test
-from simulations.scaled_unitary import get_phi_recursive_unitary
+from simulations.quantum_circuit import get_phi_recursive_unitary
 from simulations.quantum_state import (
     state_fractal, state_fibonacci, state_phi_sensitive, state_recursive_superposition
 )
