@@ -117,8 +117,8 @@ def test_noise_effects_on_entanglement():
         rho_noisy = ket2dm(rho_noisy)
     
     # Calculate purities
-    purity_clean = (rho_clean * rho_clean).tr().real
-    purity_noisy = (rho_noisy * rho_noisy).tr().real
+    purity_clean = rho_clean.purity()
+    purity_noisy = rho_noisy.purity()
     
     # Noisy evolution should reduce purity
     assert purity_noisy <= purity_clean + 1e-7  # Allow for numerical precision

@@ -23,27 +23,6 @@ from simulations.scripts.evolve_state import (
 )
 from analyses.coherence import l1_coherence, relative_entropy_coherence
 
-def calculate_purity(state):
-    """
-    Calculate the purity of a quantum state.
-    
-    Parameters:
-    -----------
-    state : Qobj
-        Quantum state (ket or density matrix)
-        
-    Returns:
-    --------
-    float
-        Purity of the state (Tr[ρ²])
-    """
-    if state.isket:
-        # For pure states, purity is always 1
-        return 1.0
-    else:
-        # For mixed states, purity is Tr[ρ²]
-        return (state * state).tr().real
-
 def calculate_purity_trajectory(result):
     """
     Calculate purity trajectory for a quantum evolution result.
@@ -60,7 +39,7 @@ def calculate_purity_trajectory(result):
     """
     purities = []
     for state in result.states:
-        purities.append(calculate_purity(state))
+        purities.append(state.purity())
     return np.array(purities)
 
 def calculate_fidelity_trajectory(result, reference_state):

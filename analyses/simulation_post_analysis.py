@@ -233,7 +233,7 @@ def format_metrics_for_display(result):
         else:
             final_dm = final_state
         
-        metrics['purity'] = (final_dm * final_dm).tr().real
+        metrics['purity'] = final_dm.purity()
         
         # Calculate fidelity to initial state
         initial_state = result.states[0]

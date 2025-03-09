@@ -90,8 +90,8 @@ def linear_entropy(state: Qobj) -> float:
     else:
         rho = state
     
-    # Calculate purity Tr(ρ^2)
-    purity = (rho * rho).tr().real
+    # Calculate purity
+    purity = rho.purity()
     
     # Calculate linear entropy
     d = rho.shape[0]  # dimension of Hilbert space

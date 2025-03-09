@@ -283,7 +283,7 @@ def analyze_circuit_noise_effects(circuit_type="standard", noise_rates=None):
         fid = fidelity(psi_init_dm, final_dm)
         
         # Calculate purity
-        purity = float((final_dm * final_dm).tr().real)
+        purity = final_dm.purity()
         
         results['fidelities'].append(fid)
         results['purities'].append(purity)

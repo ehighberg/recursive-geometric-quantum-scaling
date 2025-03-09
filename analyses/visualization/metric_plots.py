@@ -276,7 +276,7 @@ def plot_noise_metrics(
             rho = state
         
         # Calculate purity
-        purities.append((rho * rho).tr().real)
+        purities.append(rho.purity())
         
         # Calculate coherence
         n = rho.shape[0]

@@ -240,11 +240,7 @@ def plot_state_evolution(
     ax2.legend()
     
     # Plot 3: Purity
-    purities = []
-    for state in states:
-        if state.isket:
-            state = state * state.dag()
-        purities.append((state * state).tr().real)
+    purities = [state.purity() for state in states]
     
     ax3.plot(times, purities, label='Purity',
             color=COLORS['accent'])
