@@ -143,7 +143,7 @@ def get_phi_recursive_unitary(H, time, scaling_factor=1.0, recursion_depth=3):
             return U_scaled
 
 class StandardCircuit(QuantumCircuit):
-    #TODO: refactor to remove this in favor of ScaledCircuit
+    # TODO: refactor to remove this in favor of ScaledCircuit
     """
     Standard circuit evolution using qutip's solvers.
     """

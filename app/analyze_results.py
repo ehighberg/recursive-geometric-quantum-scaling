@@ -142,7 +142,7 @@ def analyze_simulation_results(result, mode: str = "Evolution"):
                     except:
                         pass
 
-        #TODO: move this section to the topological analysis tab in app.py
+        # TODO: move this section to the topological analysis tab in app.py
         st.subheader("Topological Analysis")
         if mode == "Topological Braiding":
             # Display topological invariants
