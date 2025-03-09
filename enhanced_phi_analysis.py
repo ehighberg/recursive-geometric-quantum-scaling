@@ -505,6 +505,7 @@ def create_parameter_tables(output_dir):
         f.write(styled_html)
     
     # Create phase diagram summary table
+    # TODO: dynamically generate this table
     phase_diagram = [
         {'f_s Range': 'f_s < 0.8', 'Phase Type': 'Trivial', 'Topological Invariant': '0', 'Fractal Dimension': 'Low (~0.8-1.0)', 'Gap Size': 'Large'},
         {'f_s Range': '0.8 < f_s < 1.4', 'Phase Type': 'Weakly Topological', 'Topological Invariant': '±1', 'Fractal Dimension': 'Medium (~1.0-1.2)', 'Gap Size': 'Medium'},
@@ -678,7 +679,7 @@ def enhance_energy_spectrum(output_dir):
         if not spectrum_path.exists():
             print("Energy spectrum image not found. Generating dummy visualization...")
             # Create a dummy energy spectrum visualization
-            create_dummy_energy_spectrum(output_dir)
+            placeholder_energy_spectrum(output_dir)
             return
     
     try:
@@ -727,112 +728,34 @@ def enhance_energy_spectrum(output_dir):
     except Exception as e:
         print(f"Error enhancing energy spectrum: {str(e)}")
         # Create a dummy energy spectrum visualization as fallback
-        create_dummy_energy_spectrum(output_dir)
+        placeholder_energy_spectrum(output_dir)
 
 
-def create_dummy_energy_spectrum(output_dir):
+def placeholder_energy_spectrum(output_dir):
     """
-    Create a dummy energy spectrum visualization when the original cannot be found.
+    Create a placeholder energy spectrum visualization when the original cannot be found. The figure should simply inform the reader that the energy spectrum is not available.
     
     Parameters:
     -----------
     output_dir : Path
         Directory to save the dummy image.
     """
-    print("Creating dummy energy spectrum visualization...")
+    print("Creating placeholder energy spectrum visualization...")
     
     # Create figure
     plt.figure(figsize=(10, 6))
     
-    # Generate dummy energy spectrum data
-    k_points = np.linspace(-np.pi, np.pi, 300)
-    phi = PHI
-    
-    # Create multiple bands with self-similar patterns
-    bands = []
-    
-    # Base band (nearly flat)
-    base_band = 0.2 * np.sin(k_points) + 3.0
-    bands.append(base_band)
-    
-    # Middle band (shows resonance at phi)
-    middle_band = -np.cos(k_points) * (1.0 + 0.5 * np.sin(phi * k_points))
-    bands.append(middle_band)
-    
-    # Top band (with phi modulation)
-    top_band = 2.0 + 0.4 * np.cos(2*k_points) + 0.15 * np.sin(phi * k_points)**2
-    bands.append(top_band)
-    
-    # Self-similar regions
-    region1_x = np.linspace(-2.5, -1.0, 50)
-    region1_y1 = -1.0 + 0.1 * np.sin(phi * region1_x)
-    region1_y2 = -0.8 + 0.1 * np.sin(phi * region1_x)
-    
-    region2_x = np.linspace(1.0, 2.5, 50)
-    region2_y1 = 1.0 + 0.1 * np.sin(phi * region2_x)
-    region2_y2 = 1.2 + 0.1 * np.sin(phi * region2_x)
-    
-    # Band inversion region
-    inversion_x = np.linspace(-0.5, 0.5, 50)
-    inversion_y1 = 0.1 * np.sin(5*inversion_x) + 0.2
-    inversion_y2 = 0.1 * np.sin(5*inversion_x) - 0.2
-    
-    # Plot bands
-    for band in bands:
-        plt.plot(k_points, band, 'k-', linewidth=2)
-    
-    # Plot self-similar regions
-    plt.fill_between(region1_x, region1_y1, region1_y2, color='red', alpha=0.3)
-    plt.fill_between(region2_x, region2_y1, region2_y2, color='red', alpha=0.3)
-    
-    # Plot band inversion
-    plt.fill_between(inversion_x, inversion_y1, inversion_y2, color='blue', alpha=0.3)
-    
-    # Add annotations
-    plt.annotate('Self-similar region 1', 
-                xy=(-1.75, -0.9), 
-                xytext=(-2.0, -1.5),
-                arrowprops=dict(facecolor='red', shrink=0.05, width=1.5),
-                fontsize=10, fontweight='bold', color='red')
-    
-    plt.annotate('Self-similar region 2', 
-                xy=(1.75, 1.1), 
-                xytext=(2.0, 1.5),
-                arrowprops=dict(facecolor='red', shrink=0.05, width=1.5),
-                fontsize=10, fontweight='bold', color='red')
-    
-    plt.annotate('Band inversion', 
-                xy=(0, 0), 
-                xytext=(0.5, -0.5),
-                arrowprops=dict(facecolor='blue', shrink=0.05, width=1.5),
-                fontsize=10, fontweight='bold', color='blue')
-    
-    plt.annotate(f'φ resonance\n(≈{PHI:.4f})', 
-                xy=(0, 1.5), 
-                xytext=(1.0, 2.0),
-                arrowprops=dict(facecolor='green', shrink=0.05, width=1.5),
-                fontsize=10, fontweight='bold', color='green')
-    
-    # Add labels and title
-    plt.xlabel('Wavevector k', fontsize=12)
-    plt.ylabel('Energy', fontsize=12)
-    plt.title('Energy Spectrum with Self-Similar Regions', fontsize=14, fontweight='bold')
-    plt.xlim(-np.pi, np.pi)
-    plt.ylim(-2, 4)
-    plt.grid(True, alpha=0.3)
-    
-    # Add text describing key features
-    plt.text(0, -1.8, 
-             "Key Features:\n"
-             "• Self-similar patterns scaling with φ\n"
-             "• Band inversion indicating topological phase transition\n"
-             "• φ-resonant modes showing enhanced stability", 
-             fontsize=10, bbox=dict(facecolor='white', alpha=0.8))
+    # Add text describing the issue
+    plt.text(0.5, 0.5, 
+             "Energy spectrum data not found.\n", 
+             fontsize=14, fontweight='bold', ha='center', va='center')
+    plt.axis('off')
+    plt.title("Energy Spectrum Unavailable", fontsize=16, fontweight='bold', pad=20)
     
     # Save figure
     plt.tight_layout()
     plt.savefig(output_dir / "enhanced_energy_spectrum.png", dpi=300, bbox_inches='tight')
-    print(f"Dummy energy spectrum saved to {output_dir / 'enhanced_energy_spectrum.png'}")
+    print(f"Placeholder energy spectrum saved to {output_dir / 'enhanced_energy_spectrum.png'}")
     plt.close()
 
 
