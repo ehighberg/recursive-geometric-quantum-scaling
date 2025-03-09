@@ -495,7 +495,7 @@ def test_phi_proximity_effect():
     
     # Print diagnostic information
     print(f"\nPhi Proximity Effect Results:")
-    print(f"Fidelity between phi and non-phi states: {fidy:.4f}")
+    print(f"Fidelity between phi and non-phi states: {fid:.4f}")
     
     # Since phi_sensitive states should differ based on proximity to phi,
     # the fidelity shouldn't be 1.0 (identical states)
