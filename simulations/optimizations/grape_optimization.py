@@ -1,5 +1,5 @@
 import numpy as np
-from qutip import propagator
+from qutip import propagator, fidelity
 from scipy.optimize import minimize
 
 def apply_grape_optimization(circuit, target_unitary):
@@ -47,9 +47,8 @@ def apply_grape_optimization(circuit, target_unitary):
         # Get the evolved unitary using qutip's propagator
         U = propagator(H_total, tlist[-1])
         
-        # Calculate fidelity (1 - infidelity)
-        fidelity = abs((target_unitary.dag() * U).tr()) / target_unitary.shape[0]
-        return 1.0 - fidelity
+        # Calculate fidelity 
+        return fidelity(target_unitary, U)
 
     # Initial guess for control amplitudes
     x0 = np.zeros(len(H_c) * n_ts)

@@ -7,7 +7,7 @@ Circuit-based approach using qutip-qip features for multi-qubit and braiding ope
 
 import numpy as np
 # Import all necessary qutip functions at the top level
-from qutip import sigmaz, sigmax, qeye, tensor, basis, ket2dm, Options, mesolve, identity
+from qutip import sigmaz, sigmax, qeye, tensor, basis, ket2dm, identity, fidelity
 from simulations.quantum_state import state_zero, fib_anyon_state_2d
 from simulations.quantum_circuit import StandardCircuit, ScaledCircuit, FibonacciBraidingCircuit
 
@@ -280,12 +280,12 @@ def analyze_circuit_noise_effects(circuit_type="standard", noise_rates=None):
         
         # Convert initial state to density matrix for fidelity calculation
         psi_init_dm = ket2dm(psi_init)
-        fidelity = float((psi_init_dm.dag() * final_dm * psi_init_dm).tr().real)
+        fid = fidelity(psi_init_dm, final_dm)
         
         # Calculate purity
         purity = float((final_dm * final_dm).tr().real)
         
-        results['fidelities'].append(fidelity)
+        results['fidelities'].append(fid)
         results['purities'].append(purity)
     
     return results

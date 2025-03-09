@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 # Third-party imports
 import numpy as np
 import streamlit as st
+from qutip import fidelity
 
 # Import constants - must be after numpy import
 from constants import PHI
@@ -326,12 +327,12 @@ def main():
                     initial_state = initial_state * initial_state.dag()
                 
                 with col1:
-                    purity = (final_state * final_state).tr().real
-                    st.metric("Final Purity", f"{purity:.4f}")
+                    final_purity = final_state.purity()
+                    st.metric("Final Purity", f"{final_purity:.4f}")
                 
                 with col2:
-                    fidelity = (initial_state.dag() * final_state).tr().real
-                    st.metric("Final Fidelity", f"{fidelity:.4f}")
+                    final_fidelity = fidelity(final_state, initial_state)
+                    st.metric("Final Fidelity", f"{final_fidelity:.4f}")
                 
                 with col3:
                     # Calculate decoherence rate
@@ -414,7 +415,7 @@ def main():
                 x = np.linspace(control_range[0], control_range[1], 100)
                 
                 # Calculate energy gaps and localization measures
-                from qutip import sigmaz, sigmax, tensor
+                from qutip import sigmaz, sigmax, expect
                 
                 energy_gaps = []
                 localization_measures = []
@@ -438,7 +439,7 @@ def main():
                     # in many topological models
                     _, states = h_param.eigenstates()
                     if len(states) > 0:
-                        sigma_z_exp = np.abs((states[0].dag() * sigmaz() * states[0]).tr())
+                        sigma_z_exp = expect(sigmaz(), states[0])
                         localization = 1.0 - sigma_z_exp  # Higher value means more edge-localized
                     else:
                         localization = 0.0

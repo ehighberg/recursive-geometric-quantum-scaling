@@ -8,7 +8,7 @@ and reusability.
 
 import numpy as np
 from tqdm import tqdm
-from qutip import Qobj
+from qutip import fidelity
 
 def analyze_fractal_properties(result, analyze_fractal=True):
     """
@@ -242,7 +242,7 @@ def format_metrics_for_display(result):
         else:
             initial_dm = initial_state
             
-        metrics['fidelity'] = (initial_dm.dag() * final_dm).tr().real
+        metrics['fidelity'] = fidelity(initial_dm, final_dm)
         
         # Add special metrics for phi-analysis
         if hasattr(result, 'phi_dimension'):
