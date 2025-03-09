@@ -3,7 +3,7 @@ CRAB (Chopped RAndom Basis) optimization implementation for quantum circuits.
 """
 
 import numpy as np
-from qutip import propagator
+from qutip import propagator, fidelity
 from scipy.optimize import minimize
 
 def crab_basis_functions(t, n_freq=5):
@@ -67,8 +67,7 @@ def apply_crab_optimization(circuit, target_unitary):
         U = propagator(H_total, tlist[-1])
         
         # Calculate fidelity
-        fidelity = abs((target_unitary.dag() * U).tr()) / target_unitary.shape[0]
-        return 1.0 - fidelity
+        return fidelity(target_unitary, U)
     
     # Initial guess for basis coefficients
     x0 = np.random.randn(len(H_c) * n_basis) * 0.1

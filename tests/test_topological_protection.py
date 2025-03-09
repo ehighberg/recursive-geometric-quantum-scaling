@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from pathlib import Path
 from scipy import stats
-from qutip import Qobj, ket2dm, tensor, basis, sigmax, sigmay, sigmaz, qeye
+from qutip import Qobj, ket2dm, tensor, basis, sigmax, sigmay, sigmaz, qeye, fidelity
 
 from constants import PHI
 from simulations.scripts.evolve_circuit import (
@@ -94,6 +94,7 @@ def create_equivalent_standard_circuit(braid_sequence):
     
     return gates
 
+<<<<<<< HEAD
 def calculate_fidelity(state, reference_state):
     """
     Calculate the fidelity between a quantum state and a reference state.
@@ -200,6 +201,8 @@ def calculate_fidelity(state, reference_state):
                 # Absolute last resort: assume they're completely different
                 return 0.0
 
+=======
+>>>>>>> 033b46c71c02f6ef3bb74dc3fcb185487cd672aa
 def compare_circuit_results(fib_result, std_result, ideal_state=None):
     """
     Compare results from Fibonacci anyon braiding and standard quantum circuits.
@@ -227,9 +230,32 @@ def compare_circuit_results(fib_result, std_result, ideal_state=None):
         # Use the final state from Fibonacci evolution as the reference
         ideal_state = fib_final
     
+    # Check dimensions and handle the case of mismatched dimensions
+    # if not np.array_equal(state.dims, reference_state.dims):
+    #     # If dimensions don't match, we need to fix them
+    #     # This typically happens if one state has dimensions like [[2,2],[2,2]] (superoperator form)
+    #     # while the other has dimensions like [[2],[2]] (standard operator form)
+
+    #     # Get the state in proper form
+    #     if state.type == "super" and reference_state.type != "super":
+    #         # Convert superoperator to regular density matrix if possible
+    #         if state.shape[0] == state.shape[1] and np.sqrt(state.shape[0]).is_integer():
+    #             dim = int(np.sqrt(state.shape[0]))
+    #             from qutip import Qobj
+    #             state_data = state.full()
+    #             state = Qobj(state_data[:dim, :dim], dims=[[dim], [dim]])
+    #     elif reference_state.type == "super" and state.type != "super":
+    #         # Convert superoperator to regular density matrix if possible
+    #         if reference_state.shape[0] == reference_state.shape[1] and np.sqrt(reference_state.shape[0]).is_integer():
+    #             dim = int(np.sqrt(reference_state.shape[0]))
+    #             from qutip import Qobj
+    #             ref_data = reference_state.full()
+    #             reference_state = Qobj(ref_data[:dim, :dim], dims=[[dim], [dim]])
+    
     # Calculate fidelities
-    fib_fidelity = calculate_fidelity(fib_final, ideal_state)
-    std_fidelity = calculate_fidelity(std_final, ideal_state)
+    fib_fidelity = fidelity(fib_final, ideal_state)
+    # TODO: fix mismatch between state dimension so that fidelities can be calculated. as of now, both are of type="oper", so the above code from the deprecated calculate_fidelity function would not work as-is. additionally, the method used is to truncate the superoperator to a density matrix, which is... questionable. see https://www.perplexity.ai/search/how-would-you-calculate-the-fi-F6Y7HhwMQbivq_Xj0u2wig . my recommendation is to make sure the states used as parameters when you call compare_circuit_results have the same dimensions in the first place.
+    std_fidelity = fidelity(std_final, ideal_state)
     
     # Calculate protection factor
     protection_factor = fib_fidelity / std_fidelity if std_fidelity > 0 else np.nan

@@ -59,8 +59,8 @@ def test_noise_strength():
     rho_weak = result_weak.states[-1]
     rho_strong = result_strong.states[-1]
     
-    purity_weak = (rho_weak * rho_weak).tr().real
-    purity_strong = (rho_strong * rho_strong).tr().real
+    purity_weak = rho_weak.purity()
+    purity_strong = rho_strong.purity()
     
     # Strong noise should lead to lower purity
     assert purity_strong < purity_weak
@@ -79,7 +79,7 @@ def test_noise_free_evolution():
         assert state.isket
         # Pure states have Tr(ρ2) = 1
         rho = state * state.dag()
-        purity = (rho * rho).tr().real
+        purity = rho.purity()
         assert np.abs(purity - 1.0) < 1e-10
 
 def test_combined_noise_effects():
@@ -100,9 +100,9 @@ def test_combined_noise_effects():
     rho_single = result_single.states[-1]
     rho_combined = result_combined.states[-1]
     
-    purity_single = (rho_single * rho_single).tr().real
-    purity_combined = (rho_combined * rho_combined).tr().real
-    
+    purity_single = rho_single.purity()
+    purity_combined = rho_combined.purity()
+
     # Combined noise should lead to lower purity
     assert purity_combined < purity_single
 

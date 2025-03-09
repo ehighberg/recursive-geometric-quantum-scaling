@@ -136,6 +136,10 @@ def compute_energy_spectrum(
     initial_scaling_factor: Optional[float] = None,
     scaling_method: str = "evolution_time"
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, Union[List[Tuple[float, float, float, float]], np.ndarray, Dict[str, float]]]]:
+<<<<<<< HEAD
+=======
+    # TODO: refactor to make the application of f_s meaningful. currently this scales the hamiltonian from the end of the evolution by a range of f_s values, even though the hamiltonian is based on the initial choice of the scaling factor.
+>>>>>>> 033b46c71c02f6ef3bb74dc3fcb185487cd672aa
     """
     Compute energy spectrum over f_s parameter range with enhanced analysis of
     self-similar regions. The scaling can be applied either during evolution time

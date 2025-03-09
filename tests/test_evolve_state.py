@@ -87,8 +87,8 @@ def test_noise_effects():
     rho_noisy = res_noisy.states[-1] if not res_noisy.states[-1].isket else res_noisy.states[-1] * res_noisy.states[-1].dag()
     
     # Calculate purities
-    purity_clean = (rho_clean * rho_clean).tr().real
-    purity_noisy = (rho_noisy * rho_noisy).tr().real
+    purity_clean = rho_clean.purity()
+    purity_noisy = rho_noisy.purity()
     
     # Noisy state should have lower purity
     assert purity_noisy < purity_clean

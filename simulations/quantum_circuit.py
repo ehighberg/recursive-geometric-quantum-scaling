@@ -142,8 +142,112 @@ def get_phi_recursive_unitary(H, time, scaling_factor=1.0, recursion_depth=3):
         else:
             return U_scaled
 
+<<<<<<< HEAD
 # StandardCircuit class has been refactored and is now deprecated.
 # Use ScaledCircuit with scaling_factor=1.0 for standard (unscaled) evolution.
+=======
+class StandardCircuit(QuantumCircuit):
+    # TODO: refactor to remove this in favor of ScaledCircuit
+    """
+    Standard circuit evolution using qutip's solvers.
+    """
+    def __init__(self, base_hamiltonian, total_time=None, n_steps=None, c_ops=None):
+        super().__init__(base_hamiltonian.dims[0][0] if isinstance(base_hamiltonian.dims[0], list) else 2)
+        self.base_hamiltonian = base_hamiltonian
+        self.config = load_config()
+        
+        # Get configuration values with proper type handling
+        config_total_time = float(self.config.get('total_time', 1.0))
+        config_n_steps = int(self.config.get('n_steps', 10))
+        
+        # Use provided values or defaults from config
+        self.total_time = float(total_time if total_time is not None else config_total_time)
+        self.n_steps = int(n_steps if n_steps is not None else config_n_steps)
+        
+        # Initialize noise channels
+        self._noise = Noise()  # Initialize without arguments
+        
+        # Configure noise if needed
+        noise_config = self.config.get('noise', {})
+        if isinstance(noise_config, dict) and noise_config:
+            # Create collapse operators based on noise configuration
+            self.c_ops = []
+            
+            # Handle dephasing noise
+            dephasing = noise_config.get('dephasing', {})
+            if isinstance(dephasing, dict) and dephasing.get('enabled', False):
+                rate = float(dephasing.get('rate', 0.01))
+                self.c_ops.append(np.sqrt(rate) * sigmaz())
+            
+            # Handle amplitude damping noise
+            damping = noise_config.get('amplitude_damping', {})
+            if isinstance(damping, dict) and damping.get('enabled', False):
+                rate = float(damping.get('rate', 0.01))
+                self.c_ops.append(np.sqrt(rate) * sigmax())
+        else:
+            self.c_ops = c_ops if c_ops is not None else []
+        
+    @property
+    def noise(self):
+        """Get the noise channel"""
+        return self._noise
+
+    def evolve_closed(self, initial_state, n_steps=None):
+        """
+        Evolution using qutip's sesolve for closed systems.
+        """
+        steps = int(n_steps if n_steps is not None else self.n_steps)
+        tlist = np.linspace(0, self.total_time, steps + 1)
+        
+        if initial_state.isket:
+            rho0 = ket2dm(initial_state)
+        else:
+            rho0 = initial_state
+        
+        mesolve_result = mesolve(
+            self.base_hamiltonian,
+            rho0,
+            tlist,
+            c_ops=[],  # No collapse operators for closed evolution
+            options=Options(store_states=True, store_final_state=True)
+        )
+        
+        # Create our EvolutionResult
+        result = EvolutionResult(mesolve_result.states, tlist)
+        result.eigenvalues = self.base_hamiltonian.eigenenergies()
+        result.e_ops = []
+        result.options = {}
+        
+        return result
+
+    def evolve_open(self, initial_state, c_ops=None):
+        """
+        Evolution using qutip's mesolve for open systems.
+        """
+        tlist = np.linspace(0, self.total_time, self.n_steps + 1)
+        
+        if initial_state.isket:
+            rho0 = ket2dm(initial_state)
+        else:
+            rho0 = initial_state
+        
+        # Use provided c_ops or default to instance c_ops
+        collapse_ops = c_ops if c_ops is not None else self.c_ops
+        
+        mesolve_result = mesolve(
+            self.base_hamiltonian,
+            rho0,
+            tlist,
+            collapse_ops,
+            options=Options(store_states=True)
+        )
+        
+        # Create our EvolutionResult
+        result = EvolutionResult(mesolve_result.states, tlist)
+        result.e_ops = []
+        result.options = {}
+        return result
+>>>>>>> 033b46c71c02f6ef3bb74dc3fcb185487cd672aa
 
 class CustomCircuit(QuantumCircuit):
     """

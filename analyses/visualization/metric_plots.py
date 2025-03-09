@@ -7,7 +7,7 @@ import itertools
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from qutip import Qobj
+from qutip import Qobj, fidelity
 from .style_config import set_style, configure_axis, get_color_cycle, COLORS
 from analyses import run_analyses
 
@@ -276,7 +276,7 @@ def plot_noise_metrics(
             rho = state
         
         # Calculate purity
-        purities.append((rho * rho).tr().real)
+        purities.append(rho.purity())
         
         # Calculate coherence
         n = rho.shape[0]
@@ -293,7 +293,7 @@ def plot_noise_metrics(
                 rho_init = initial_state * initial_state.dag()
             else:
                 rho_init = initial_state
-            fid = (rho_init.dag() * rho).tr().real
+            fid = fidelity(rho_init, rho)
             fidelities.append(fid)
     
     # Plot metrics
