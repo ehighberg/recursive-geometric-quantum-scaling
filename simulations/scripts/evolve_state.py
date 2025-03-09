@@ -13,7 +13,7 @@ This module includes implementations for:
 """
 
 import numpy as np
-from qutip import sigmaz, tensor, qeye, sesolve, mesolve, sigmax, Options
+from qutip import sigmaz, tensor, qeye, sesolve, mesolve, sigmax, Options, expect
 from constants import PHI
 from simulations.scaled_unitary import get_phi_recursive_unitary
 from tqdm import tqdm
@@ -518,14 +518,7 @@ def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor
     for op in e_ops:
         expect_values = []
         for state in tqdm(states, desc=f"Computing <{op}>", unit="state", leave=False):
-            # Handle the case where the result is already a complex number
-            expectation = state.dag() * op * state
-            if hasattr(expectation, 'tr'):
-                # If it's a QuTiP object with a trace method
-                expectation = expectation.tr()
-            # Ensure the result is a real number if it's supposed to be
-            if isinstance(expectation, complex) and abs(expectation.imag) < 1e-10:
-                expectation = expectation.real
+            expectation = expect(op, state)
             expect_values.append(expectation)
         result.expect.append(np.array(expect_values))
     
