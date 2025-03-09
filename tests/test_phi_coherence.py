@@ -14,7 +14,7 @@ from matplotlib.gridspec import GridSpec
 import pandas as pd
 from pathlib import Path
 from scipy import stats, optimize
-from qutip import Qobj, ket2dm
+from qutip import fidelity
 
 from constants import PHI
 from simulations.scripts.evolve_state import (
@@ -63,33 +63,6 @@ def calculate_purity_trajectory(result):
         purities.append(calculate_purity(state))
     return np.array(purities)
 
-def calculate_fidelity(state, reference_state):
-    """
-    Calculate the fidelity between a quantum state and a reference state.
-    
-    Parameters:
-    -----------
-    state : Qobj
-        Quantum state (ket or density matrix)
-    reference_state : Qobj
-        Reference quantum state (ket or density matrix)
-        
-    Returns:
-    --------
-    float
-        Fidelity between the states
-    """
-    # Convert to density matrices if needed
-    if state.isket:
-        state = ket2dm(state)
-    if reference_state.isket:
-        reference_state = ket2dm(reference_state)
-    
-    # Calculate fidelity using sqrt(ρ₁) ρ₂ sqrt(ρ₁)
-    sqrt_state = state.sqrtm()
-    fidelity = (sqrt_state * reference_state * sqrt_state).tr().real
-    return np.sqrt(fidelity)
-
 def calculate_fidelity_trajectory(result, reference_state):
     """
     Calculate fidelity trajectory for a quantum evolution result.
@@ -108,7 +81,7 @@ def calculate_fidelity_trajectory(result, reference_state):
     """
     fidelities = []
     for state in result.states:
-        fidelities.append(calculate_fidelity(state, reference_state))
+        fidelities.append(fidelity(state, reference_state))
     return np.array(fidelities)
 
 def exponential_decay(t, a, tau, c):
@@ -539,15 +512,15 @@ def test_phi_proximity_effect():
     non_phi_state = state_phi_sensitive(num_qubits=1, scaling_factor=1.0)
     
     # The states should be different if phi_sensitive implementation is working
-    fidelity = calculate_fidelity(phi_state, non_phi_state)
+    fid = fidelity(phi_state, non_phi_state)
     
     # Print diagnostic information
     print(f"\nPhi Proximity Effect Results:")
-    print(f"Fidelity between phi and non-phi states: {fidelity:.4f}")
+    print(f"Fidelity between phi and non-phi states: {fidy:.4f}")
     
     # Since phi_sensitive states should differ based on proximity to phi,
     # the fidelity shouldn't be 1.0 (identical states)
-    assert fidelity < 0.999, "Phi-sensitive states do not differ based on phi proximity"
+    assert fid < 0.999, "Phi-sensitive states do not differ based on phi proximity"
 
 if __name__ == "__main__":
     # Run coherence comparison with more comprehensive parameters
