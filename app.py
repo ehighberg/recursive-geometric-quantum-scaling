@@ -14,11 +14,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 # Third-party imports
 import numpy as np
 import streamlit as st
-<<<<<<< HEAD
 import matplotlib.pyplot as plt
-=======
 from qutip import fidelity
->>>>>>> 033b46c71c02f6ef3bb74dc3fcb185487cd672aa
 
 # Import constants - must be after numpy import
 from constants import PHI

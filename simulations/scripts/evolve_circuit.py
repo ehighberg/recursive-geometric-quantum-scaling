@@ -9,7 +9,13 @@ import numpy as np
 # Import all necessary qutip functions at the top level
 from qutip import sigmaz, sigmax, qeye, tensor, basis, ket2dm, identity, fidelity
 from simulations.quantum_state import state_zero, fib_anyon_state_2d
-from simulations.quantum_circuit import StandardCircuit, ScaledCircuit, FibonacciBraidingCircuit
+
+# Import circuit classes with relative imports to ensure we're using the updated versions
+from simulations.quantum_circuit import (
+    StandardCircuit,
+    ScaledCircuit,
+    FibonacciBraidingCircuit
+)
 
 def run_standard_twoqubit_circuit(noise_config=None):
     """

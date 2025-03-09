@@ -199,12 +199,12 @@ def analyze_phi_resonance(result, analyze_phi=True):
     # Compute phi-sensitive winding number
     print("Computing phi-sensitive winding number...")
     winding = compute_phi_sensitive_winding(eigenstates, k_points, scaling_factor=scaling_factor)
-    analysis_results['phi_winding'] = winding
+    analysis_results['phi_winding'] = float(winding)  # Convert to float for serialization
     
     # Compute phi-resonant Berry phase
     print("Computing phi-resonant Berry phase...")
     berry_phase = compute_phi_resonant_berry_phase(eigenstates, scaling_factor)
-    analysis_results['phi_berry_phase'] = berry_phase
+    analysis_results['phi_berry_phase'] = float(berry_phase)  # Convert to float for serialization
     
     return analysis_results
 

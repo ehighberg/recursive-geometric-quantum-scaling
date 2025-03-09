@@ -2,6 +2,10 @@
 
 import numpy as np
 from qutip import sigmaz, sigmax, sigmay, Qobj, basis, expect
+import sys
+import os
+# Add the project root to the path so imports work correctly
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from simulations.quantum_circuit import StandardCircuit, ScaledCircuit, FibonacciBraidingCircuit
 from simulations.quantum_state import state_plus, state_zero
 
