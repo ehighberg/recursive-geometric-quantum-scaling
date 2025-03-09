@@ -122,7 +122,13 @@ def calculate_fidelity(state, reference_state):
         # This typically happens if one state has dimensions like [[2,2],[2,2]] (superoperator form)
         # while the other has dimensions like [[2],[2]] (standard operator form)
         
-        # Get the state in proper form
+        # First, ensure both are density matrices
+        if state.isket:
+            state = ket2dm(state)
+        if reference_state.isket:
+            reference_state = ket2dm(reference_state)
+        
+        # Handle superoperator conversion
         if state.type == "super" and reference_state.type != "super":
             # Convert superoperator to regular density matrix if possible
             if state.shape[0] == state.shape[1] and np.sqrt(state.shape[0]).is_integer():
@@ -137,6 +143,40 @@ def calculate_fidelity(state, reference_state):
                 from qutip import Qobj
                 ref_data = reference_state.full()
                 reference_state = Qobj(ref_data[:dim, :dim], dims=[[dim], [dim]])
+        
+        # Handle dimension mismatches when one state has more qubits than the other
+        # This specifically addresses Fibonacci anyon states vs. standard qubit states
+        if len(state.dims[0]) != len(reference_state.dims[0]):
+            # If dimensions still don't match, try to adapt them
+            # For example, if comparing a 2-qubit state with a 1-qubit state
+            try:
+                # Get the total dimension sizes
+                state_dim = np.prod(state.dims[0])
+                ref_dim = np.prod(reference_state.dims[0])
+                
+                # If the state has higher dimension, truncate or project it
+                if state_dim > ref_dim:
+                    # Create a projection to the first ref_dim basis states
+                    state_mat = state.full()
+                    truncated_state = state_mat[:ref_dim, :ref_dim]
+                    # Normalize if needed
+                    trace = np.trace(truncated_state)
+                    if abs(trace) > 1e-10:  # Avoid division by near-zero
+                        truncated_state /= trace
+                    state = Qobj(truncated_state, dims=reference_state.dims)
+                # If reference has higher dimension, adapt the state
+                elif ref_dim > state_dim:
+                    # Embed state in larger space filled with zeros
+                    ref_mat = reference_state.full()
+                    embedded_state = np.zeros((ref_dim, ref_dim), dtype=complex)
+                    embedded_state[:state_dim, :state_dim] = state.full()
+                    # Normalize if needed
+                    trace = np.trace(embedded_state)
+                    if abs(trace) > 1e-10:  # Avoid division by near-zero
+                        embedded_state /= trace
+                    state = Qobj(embedded_state, dims=reference_state.dims)
+            except Exception as e:
+                print(f"Warning: Failed to adapt dimensions: {str(e)}")
     
     # For incompatible dimensions that can't be easily converted, use a simpler approach to calculate fidelity
     try:

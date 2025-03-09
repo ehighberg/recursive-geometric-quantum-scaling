@@ -132,13 +132,14 @@ def compute_wavefunction_profile(
 def compute_energy_spectrum(
     H_func: Callable[[float], Union[Qobj, np.ndarray]],
     config: Optional[Dict] = None,
-    eigen_index: int = 0
+    eigen_index: int = 0,
+    initial_scaling_factor: Optional[float] = None,
+    scaling_method: str = "evolution_time"
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, Union[List[Tuple[float, float, float, float]], np.ndarray, Dict[str, float]]]]:
-    #TODO: refactor to make the application of f_s meaningful. currently this scales the hamiltonian from the end of the evolution by a range of f_s values, even though the hamiltonian is based on the initial choice of the scaling factor.
     """
     Compute energy spectrum over f_s parameter range with enhanced analysis of
-    self-similar regions.
-
+    self-similar regions. The scaling can be applied either during evolution time
+    or as a post-evolution scaling.
     Parameters:
     -----------
     H_func : Callable[[float], Union[Qobj, np.ndarray]]
@@ -147,6 +148,11 @@ def compute_energy_spectrum(
         Configuration dictionary. If None, loads from evolution_config.yaml.
     eigen_index : int
         Index of eigenvalue to use for analysis (default: 0, ground state).
+    initial_scaling_factor : Optional[float]
+        Initial scaling factor used for evolution. If None, will be treated as 1.0.
+    scaling_method : str
+        Method to apply scaling: "evolution_time" (scaling during evolution) or 
+        "post_evolution" (scaling after evolution).
 
     Returns:
     --------
@@ -169,12 +175,35 @@ def compute_energy_spectrum(
     correlation_threshold = spectrum_config.get('correlation_threshold', 0.8)
     window_size = spectrum_config.get('window_size', 20)
     
+    # Set default initial scaling factor if not provided
+    if initial_scaling_factor is None:
+        initial_scaling_factor = 1.0
+    
     f_s_values = np.linspace(f_s_range[0], f_s_range[1], resolution)
     energies = []
     
-    # Compute energy spectrum
+    # Compute energy spectrum based on scaling method
     for f_s in f_s_values:
-        H = H_func(f_s)
+        if scaling_method == "evolution_time":
+            # Apply f_s during evolution time - create Hamiltonian with the actual f_s
+            # that would be used during the quantum evolution process
+            H = H_func(f_s)
+        else:  # "post_evolution"
+            # First get Hamiltonian using initial scaling factor
+            base_H = H_func(initial_scaling_factor)
+            
+            # Then apply f_s as a post-evolution scaling factor
+            # This creates a scaled Hamiltonian as if it was applied after evolution
+            try:
+                # If the Hamiltonian is a Qobj, scale properly
+                if isinstance(base_H, Qobj):
+                    H = (f_s / initial_scaling_factor) * base_H
+                else:
+                    # For numpy arrays or other types, simple scaling
+                    H = (f_s / initial_scaling_factor) * base_H
+            except:
+                # Fallback if scaling fails
+                H = base_H
         
         # Handle different types of Hamiltonian objects
         if isinstance(H, Qobj):

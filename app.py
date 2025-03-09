@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 # Third-party imports
 import numpy as np
 import streamlit as st
+import matplotlib.pyplot as plt
 
 # Import constants - must be after numpy import
 from constants import PHI
@@ -400,6 +401,8 @@ def main():
         with tab5:
             st.header("Topological Analysis")
             
+            # First section - general control parameters for topological analysis
+            st.subheader("Topological Protection Parameters")
             control_range = st.slider("Topological Control Parameter Range", 0.0, 10.0, (0.0, 5.0))
             from analyses.topology_plots import plot_invariants, plot_protection_metrics
             
@@ -469,6 +472,73 @@ def main():
                     Note the enhanced protection near the golden ratio φ ≈ 1.618, demonstrating the
                     special role of φ in creating stable topological phases.
                 """)
+            
+            # Second section - specific topological metrics for braiding experiments
+            if mode == "Topological Braiding" and result is not None:
+                st.subheader("Topological Braiding Analysis")
+                
+                # Display topological invariants
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    if hasattr(result, 'chern_number'):
+                        st.metric("Chern Number", result.chern_number)
+                    else:
+                        st.info("Chern number not available for this simulation.")
+                
+                with col2:
+                    if hasattr(result, 'winding_number'):
+                        st.metric("Winding Number", result.winding_number)
+                    else:
+                        st.info("Winding number not available for this simulation.")
+                
+                with col3:
+                    if hasattr(result, 'z2_index'):
+                        st.metric("Z₂ Index", result.z2_index)
+                    else:
+                        st.info("Z₂ index not available for this simulation.")
+                
+                # Display combined metrics
+                col1, col2 = st.columns(2)
+                with col1:
+                    if hasattr(result, 'fractal_chern_correlation'):
+                        st.metric("Fractal-Chern Correlation", result.fractal_chern_correlation)
+                
+                with col2:
+                    if hasattr(result, 'protection_dimension'):
+                        st.metric("Protection Dimension", result.protection_dimension)
+                
+                # Add interactive controls for time evolution analysis
+                if hasattr(result, 'times') and len(result.times) > 1:
+                    st.subheader("Time Evolution Analysis")
+                    time_range = st.slider("Time Range", 
+                                          min_value=float(result.times[0]), 
+                                          max_value=float(result.times[-1]),
+                                          value=(float(result.times[0]), float(result.times[-1])))
+                
+                # Add performance monitoring section
+                if hasattr(result, 'computation_times'):
+                    st.subheader("Performance Monitoring")
+                    total_time = sum(result.computation_times.values())
+                    st.metric("Total Computation Time", f"{total_time:.2f}s")
+                    
+                    # Create performance breakdown chart
+                    fig_perf, ax = plt.subplots(figsize=(10, 6))
+                    labels = list(result.computation_times.keys())
+                    values = list(result.computation_times.values())
+                    ax.bar(labels, values)
+                    ax.set_xlabel('Component')
+                    ax.set_ylabel('Time (s)')
+                    ax.set_title('Computation Time Breakdown')
+                    ax.set_xticks(range(len(labels)))
+                    ax.set_xticklabels(labels, rotation=45, ha='right')
+                    fig_perf.tight_layout()
+                    st.pyplot(fig_perf)
+                    
+                    # Add export functionality
+                    st.download_button("Export Analysis Results", 
+                                       data=str(result.__dict__), 
+                                       file_name="topological_analysis.txt")
        
         # New Scaling Analysis tab
         with tab6:
