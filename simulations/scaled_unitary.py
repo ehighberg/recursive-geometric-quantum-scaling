@@ -14,7 +14,8 @@ from qutip_qip.operations import Gate
 from qutip_qip.circuit import QubitCircuit
 from constants import PHI
 
-#TODO: use these functions instead of existing code with the same purpose, or remove them
+# These functions are the canonical implementations for scaled and phi-recursive unitaries.
+# They are used by the ScaledCircuit class in quantum_circuit.py.
 def get_scaled_unitary(H, time, scaling_factor=1.0):
     """
     Get the linearly scaled unitary operator for a given Hamiltonian.

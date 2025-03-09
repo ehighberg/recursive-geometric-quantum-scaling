@@ -38,7 +38,7 @@ def run_analyses(initial_state, current_state):
     neg_val = negativity(rho_current, sysA=[0])
     vn_ent = von_neumann_entropy(rho_current, base=2)
     co_val = l1_coherence(rho_current, dim=rho_current.shape[0])
-    purity = (rho_current * rho_current).tr().real
+    purity = rho_current.purity()
     
     results = {
         "negativity": neg_val,

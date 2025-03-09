@@ -5,7 +5,7 @@ Visualization functions for quantum state evolution and properties.
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from qutip import Qobj, Bloch, sigmax, sigmay, sigmaz
+from qutip import Qobj, Bloch, sigmax, sigmay, sigmaz, fidelity
 from typing import List, Union, Optional, Tuple, Callable
 from .style_config import configure_axis, COLORS, PLOT_STYLE
 
@@ -240,11 +240,7 @@ def plot_state_evolution(
     ax2.legend()
     
     # Plot 3: Purity
-    purities = []
-    for state in states:
-        if state.isket:
-            state = state * state.dag()
-        purities.append((state * state).tr().real)
+    purities = [state.purity() for state in states]
     
     ax3.plot(times, purities, label='Purity',
             color=COLORS['accent'])
@@ -257,17 +253,7 @@ def plot_state_evolution(
     
     # Plot 4: Fidelity with initial state
     initial_state = states[0]
-    if initial_state.isket:
-        initial_state = initial_state * initial_state.dag()
-    
-    fidelities = []
-    for state in states:
-        if state.isket:
-            state = state * state.dag()
-        # Calculate fidelity using sqrt(ρ1) ρ2 sqrt(ρ1)
-        sqrt_rho1 = initial_state.sqrtm()
-        fid = (sqrt_rho1 * state * sqrt_rho1).tr().real
-        fidelities.append(fid)
+    fidelities = [fidelity(state, initial_state) for state in states]
     
     ax4.plot(times, fidelities, label='Fidelity',
             color=COLORS['highlight'])

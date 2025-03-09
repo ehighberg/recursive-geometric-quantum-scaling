@@ -18,7 +18,7 @@ from qutip import sigmaz, sigmax, basis
 from constants import PHI
 
 # Import components to test
-from simulations.scaled_unitary import get_phi_recursive_unitary
+from simulations.quantum_circuit import get_phi_recursive_unitary
 from simulations.quantum_state import (
     state_fractal, state_fibonacci, state_phi_sensitive, state_recursive_superposition
 )
@@ -86,8 +86,8 @@ class TestPhiResonantFeatures(unittest.TestCase):
     
     def test_phi_sensitive_dimension(self):
         """Test phi-sensitive fractal dimension calculation."""
-        # Create test data
-        data = np.random.rand(1000)
+        # Create test data with explicit size to avoid octal interpretation
+        data = np.random.rand(int(1000))  # Using int() to ensure no octal interpretation
         
         # Compute phi-sensitive dimension at phi
         dim_phi = phi_sensitive_dimension(data, scaling_factor=self.phi)

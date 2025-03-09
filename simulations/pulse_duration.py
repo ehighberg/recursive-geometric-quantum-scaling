@@ -3,7 +3,7 @@ Pulse duration optimization using qutip's control optimization features.
 """
 
 import numpy as np
-from qutip import Qobj, sesolve, mesolve, sigmax, sigmaz
+from qutip import fidelity, sesolve, mesolve, sigmax, sigmaz
 from qutip import basis, sigmay  # Used only in specific functions
 from qutip_qip.pulse import Pulse
 from qutip_qip.circuit import QubitCircuit
@@ -54,11 +54,11 @@ def optimize_pulse_duration(target_unitary, max_time=10.0, num_tslots=100, noise
     U = result.states[-1]
     
     # Calculate fidelity
-    fidelity = abs((target_unitary.dag() * U).tr()) / target_unitary.shape[0]
+    fid = fidelity(U, target_unitary)
     
     return {
         'final_unitary': U,
-        'fidelity': fidelity,
+        'fidelity': fid,
         'pulse': pulse,
         'coeffs': coeffs,
         'tlist': tlist

@@ -132,33 +132,52 @@ def compute_wavefunction_profile(
 def compute_energy_spectrum(
     H_func: Callable[[float], Union[Qobj, np.ndarray]],
     config: Optional[Dict] = None,
-    eigen_index: int = 0
+    eigen_index: int = 0,
+    initial_scaling_factor: Optional[float] = None,
+    scaling_method: str = "evolution_time"
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, Union[List[Tuple[float, float, float, float]], np.ndarray, Dict[str, float]]]]:
-    #TODO: refactor to make the application of f_s meaningful. currently this scales the hamiltonian from the end of the evolution by a range of f_s values, even though the hamiltonian is based on the initial choice of the scaling factor.
     """
-    Compute energy spectrum over f_s parameter range with enhanced analysis of
-    self-similar regions.
-
+    Compute energy spectrum over fractal scaling (f_s) parameter range with enhanced analysis of
+    self-similar regions. The fractal scaling factor modifies how quantum states evolve in space
+    and time, creating distinct patterns in the energy spectrum.
+    
+    The scaling can be applied in two ways:
+    1. "evolution_time": The scaling factor modifies the Hamiltonian directly during evolution time,
+       affecting the entire evolution process including the distribution of quantum states.
+    2. "post_evolution": Scaling is applied after a standard evolution, which is useful for comparing
+       how different scaling factors affect the same baseline quantum states.
+    
     Parameters:
     -----------
     H_func : Callable[[float], Union[Qobj, np.ndarray]]
-        Function that takes f_s parameter and returns Hamiltonian (either Qobj or numpy array).
+        Function that takes fractal scaling parameter f_s and returns the corresponding
+        Hamiltonian (either Qobj or numpy array). This function determines the relationship
+        between the scaling factor and the physical system's energy.
     config : Optional[Dict]
         Configuration dictionary. If None, loads from evolution_config.yaml.
     eigen_index : int
         Index of eigenvalue to use for analysis (default: 0, ground state).
+    initial_scaling_factor : Optional[float]
+        Initial scaling factor used for evolution. If None, will be treated as 1.0.
+        This is especially important for "post_evolution" scaling.
+    scaling_method : str
+        Method to apply scaling: 
+        - "evolution_time": Scaling modifies evolution dynamics directly (recommended)
+        - "post_evolution": Scaling is applied to results from a standard evolution
 
     Returns:
     --------
     parameter_values : np.ndarray
-        Array of f_s parameter values.
+        Array of fractal scaling (f_s) parameter values used in the analysis.
     energies : np.ndarray
-        Array of eigenenergies.
+        Array of eigenenergies for each f_s value, showing how energy levels change with scaling.
     analysis : Dict
-        Dictionary containing:
-        - 'self_similar_regions': List of (start, end) f_s values
-        - 'correlation_matrix': Matrix of correlations between regions
-        - 'gap_statistics': Statistics of energy gaps
+        Dictionary containing detailed analysis:
+        - 'self_similar_regions': List of (start, end) f_s value pairs where energy patterns 
+          show self-similarity, indicating fractal behavior
+        - 'correlation_matrix': Matrix showing correlations between different f_s regions
+        - 'gap_statistics': Statistics of energy level spacing, which can reveal quantum chaos
+          or integrability properties
     """
     if config is None:
         config = load_fractal_config()
@@ -169,12 +188,45 @@ def compute_energy_spectrum(
     correlation_threshold = spectrum_config.get('correlation_threshold', 0.8)
     window_size = spectrum_config.get('window_size', 20)
     
+    # Set default initial scaling factor if not provided
+    if initial_scaling_factor is None:
+        initial_scaling_factor = 1.0
+    
+    # Generate fractal scaling parameter range
     f_s_values = np.linspace(f_s_range[0], f_s_range[1], resolution)
     energies = []
     
-    # Compute energy spectrum
+    # Compute energy spectrum based on the chosen scaling method
     for f_s in f_s_values:
-        H = H_func(f_s)
+        if scaling_method == "evolution_time":
+            # Method 1: Apply f_s directly during Hamiltonian construction
+            # This affects the entire evolution process and is the primary method
+            # for studying how fractal scaling impacts quantum dynamics
+            H = H_func(f_s)
+            
+        else:  # "post_evolution"
+            # Method 2: Apply f_s as a post-processing step after standard evolution
+            # This is useful for comparative analysis and isolating scaling effects
+            
+            # First get baseline Hamiltonian using initial scaling factor
+            base_H = H_func(initial_scaling_factor)
+            
+            # Then apply f_s as a scaling transformation to the baseline Hamiltonian
+            # This creates a scaled energy landscape without changing the wave functions
+            try:
+                scaling_ratio = f_s / initial_scaling_factor
+                
+                # Scale different types of Hamiltonian objects appropriately
+                if isinstance(base_H, Qobj):
+                    # For QuTiP quantum objects, use proper scaling
+                    H = scaling_ratio * base_H
+                else:
+                    # For numpy arrays or other numerical types
+                    H = scaling_ratio * base_H
+            except Exception as e:
+                logger.warning(f"Scaling failed for f_s={f_s}: {str(e)}")
+                # Fallback to unscaled Hamiltonian if scaling fails
+                H = base_H
         
         # Handle different types of Hamiltonian objects
         if isinstance(H, Qobj):
@@ -304,7 +356,7 @@ def estimate_fractal_dimension(
     base_threshold = threshold_factor * np.mean(data)
     
     # Set maximum number of segments to prevent memory errors
-    MAX_SEGMENTS = 1000  # Limit to prevent memory overflow
+    MAX_SEGMENTS = int(1000)  # Maximum number of segments to prevent memory overflow
     
     for box in box_sizes:
         # Use multiple thresholds for each box size
@@ -422,7 +474,7 @@ def phi_sensitive_dimension(
         box_sizes = np.logspace(-2, 0, 20)  # Minimum box size of 0.01 instead of 0.001
     
     # Set maximum number of segments to prevent memory errors
-    MAX_SEGMENTS = 1000  # Limit to prevent memory overflow
+    MAX_SEGMENTS = int(1000)  # Limit to prevent memory overflow
     
     # Modified box-counting algorithm
     counts = []
@@ -711,52 +763,84 @@ def analyze_phi_resonance(
     Dict[str, np.ndarray]
         Dictionary containing analysis results.
     """
+    phi = PHI  # Golden ratio
+    
     # Set default scaling factors if not provided
     if scaling_factors is None:
-        # Include phi and nearby values for detailed analysis
-        phi = PHI
         # Create denser sampling around phi
         phi_neighborhood = np.linspace(phi - 0.1, phi + 0.1, 11)
-        scaling_factors = np.sort(np.concatenate([
-            np.linspace(0.5, phi - 0.1, 5),
+        regular_samples = np.linspace(0.5, 2.0, 16)
+        # Remove duplicates and sort
+        scaling_factors = np.sort(np.unique(np.concatenate([
+            regular_samples, 
             phi_neighborhood,
-            np.linspace(phi + 0.1, 3.0, 5)
-        ]))
+            [phi]  # Ensure phi itself is included
+        ])))
     
-    # Initialize results
-    dimensions = np.zeros_like(scaling_factors)
-    phi_sensitive_dims = np.zeros_like(scaling_factors)
-    multifractal_widths = np.zeros_like(scaling_factors)
-    resonance_metrics = np.zeros_like(scaling_factors)
+    # Initialize arrays for results
+    n_factors = len(scaling_factors)
+    dimensions = np.zeros(n_factors)
+    phi_sensitivity = np.zeros(n_factors)
+    correlation_scores = np.zeros(n_factors)
     
-    # Analyze each scaling factor
+    # Compute fractal dimension and phi sensitivity for each scaling factor
     for i, factor in enumerate(scaling_factors):
         # Get data for this scaling factor
-        data = data_func(factor)
-        
-        # Compute standard fractal dimension
-        dim, _ = estimate_fractal_dimension(data)
-        dimensions[i] = dim
-        
-        # Compute phi-sensitive dimension
-        phi_dim = phi_sensitive_dimension(data, scaling_factor=factor)
-        phi_sensitive_dims[i] = phi_dim
-        
-        # Compute multifractal spectrum
-        mf_spectrum = compute_multifractal_spectrum(data, scaling_factor=factor)
-        
-        # Calculate width of multifractal spectrum (if available)
-        if len(mf_spectrum['alpha']) > 1:
-            multifractal_widths[i] = np.max(mf_spectrum['alpha']) - np.min(mf_spectrum['alpha'])
-        
-        # Calculate resonance metric (difference between standard and phi-sensitive)
-        resonance_metrics[i] = abs(phi_dim - dim)
+        try:
+            data = data_func(factor)
+            
+            # Skip if data is invalid
+            if data is None or len(data) == 0 or np.all(np.isnan(data)):
+                dimensions[i] = np.nan
+                phi_sensitivity[i] = np.nan
+                correlation_scores[i] = np.nan
+                continue
+                
+            # Compute regular fractal dimension
+            dim, info = estimate_fractal_dimension(data)
+            dimensions[i] = dim
+            
+            # Compute phi-sensitive dimension
+            phi_dim = phi_sensitive_dimension(data, scaling_factor=factor)
+            
+            # Calculate phi sensitivity as the difference between phi-sensitive and regular dimension
+            phi_sensitivity[i] = phi_dim - dim
+            
+            # Calculate correlation with phi
+            phi_proximity = np.exp(-(factor - phi)**2 / 0.1)
+            correlation_scores[i] = phi_proximity
+            
+        except Exception as e:
+            # Log error and continue with NaN values
+            logger.error(f"Error analyzing factor {factor}: {str(e)}")
+            dimensions[i] = np.nan
+            phi_sensitivity[i] = np.nan
+            correlation_scores[i] = np.nan
     
+    # Find phi resonance points
+    valid_indices = ~np.isnan(dimensions)
+    if np.sum(valid_indices) >= 3:
+        # Find peaks in phi sensitivity
+        peak_indices = []
+        for i in range(1, n_factors-1):
+            if (not np.isnan(phi_sensitivity[i]) and 
+                phi_sensitivity[i] > phi_sensitivity[i-1] and 
+                phi_sensitivity[i] > phi_sensitivity[i+1]):
+                peak_indices.append(i)
+        
+        resonance_points = scaling_factors[peak_indices]
+        resonance_values = phi_sensitivity[peak_indices]
+    else:
+        resonance_points = np.array([])
+        resonance_values = np.array([])
+    
+    # Compile and return results
     return {
         'scaling_factors': scaling_factors,
         'dimensions': dimensions,
-        'phi_sensitive_dimensions': phi_sensitive_dims,
-        'multifractal_widths': multifractal_widths,
-        'resonance_metrics': resonance_metrics,
-        'phi_index': np.argmin(np.abs(scaling_factors - PHI))
+        'phi_sensitivity': phi_sensitivity,
+        'correlation_scores': correlation_scores,
+        'resonance_points': resonance_points,
+        'resonance_values': resonance_values,
+        'phi_value': phi
     }

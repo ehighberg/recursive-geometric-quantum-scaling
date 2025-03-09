@@ -102,10 +102,21 @@ def test_plot_styles_and_formatting():
     
     # Check line styles and colors
     lines2 = ax2.get_lines()
-    assert len(lines2) == 3
-    assert lines2[0].get_color() == "blue"   # Chern number color
-    assert lines2[1].get_color() == "green"  # Winding number color
-    assert lines2[2].get_color() == "red"    # Z₂ index color
+    assert len(lines2) == 5  # Now we have 5 lines (3 scatter plot lines + 2 interpolated lines)
+    
+    # Check the scatter plot lines (first 3 lines)
+    assert lines2[0].get_color() == "blue"   # Chern number scatter color
+    assert lines2[1].get_color() == "green"  # Winding number scatter color
+    assert lines2[2].get_color() == "red"    # Z₂ index scatter color
+    
+    # Check the interpolated lines (last 2 lines)
+    assert lines2[3].get_color() == "blue"   # Chern number interpolated line
+    assert lines2[4].get_color() == "green"  # Winding number interpolated line
+    
+    # Check the markers are used for the scatter plots
+    assert lines2[0].get_marker() == 'o'
+    assert lines2[1].get_marker() == 'o'
+    assert lines2[2].get_marker() == 'o'
     
     plt.close(fig1)
     plt.close(fig2)

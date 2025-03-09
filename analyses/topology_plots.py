@@ -26,20 +26,111 @@ def plot_invariants(control_range):
     if control_range[1] <= control_range[0]:
         raise ValueError("Invalid control range: max value must be greater than min value")
 
-    # For demonstration, generate placeholder data.
-    # In practice, these values should be computed using functions
-    # from analyses/topological_invariants.py.
-    #TODO: replace with actual invariant computation
+    # Generate parameter space for invariant calculation
     x = np.linspace(control_range[0], control_range[1], 100)
-    # Example: pretend invariants vary sinusoidally (for demonstration purposes)
-    chern_values = np.sin(x) * 1.5  # e.g., range -1.5 to 1.5
-    winding_values = np.cos(x)       # e.g., range -1 to 1
-    z2_values = (np.mod(np.round(np.sin(x) + 1), 2))  # alternating 0 and 1
     
+    # Import topological invariant functions
+    from analyses.topological_invariants import (
+        compute_chern_number,
+        compute_winding_number,
+        compute_z2_index,
+        compute_phi_sensitive_winding
+    )
+    from constants import PHI
+    
+    # Generate eigenstates for different parameter values
+    # We'll create a model Hamiltonian that depends on the parameter
+    from qutip import sigmax, sigmaz, qeye, Qobj, tensor
+    
+    # Create a family of Hamiltonians and compute their eigenstates
+    eigenstates_1d = []  # For winding and Z2
+    eigenstates_2d = []  # For Chern
+    
+    # Compute eigenstates for each parameter value
+    for param in x:
+        # 1D parameter model (for winding/Z2)
+        h_param = np.cos(param) * sigmaz() + np.sin(param) * sigmax()
+        _, states_1d = h_param.eigenstates()
+        eigenstates_1d.append(states_1d[0])  # Ground state
+        
+        # 2D parameter model (for Chern number)
+        # We'll create a 3x3 grid of parameter values around each point
+        grid = []
+        for i in range(3):
+            row = []
+            for j in range(3):
+                # Create 2D parameter variation around the current point
+                # Make sure all operators have compatible dimensions
+                sz = sigmaz()
+                sx = sigmax()
+                id2 = qeye(2)
+                
+                # Use tensor products consistently for 2D parameter space
+                h_2d = (np.cos(param) * tensor(sz, id2) + 
+                       np.sin(param) * tensor(sx, id2) + 
+                       0.1 * (i-1) * tensor(id2, id2) +
+                       0.1 * (j-1) * tensor(sx, sz))
+                _, states_2d = h_2d.eigenstates()
+                row.append(states_2d[0])  # Ground state
+            grid.append(row)
+        eigenstates_2d.append(grid)
+    
+    # Calculate invariants
+    # For computational efficiency, we'll calculate at fewer points
+    stride = 5  # Calculate every 5th point to reduce computation time
+    sparse_x = x[::stride]
+    
+    # Compute invariants at the sparse points
+    winding_values = np.zeros_like(sparse_x)
+    z2_values = np.zeros_like(sparse_x)
+    chern_values = np.zeros_like(sparse_x)
+    phi_winding_values = np.zeros_like(sparse_x)
+    
+    for i, param in enumerate(sparse_x):
+        # Create k-points for a circle in parameter space
+        k_points = np.linspace(0, 2*np.pi, 24)
+        sparse_states = eigenstates_1d[i*stride:(i+1)*stride] if i < len(sparse_x)-1 else eigenstates_1d[i*stride:]
+        
+        # Compute winding number
+        winding_values[i] = compute_winding_number(sparse_states, k_points)
+        
+        # Compute Z2 index
+        z2_values[i] = compute_z2_index(sparse_states, k_points)
+        
+        # Compute Chern number (using a small grid around each point)
+        # We'll use a 3x3 grid of k-points for Chern number calculation
+        k_mesh = (np.array([-0.1, 0, 0.1]), np.array([-0.1, 0, 0.1]))
+        chern_values[i] = compute_chern_number(eigenstates_2d[i*stride], k_mesh)
+        
+        # Compute phi-sensitive winding number
+        phi_winding_values[i] = compute_phi_sensitive_winding(
+            sparse_states, k_points, PHI)
+    
+    # Interpolate to get smooth curves for all points
+    from scipy.interpolate import interp1d
+    
+    # Create interpolation functions
+    f_winding = interp1d(sparse_x, winding_values, kind='cubic', fill_value='extrapolate')
+    f_z2 = interp1d(sparse_x, z2_values, kind='nearest', fill_value='extrapolate')
+    f_chern = interp1d(sparse_x, chern_values, kind='cubic', fill_value='extrapolate')
+    f_phi_winding = interp1d(sparse_x, phi_winding_values, kind='cubic', fill_value='extrapolate')
+    
+    # Evaluate interpolation functions at all points
+    winding_values_full = f_winding(x)
+    z2_values_full = f_z2(x)
+    chern_values_full = f_chern(x)
+    phi_winding_values_full = f_phi_winding(x)
+    
+    # Create arrays with matching dimensions for plotting
+    # We'll use sparse_x for sparse arrays and x for interpolated values
     fig, ax = plt.subplots(figsize=(8, 6))
-    ax.plot(x, chern_values, label="Chern Number", color="blue")
-    ax.plot(x, winding_values, label="Winding Number", color="green")
-    ax.plot(x, z2_values, label="Z₂ Index", color="red", linestyle="--")
+    ax.plot(sparse_x, chern_values, 'o-', label="Chern Number", color="blue", markersize=4)
+    ax.plot(sparse_x, winding_values, 'o-', label="Winding Number", color="green", markersize=4)
+    ax.plot(sparse_x, z2_values, 'o-', label="Z₂ Index", color="red", linestyle="--", markersize=4)
+    
+    # Also plot the interpolated full values as lines
+    ax.plot(x, chern_values_full, '-', color="blue", alpha=0.3)
+    ax.plot(x, winding_values_full, '-', color="green", alpha=0.3)
     
     ax.set_xlabel("Control Parameter")
     ax.set_ylabel("Invariant Value")

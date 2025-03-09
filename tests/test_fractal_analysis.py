@@ -8,6 +8,11 @@ import pytest
 from qutip import basis, sigmax, sigmaz
 from pathlib import Path
 import matplotlib.pyplot as plt
+import sys
+import os
+
+# Add the project root to the path so imports work correctly
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from analyses.fractal_analysis import (
     load_fractal_config,

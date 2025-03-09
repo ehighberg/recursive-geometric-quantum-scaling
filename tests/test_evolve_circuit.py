@@ -3,7 +3,7 @@ Tests for circuit evolution implementations.
 """
 
 import numpy as np
-from qutip import sigmaz, tensor, qeye, ket2dm
+from qutip import sigmaz, tensor, qeye, ket2dm, fidelity
 from simulations.scripts.evolve_circuit import (
     run_standard_twoqubit_circuit,
     run_phi_scaled_twoqubit_circuit,
@@ -82,8 +82,7 @@ def test_circuit_gate_operations():
         final_state = ket2dm(final_state)
     
     # Verify state changed
-    fidelity = abs((initial_state * final_state).tr())
-    assert fidelity < 0.99  # State should have evolved
+    assert fidelity(initial_state, final_state) < 0.99  # State should have evolved
     
     # Test phi-scaled circuit
     result_phi = run_phi_scaled_twoqubit_circuit(scaling_factor=1.0)
@@ -97,8 +96,7 @@ def test_circuit_gate_operations():
         final_state = ket2dm(final_state)
     
     # Verify state changed with scaling
-    fidelity = abs((initial_state * final_state).tr())
-    assert fidelity < 0.99  # State should have evolved
+    assert fidelity(initial_state, final_state) < 0.99  # State should have evolved
 
 def test_noise_effects_on_entanglement():
     """Test how noise affects entanglement in circuits."""
@@ -119,8 +117,8 @@ def test_noise_effects_on_entanglement():
         rho_noisy = ket2dm(rho_noisy)
     
     # Calculate purities
-    purity_clean = (rho_clean * rho_clean).tr().real
-    purity_noisy = (rho_noisy * rho_noisy).tr().real
+    purity_clean = rho_clean.purity()
+    purity_noisy = rho_noisy.purity()
     
     # Noisy evolution should reduce purity
     assert purity_noisy <= purity_clean + 1e-7  # Allow for numerical precision
