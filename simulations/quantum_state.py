@@ -11,6 +11,12 @@ import numpy as np
 from qutip import Qobj, basis, tensor, sigmax, qeye
 from constants import PHI
 
+# Define parameters with default values
+# These values would normally come from the config module
+PHI_GAUSSIAN_WIDTH = 0.1
+PHI_WEIGHT_CUTOFF = 0.9
+PHI_INTERMEDIATE_CUTOFF = 0.5
+
 def state_zero(num_qubits=1):
     """All-|0> state."""
     if num_qubits == 1:
@@ -324,10 +330,15 @@ def state_fibonacci(num_qubits=8):
     return Qobj(coeffs, dims=dims)
 
 
-def state_phi_sensitive(num_qubits=1, scaling_factor=None):
+def state_phi_sensitive(num_qubits=1, scaling_factor=None, gaussian_width=None,
+                       phi_weight_cutoff=None, phi_intermediate_cutoff=None):
     """
     Create a quantum state that exhibits different behavior 
     based on proximity to the golden ratio.
+    
+    This function generates quantum states that vary based on how close the
+    scaling factor is to φ. The behavior changes smoothly from product states
+    far from φ to maximally entangled states near φ.
     
     Parameters:
     -----------
@@ -335,42 +346,86 @@ def state_phi_sensitive(num_qubits=1, scaling_factor=None):
         Number of qubits
     scaling_factor : float or None
         Scaling factor that influences state structure
+                                   (Default: PHI)
+    gaussian_width : float or None
+        Width of Gaussian for phi-proximity
+                                   (Default: PHI_GAUSSIAN_WIDTH)
+    phi_weight_cutoff : float or None
+        Threshold for maximally entangled states
+                                      (Default: PHI_WEIGHT_CUTOFF)
+    phi_intermediate_cutoff : float or None
+        Threshold for intermediate entanglement
+                                           (Default: PHI_INTERMEDIATE_CUTOFF)
         
     Returns:
     --------
     Qobj
         Quantum state with phi-sensitive properties
+    
+    Notes:
+    ------
+    For the single-qubit case, this creates a superposition with weights
+    determined by φ-proximity. For multiple qubits, it creates a smooth
+    transition between GHZ, W, and product states based on proximity to φ.
     """
+    # Use default values from config if not specified
+    if gaussian_width is None:
+        gaussian_width = PHI_GAUSSIAN_WIDTH
+    if phi_weight_cutoff is None:
+        phi_weight_cutoff = PHI_WEIGHT_CUTOFF
+    if phi_intermediate_cutoff is None:
+        phi_intermediate_cutoff = PHI_INTERMEDIATE_CUTOFF
+    
     # Use PHI as default scaling factor
     if scaling_factor is None:
         scaling_factor = PHI
     
     # Calculate proximity to phi
     phi = PHI
-    phi_proximity = np.exp(-(scaling_factor - phi)**2 / 0.1)  # Gaussian centered at phi
+    phi_proximity = np.exp(-(scaling_factor - phi)**2 / gaussian_width)
     
     if num_qubits == 1:
         # For 1 qubit, create superposition weighted by phi proximity
+        # Use a smooth function of phi_proximity to determine the superposition angle
         alpha = np.cos(phi_proximity * np.pi/4)
         beta = np.sin(phi_proximity * np.pi/4)
         return (alpha * basis(2, 0) + beta * basis(2, 1)).unit()
     
-    # For multiple qubits, create a more complex structure
-    # Start with a uniform superposition
-    state = state_plus(num_qubits)
+    # For multiple qubits, create a smooth transition between state types
     
-    # Create different entanglement structures based on phi proximity
-    if phi_proximity > 0.9:  # Very close to phi
-        # Create GHZ-like state
-        return state_ghz(num_qubits)
-    elif phi_proximity > 0.5:  # Moderately close
-        # Create W-like state
-        return state_w(num_qubits)
-    else:  # Far from phi
-        # Create product state with phase differences
-        phases = [np.exp(1j * scaling_factor * i * np.pi / num_qubits) for i in range(num_qubits)]
-        single_states = [(basis(2, 0) + phases[i] * basis(2, 1)).unit() for i in range(num_qubits)]
-        return tensor(*single_states)
+    # First, create GHZ and W states as reference points
+    ghz_state = state_ghz(num_qubits)
+    w_state = state_w(num_qubits)
+    
+    # Create product state with phase differences
+    phases = [np.exp(1j * scaling_factor * i * np.pi / num_qubits) for i in range(num_qubits)]
+    single_states = [(basis(2, 0) + phases[i] * basis(2, 1)).unit() for i in range(num_qubits)]
+    product_state = tensor(*single_states)
+    
+    # Now create smooth blending based on phi_proximity
+    if phi_proximity > phi_weight_cutoff:
+        # Near phi: blend between GHZ and W states
+        blend_factor = (phi_proximity - phi_weight_cutoff) / (1.0 - phi_weight_cutoff)
+        blend_factor = min(max(blend_factor, 0.0), 1.0)  # Clamp to [0,1]
+        
+        # Linear interpolation of state vectors (then renormalize)
+        # Note: This is a simplification; properly we should use something 
+        # like a geodesic interpolation on the quantum state manifold
+        result_state = (blend_factor * ghz_state + (1.0 - blend_factor) * w_state).unit()
+        return result_state
+        
+    elif phi_proximity > phi_intermediate_cutoff:
+        # Intermediate proximity: blend between W and product states
+        blend_factor = (phi_proximity - phi_intermediate_cutoff) / (phi_weight_cutoff - phi_intermediate_cutoff)
+        blend_factor = min(max(blend_factor, 0.0), 1.0)  # Clamp to [0,1]
+        
+        # Linear interpolation (then renormalize)
+        result_state = (blend_factor * w_state + (1.0 - blend_factor) * product_state).unit()
+        return result_state
+        
+    else:
+        # Far from phi: use product state
+        return product_state
 
 
 def state_recursive_superposition(num_qubits=8, depth=3, scaling_factor=None):

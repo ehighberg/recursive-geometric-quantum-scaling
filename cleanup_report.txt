@@ -1,0 +1,13 @@
+Cleanup Report - 2025-03-09 18:24:31.315435
+
+Parameters:
+- Age threshold: 2.0 days (before 2025-03-07 17:24:22)
+- Dry run: False
+- Backup: True
+- Backup directory: file_backups_20250309_182431
+
+Total files deleted: 1
+==================================================
+
+Deleted files:
+- report\phi_resonant_small.png
