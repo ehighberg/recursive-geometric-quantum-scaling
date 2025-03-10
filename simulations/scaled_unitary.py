@@ -1,18 +1,76 @@
 """
 Scaled unitary operator implementation using qutip's features.
 
-This module includes implementations for:
+This module provides implementations for:
 - Linear scaling of unitary operators
 - Non-linear phi-resonant scaling
 - Recursive geometric scaling with golden ratio properties
+
+All functions are designed to avoid arbitrary parameter values and provide
+configurable parameters with physically-justified defaults.
 """
 
 import numpy as np
-from qutip import Qobj, propagator, sigmax, sigmaz
+from qutip import Qobj, propagator, sigmax, sigmaz, qeye
 from qutip.solver import Result
 from qutip_qip.operations import Gate
 from qutip_qip.circuit import QubitCircuit
 from constants import PHI
+from simulations.config import (
+    PHI_GAUSSIAN_WIDTH, PHI_THRESHOLD, CORRECTION_CUTOFF,
+    UNITARITY_RTOL, UNITARITY_ATOL
+)
+
+def _ensure_unitarity(U):
+    """
+    Helper function to ensure a matrix is unitary by performing SVD normalization.
+    
+    Parameters:
+    -----------
+    U (Qobj): Input operator to normalize
+    
+    Returns:
+    --------
+    Qobj: Unitarized operator
+    """
+    # Perform singular value decomposition
+    u, s, vh = np.linalg.svd(U.full())
+    
+    # Reconstruct with all singular values = 1
+    unitarized = np.dot(u, vh)
+    
+    # Return as Qobj with same dimensions
+    return Qobj(unitarized, dims=U.dims)
+
+def _calculate_phi_proximity(scaling_factor, gaussian_width=None):
+    """
+    Calculate a smooth proximity measure to the golden ratio.
+    
+    This function creates a Gaussian bell curve centered at φ, giving a
+    continuous measure of how close a value is to φ.
+    
+    Parameters:
+    -----------
+    scaling_factor (float): The value to check against φ
+    gaussian_width (float, optional): Width parameter for the Gaussian
+    
+    Returns:
+    --------
+    float: Proximity measure in range [0,1] where 1 means exactly φ
+    """
+    if gaussian_width is None:
+        gaussian_width = PHI_GAUSSIAN_WIDTH
+        
+    phi = PHI  # Golden ratio from constants
+    
+    # Avoid division by zero if gaussian_width is too small
+    if gaussian_width <= 1e-10:
+        gaussian_width = 1e-10
+        
+    # Calculate Gaussian centered at phi
+    proximity = np.exp(-((scaling_factor - phi)**2) / gaussian_width)
+    
+    return proximity
 
 # These functions are the canonical implementations for scaled and phi-recursive unitaries.
 # They are used by the ScaledCircuit class in quantum_circuit.py.
@@ -20,39 +78,89 @@ def get_scaled_unitary(H, time, scaling_factor=1.0):
     """
     Get the linearly scaled unitary operator for a given Hamiltonian.
     
+    This uses matrix logarithm and exponentiation to perform continuous scaling
+    of a unitary operator: U^s = exp(s * log(U)) where s is scaling_factor.
+    
     Parameters:
-    - H (Qobj): Hamiltonian operator
-    - time (float): Evolution time
-    - scaling_factor (float): Factor to scale the unitary
+    -----------
+    H (Qobj): Hamiltonian operator
+    time (float): Evolution time
+    scaling_factor (float): Factor to scale the unitary
     
     Returns:
-    - Qobj: Scaled unitary operator
+    --------
+    Qobj: Scaled unitary operator
+    
+    Notes:
+    ------
+    The mathematical validity of this method depends on the logarithm being 
+    well-defined for the unitary operator. For scaling factors close to 1.0, 
+    the approximation is highly accurate.
     """
     # Get unitary for original Hamiltonian
     U = propagator(H, time)
     
-    # Scale the unitary using matrix exponentiation
-    # U^s = exp(s * log(U)) where s is the scaling factor
+    # Special case: scaling_factor = 1.0 returns the original unitary
     if scaling_factor == 1.0:
         return U
     else:
+        # For non-unity scaling, use matrix logarithm and exponentiation
         logU = U.logm()  # Matrix logarithm
-        return (scaling_factor * logU).expm()
+        scaled_U = (scaling_factor * logU).expm()
+        
+        # Ensure the result preserves unitarity (within numerical precision)
+        unitarity_check = (scaled_U * scaled_U.dag())
+        dims = unitarity_check.dims
+        I = Qobj(np.eye(scaled_U.shape[0]), dims=dims)
+        if not np.allclose((scaled_U * scaled_U.dag()).full(), I.full(), 
+                           rtol=UNITARITY_RTOL, atol=UNITARITY_ATOL):
+            # Apply re-normalization to ensure unitarity
+            scaled_U = _ensure_unitarity(scaled_U)
+        
+        return scaled_U
 
 
-def get_phi_recursive_unitary(H, time, scaling_factor=1.0, recursion_depth=3):
+def get_phi_recursive_unitary(H, time, scaling_factor=1.0, recursion_depth=3,
+                             gaussian_width=None, phi_threshold=None, 
+                             correction_cutoff=None):
     """
     Create a unitary with recursive golden-ratio-based structure.
     
+    This function implements a phi-resonant scaling of quantum operations. When the
+    scaling factor is close to φ, it creates a recursive pattern based on the Fibonacci
+    sequence. Otherwise, it applies a standard scaling with nonlinear corrections.
+    
     Parameters:
-    - H (Qobj): Hamiltonian operator
-    - time (float): Evolution time
-    - scaling_factor (float): Factor to scale the unitary
-    - recursion_depth (int): Depth of recursion for phi-based patterns
+    -----------
+    H (Qobj): Hamiltonian operator
+    time (float): Evolution time
+    scaling_factor (float): Factor to scale the unitary
+    recursion_depth (int): Depth of recursion for phi-based patterns
+    gaussian_width (float, optional): Width of the Gaussian for phi-proximity
+                                     (Default: PHI_GAUSSIAN_WIDTH)
+    phi_threshold (float, optional): Threshold for phi proximity effect
+                                    (Default: PHI_THRESHOLD)
+    correction_cutoff (float, optional): Cutoff to decide if correction is applied
+                                        (Default: CORRECTION_CUTOFF)
     
     Returns:
-    - Qobj: Scaled unitary with potential phi-resonance
+    --------
+    Qobj: Scaled unitary with potential phi-resonance
+    
+    Notes:
+    ------
+    The recursive structure at φ models the self-similar patterns of golden-ratio-based
+    systems in nature. The recursive formula: U_φ = U_φ/φ * U_φ/φ² creates a pattern
+    that exhibits fibonacci-like properties in the quantum evolution.
     """
+    # Use default values from config if not specified
+    if gaussian_width is None:
+        gaussian_width = PHI_GAUSSIAN_WIDTH
+    if phi_threshold is None:
+        phi_threshold = PHI_THRESHOLD
+    if correction_cutoff is None:
+        correction_cutoff = CORRECTION_CUTOFF
+        
     # Use matrix exponentiation directly instead of propagator to avoid integration issues
     U_base = (-1j * H * time).expm()
     
@@ -60,16 +168,21 @@ def get_phi_recursive_unitary(H, time, scaling_factor=1.0, recursion_depth=3):
     if recursion_depth <= 0 or scaling_factor == 1.0:
         return U_base
     
-    # Create recursive structure based on Fibonacci/golden ratio pattern
     phi = PHI  # Golden ratio
     
     # Calculate proximity to phi for resonance effects
-    phi_proximity = np.exp(-(scaling_factor - phi)**2 / 0.1)  # Gaussian centered at phi
+    phi_proximity = _calculate_phi_proximity(scaling_factor, gaussian_width)
     
-    if phi_proximity > 0.9:  # Close to phi
+    if phi_proximity > phi_threshold:  # Close to phi
         # At phi, create recursive operator structure 
-        U_phi1 = get_phi_recursive_unitary(H, time/phi, scaling_factor/phi, recursion_depth-1)
-        U_phi2 = get_phi_recursive_unitary(H, time/phi**2, scaling_factor/phi**2, recursion_depth-1)
+        U_phi1 = get_phi_recursive_unitary(
+            H, time/phi, scaling_factor/phi, recursion_depth-1,
+            gaussian_width, phi_threshold, correction_cutoff
+        )
+        U_phi2 = get_phi_recursive_unitary(
+            H, time/phi**2, scaling_factor/phi**2, recursion_depth-1,
+            gaussian_width, phi_threshold, correction_cutoff
+        )
         return U_phi1 * U_phi2
     else:
         # For non-phi values, use different composition rule
@@ -78,7 +191,7 @@ def get_phi_recursive_unitary(H, time, scaling_factor=1.0, recursion_depth=3):
         
         # Add non-linear term that's most significant near phi
         correction_factor = scaling_factor/(1 + abs(scaling_factor - phi))
-        correction = (correction_factor * logU**2).expm() if correction_factor > 0.2 else Qobj(np.eye(U_base.shape[0]))
+        correction = (correction_factor * logU**2).expm() if correction_factor > correction_cutoff else Qobj(np.eye(U_base.shape[0]))
         
         return U_scaled * correction
 
