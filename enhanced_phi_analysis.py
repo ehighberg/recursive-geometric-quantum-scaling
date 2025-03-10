@@ -16,38 +16,20 @@ These visualizations are specifically designed to address the requirements outli
 paper "A φ-Driven Framework for Quantum Dynamics: Bridging Fractal Recursion and Topological Protection".
 """
 
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import pandas as pd
 from pathlib import Path
 from constants import PHI
-from tqdm import tqdm
 import matplotlib.image as mpimg
-from PIL import Image, ImageDraw, ImageFont
 from matplotlib.patches import Rectangle, FancyArrowPatch
-from matplotlib.colors import LinearSegmentedColormap
 
-# Import original analysis functions
-from run_phi_resonant_analysis import run_phi_analysis, create_comparative_plots
-
-# Import simulation components
-from simulations.scripts.evolve_state import (
-    run_state_evolution,
-    run_phi_recursive_evolution,
-    run_comparative_analysis
-)
-from analyses.fractal_analysis import (
-    phi_sensitive_dimension,
-    analyze_phi_resonance,
-    estimate_fractal_dimension,
-    compute_wavefunction_profile
-)
-from analyses.topological_invariants import (
-    compute_phi_sensitive_winding,
-    compute_phi_sensitive_z2,
-    compute_phi_resonant_berry_phase
-)
+# Import original analysis function
+from run_phi_resonant_analysis import run_phi_analysis
 
 
 def plot_fractal_dim_vs_recursion(metrics, output_dir):
@@ -162,7 +144,7 @@ def plot_fractal_dim_vs_recursion(metrics, output_dir):
     print(f"Fractal dimension vs. recursion depth plot saved to {output_dir / 'fractal_dim_vs_recursion.png'}")
 
 
-def calculate_protection_metric(scaling_factor, perturbation_strength, results):
+def calculate_protection_metric(scaling_factor, perturbation_strength, simulation_results):
     """
     Calculate protection metric (energy gap, etc.) for given parameters.
     
@@ -172,7 +154,7 @@ def calculate_protection_metric(scaling_factor, perturbation_strength, results):
         Scaling factor used in the simulation.
     perturbation_strength : float
         Strength of the perturbation applied.
-    results : dict
+    simulation_results : dict
         Dictionary containing simulation results.
         
     Returns:
@@ -181,7 +163,7 @@ def calculate_protection_metric(scaling_factor, perturbation_strength, results):
         Protection metric value.
     """
     # Find closest scaling factor in results
-    factors = np.array(results.get('scaling_factors', [scaling_factor]))
+    factors = np.array(simulation_results.get('scaling_factors', [scaling_factor]))
     idx = np.argmin(np.abs(factors - scaling_factor))
     
     # Check if we have valid index
@@ -191,8 +173,8 @@ def calculate_protection_metric(scaling_factor, perturbation_strength, results):
     factor = factors[idx]
     
     # Get the relevant results
-    std_results = results.get('standard_results', {})
-    phi_results = results.get('phi_recursive_results', {})
+    std_results = simulation_results.get('standard_results', {})
+    phi_results = simulation_results.get('phi_recursive_results', {})
     
     # Calculate phi proximity
     phi = PHI
@@ -230,13 +212,13 @@ def calculate_protection_metric(scaling_factor, perturbation_strength, results):
     return max(0.0, min(protection, 2.0))  # Clamp to reasonable range [0, 2]
 
 
-def plot_robustness_under_perturbations(results, output_dir):
+def plot_robustness_under_perturbations(simulation_results, output_dir):
     """
     Create plot showing robustness under perturbations.
     
     Parameters:
     -----------
-    results : dict
+    simulation_results : dict
         Dictionary containing simulation results.
     output_dir : Path
         Directory to save plots.
@@ -261,15 +243,15 @@ def plot_robustness_under_perturbations(results, output_dir):
     # For each perturbation strength, calculate protection metric
     for strength in perturbation_strengths:
         # Calculate protection at phi
-        phi_protection = calculate_protection_metric(phi, strength, results)
+        phi_protection = calculate_protection_metric(phi, strength, simulation_results)
         protection_metrics['phi'].append(phi_protection)
         
         # Calculate protection at unit scaling
-        unit_protection = calculate_protection_metric(unit, strength, results)
+        unit_protection = calculate_protection_metric(unit, strength, simulation_results)
         protection_metrics['unit'].append(unit_protection)
         
         # Calculate protection at arbitrary scaling
-        arb_protection = calculate_protection_metric(arbitrary, strength, results)
+        arb_protection = calculate_protection_metric(arbitrary, strength, simulation_results)
         protection_metrics['arbitrary'].append(arb_protection)
     
     # Create plot
@@ -342,7 +324,7 @@ def plot_robustness_under_perturbations(results, output_dir):
             from itertools import groupby
             from operator import itemgetter
             
-            for k, g in groupby(enumerate(advantage_regions), lambda ix: ix[0] - ix[1]):
+            for _, g in groupby(enumerate(advantage_regions), lambda ix: ix[0] - ix[1]):
                 region = list(map(itemgetter(1), g))
                 if len(region) > 0:
                     start_idx = region[0]
@@ -439,10 +421,11 @@ def create_parameter_tables(output_dir):
     """
     
     # Save HTML
-    with open(output_dir / "parameter_overview.html", 'w') as f:
+    with open(output_dir / "parameter_overview.html", 'w', encoding='utf-8') as f:
         f.write(styled_html)
     
     # Create computational complexity table
+    # TODO: dynamically generate this table
     complexity = [
         {'System Size': '1 qubit', 'Method': 'State Evolution', 'Time': '~20 sec', 'Memory': '~50 MB', 'Error': '<0.1%'},
         {'System Size': '2 qubits', 'Method': 'State Evolution', 'Time': '~2 min', 'Memory': '~200 MB', 'Error': '<0.5%'},
@@ -501,7 +484,7 @@ def create_parameter_tables(output_dir):
     """
     
     # Save HTML
-    with open(output_dir / "computational_complexity.html", 'w') as f:
+    with open(output_dir / "computational_complexity.html", 'w', encoding='utf-8') as f:
         f.write(styled_html)
     
     # Create phase diagram summary table
@@ -568,7 +551,7 @@ def create_parameter_tables(output_dir):
     """
     
     # Save HTML
-    with open(output_dir / "phase_diagram_summary.html", 'w') as f:
+    with open(output_dir / "phase_diagram_summary.html", 'w', encoding='utf-8') as f:
         f.write(styled_html)
     
     # Convert HTML tables to images using matplotlib
@@ -612,7 +595,9 @@ def create_table_image(df, title, output_path, header_color='#4CAF50', highlight
     highlight_row : int, optional
         Index of row to highlight (if any).
     """
-    fig, ax = plt.figure(figsize=(12, len(df) * 0.6 + 1.5)), plt.subplot(111)
+    # Create figure and axis separately to avoid syntax issues
+    _ = plt.figure(figsize=(12, len(df) * 0.6 + 1.5))
+    ax = plt.subplot(111)
     ax.axis('off')
     
     # Create the table
@@ -630,7 +615,7 @@ def create_table_image(df, title, output_path, header_color='#4CAF50', highlight
     table.scale(1.2, 1.5)
     
     # Style header row
-    for j, key in enumerate(df.columns):
+    for j in range(len(df.columns)):
         cell = table[0, j]
         cell.set_facecolor(header_color)
         cell.set_text_props(color='white', fontweight='bold')
@@ -883,7 +868,7 @@ def enhance_wavefunction_profile(output_dir):
         # Create a new wavefunction profile visualization as fallback
         create_wavefunction_profile(output_dir)
 
-
+# TODO: either remove the wavefunction profile or base it on data from the simulation
 def create_wavefunction_profile(output_dir):
     """
     Create a new wavefunction profile visualization with self-similarity features.
@@ -997,11 +982,11 @@ def run_enhanced_phi_analysis(output_dir=None, num_qubits=1, n_steps=100):
     
     # Run standard phi analysis
     print("Running standard phi resonant analysis...")
-    results = run_phi_analysis(output_dir=output_dir, num_qubits=num_qubits, n_steps=n_steps)
+    simulation_results = run_phi_analysis(output_dir=output_dir, num_qubits=num_qubits, n_steps=n_steps)
     
     # Extract metrics for additional plotting
     metrics = {
-        'scaling_factors': results.get('scaling_factors', []),
+        'scaling_factors': simulation_results.get('scaling_factors', []),
         'state_overlaps': [],
         'dimension_differences': [],
         'phi_proximities': [],
@@ -1012,18 +997,18 @@ def run_enhanced_phi_analysis(output_dir=None, num_qubits=1, n_steps=100):
     }
     
     # Extract metrics if they exist in the results
-    if 'comparative_metrics' in results:
-        for factor in results.get('scaling_factors', []):
-            if factor in results['comparative_metrics']:
-                comp_metrics = results['comparative_metrics'][factor]
+    if 'comparative_metrics' in simulation_results:
+        for factor in simulation_results.get('scaling_factors', []):
+            if factor in simulation_results['comparative_metrics']:
+                comp_metrics = simulation_results['comparative_metrics'][factor]
                 
                 metrics['state_overlaps'].append(comp_metrics.get('state_overlap', np.nan))
                 metrics['dimension_differences'].append(comp_metrics.get('dimension_difference', np.nan))
                 metrics['phi_proximities'].append(comp_metrics.get('phi_proximity', np.nan))
                 
                 # Get standard fractal dimension if available
-                if 'standard_results' in results and factor in results['standard_results']:
-                    std_result = results['standard_results'][factor]
+                if 'standard_results' in simulation_results and factor in simulation_results['standard_results']:
+                    std_result = simulation_results['standard_results'][factor]
                     if hasattr(std_result, 'fractal_dimensions'):
                         metrics['standard_dimensions'].append(np.nanmean(std_result.fractal_dimensions))
                     else:
@@ -1032,8 +1017,8 @@ def run_enhanced_phi_analysis(output_dir=None, num_qubits=1, n_steps=100):
                     metrics['standard_dimensions'].append(np.nan)
                 
                 # Get phi-sensitive dimension if available
-                if 'phi_recursive_results' in results and factor in results['phi_recursive_results']:
-                    phi_result = results['phi_recursive_results'][factor]
+                if 'phi_recursive_results' in simulation_results and factor in simulation_results['phi_recursive_results']:
+                    phi_result = simulation_results['phi_recursive_results'][factor]
                     if hasattr(phi_result, 'phi_dimension'):
                         metrics['phi_dimensions'].append(phi_result.phi_dimension)
                     else:
@@ -1062,7 +1047,7 @@ def run_enhanced_phi_analysis(output_dir=None, num_qubits=1, n_steps=100):
     plot_fractal_dim_vs_recursion(metrics, output_dir)
     
     # 2. Robustness Under Perturbations Graph
-    plot_robustness_under_perturbations(results, output_dir)
+    plot_robustness_under_perturbations(simulation_results, output_dir)
     
     # 3. Parameter, complexity, and phase diagram tables
     create_parameter_tables(output_dir)
@@ -1074,12 +1059,12 @@ def run_enhanced_phi_analysis(output_dir=None, num_qubits=1, n_steps=100):
     enhance_wavefunction_profile(output_dir)
     
     print("\nEnhanced analysis complete.")
-    return results
+    return simulation_results
 
 
 if __name__ == "__main__":
     # Run enhanced phi-resonant analysis
-    results = run_enhanced_phi_analysis(output_dir="report", num_qubits=1, n_steps=100)
+    analysis_results = run_enhanced_phi_analysis(output_dir="report", num_qubits=1, n_steps=100)
     
     print(f"\nPhi = {PHI:.6f}")
     print("\nAll enhanced visualizations have been generated in the report directory.")
