@@ -52,7 +52,10 @@ from analyses.topological_invariants import (
 
 def plot_fractal_dim_vs_recursion(metrics, output_dir):
     """
-    Create plot showing fractal dimension vs. recursion depth.
+    Create plot showing fractal dimension vs. recursion depth based on actual data.
+    
+    This function computes actual fractal dimensions for different recursion depths
+    rather than using arbitrary mathematical functions to simulate the data.
     
     Parameters:
     -----------
@@ -61,60 +64,51 @@ def plot_fractal_dim_vs_recursion(metrics, output_dir):
     output_dir : Path
         Directory to save plots.
     """
-    print("Creating fractal dimension vs. recursion depth plot...")
+    print("Creating fractal dimension vs. recursion depth plot based on actual computation...")
     
     # Setup recursion depths to analyze
-    recursion_depths = np.arange(1, 9)  # From 1 to 8 levels of recursion
+    recursion_depths = np.arange(1, 6)  # Reasonable range for computation
     
-    # Find phi index in scaling factors
+    # Select key scaling factors to analyze
     phi = PHI
-    phi_idx = np.argmin(np.abs(metrics['scaling_factors'] - phi))
-    phi_factor = metrics['scaling_factors'][phi_idx]
+    unit_factor = 1.0
+    arb_factor = 2.5  # Arbitrary factor away from phi and unit
     
-    # Initialize dimensions arrays for different scaling factors
+    # Initialize dimensions arrays
     phi_dimensions = []
     unit_dimensions = []
     arbitrary_dimensions = []
     
-    # Find unit scaling and arbitrary scaling indices
-    unit_idx = np.argmin(np.abs(metrics['scaling_factors'] - 1.0))
-    unit_factor = metrics['scaling_factors'][unit_idx]
+    # For each recursion depth, compute actual fractal dimensions
+    # First import state generation and fractal analysis functions
+    from simulations.quantum_state import state_recursive_superposition
+    from analyses.fractal_analysis import estimate_fractal_dimension
     
-    # Choose an arbitrary factor away from phi and unit
-    arb_candidates = [f for f in metrics['scaling_factors'] 
-                      if abs(f - phi) > 0.3 and abs(f - 1.0) > 0.3]
-    arb_factor = arb_candidates[0] if arb_candidates else 2.5
-    arb_idx = np.argmin(np.abs(metrics['scaling_factors'] - arb_factor))
-    
-    # Get base dimensions from metrics
-    if 'standard_dimensions' in metrics and len(metrics['standard_dimensions']) > phi_idx:
-        phi_base_dim = metrics['standard_dimensions'][phi_idx] if not np.isnan(metrics['standard_dimensions'][phi_idx]) else 1.2
-        unit_base_dim = metrics['standard_dimensions'][unit_idx] if not np.isnan(metrics['standard_dimensions'][unit_idx]) else 1.0
-        arb_base_dim = metrics['standard_dimensions'][arb_idx] if not np.isnan(metrics['standard_dimensions'][arb_idx]) else 1.1
-    else:
-        # Fallback values if metrics not available
-        phi_base_dim = 1.2
-        unit_base_dim = 1.0
-        arb_base_dim = 1.1
-    
-    # Generate dimension patterns for each recursion depth
     for depth in recursion_depths:
-        # Phi-scaled recursion effect (converges to specific value)
-        phi_effect = phi_base_dim * (1.0 - np.exp(-0.5 * depth)) + 0.05 * np.sin(depth * np.pi / phi)
-        phi_dimensions.append(phi_effect)
+        # Create quantum states with the specified recursion depth
+        phi_state = state_recursive_superposition(num_qubits=4, depth=depth, scaling_factor=phi)
+        unit_state = state_recursive_superposition(num_qubits=4, depth=depth, scaling_factor=unit_factor)
+        arb_state = state_recursive_superposition(num_qubits=4, depth=depth, scaling_factor=arb_factor)
         
-        # Unit-scaled recursion effect (linear growth with saturation)
-        unit_effect = unit_base_dim * (1.0 - np.exp(-0.3 * depth))
-        unit_dimensions.append(unit_effect)
+        # Extract probability amplitudes
+        phi_data = np.abs(phi_state.full().flatten())**2
+        unit_data = np.abs(unit_state.full().flatten())**2
+        arb_data = np.abs(arb_state.full().flatten())**2
         
-        # Arbitrary-scaled recursion effect (oscillatory)
-        arb_effect = arb_base_dim * (1.0 - np.exp(-0.4 * depth)) + 0.08 * np.sin(depth * np.pi / arb_factor)
-        arbitrary_dimensions.append(arb_effect)
+        # Compute fractal dimensions using proper algorithm
+        phi_dim, _ = estimate_fractal_dimension(phi_data)
+        unit_dim, _ = estimate_fractal_dimension(unit_data)
+        arb_dim, _ = estimate_fractal_dimension(arb_data)
+        
+        # Store dimensions
+        phi_dimensions.append(phi_dim)
+        unit_dimensions.append(unit_dim)
+        arbitrary_dimensions.append(arb_dim)
     
     # Create plot
     plt.figure(figsize=(10, 6))
-    plt.plot(recursion_depths, phi_dimensions, 'o-', color='#1f77b4', 
-             label=f'Phi-Scaled (f_s = {phi_factor:.3f})')
+    plt.plot(recursion_depths, phi_dimensions, 'o-', color='#1f77b4',
+             label=f'Phi-Scaled (f_s = {PHI:.3f})')
     plt.plot(recursion_depths, unit_dimensions, 's-', color='#ff7f0e', 
              label=f'Unit-Scaled (f_s = {unit_factor:.3f})')
     plt.plot(recursion_depths, arbitrary_dimensions, '^-', color='#2ca02c', 
@@ -164,7 +158,10 @@ def plot_fractal_dim_vs_recursion(metrics, output_dir):
 
 def calculate_protection_metric(scaling_factor, perturbation_strength, results):
     """
-    Calculate protection metric (energy gap, etc.) for given parameters.
+    Calculate protection metric (energy gap) based on actual simulation results.
+    
+    This function computes protection from energy gaps in a consistent way across
+    all scaling factors, without artificially boosting protection near phi.
     
     Parameters:
     -----------
@@ -186,7 +183,7 @@ def calculate_protection_metric(scaling_factor, perturbation_strength, results):
     
     # Check if we have valid index
     if idx >= len(factors):
-        return 1.0  # Default fallback value
+        return 0.0  # No protection
     
     factor = factors[idx]
     
@@ -194,40 +191,44 @@ def calculate_protection_metric(scaling_factor, perturbation_strength, results):
     std_results = results.get('standard_results', {})
     phi_results = results.get('phi_recursive_results', {})
     
-    # Calculate phi proximity
-    phi = PHI
-    phi_proximity = np.exp(-(scaling_factor - phi)**2 / 0.1)  # Gaussian centered at phi
+    # Try to extract energy gap from the simulations
+    energy_gap = None
+    if factor in std_results:
+        # Try to get energy gap from standard results
+        std_result = std_results[factor]
+        if hasattr(std_result, 'energy_gap'):
+            energy_gap = std_result.energy_gap
+        # If not directly available, try to compute from Hamiltonian
+        elif hasattr(std_result, 'base_hamiltonian') and hasattr(std_result, 'applied_scaling_factor'):
+            try:
+                from qutip import Qobj
+                H = std_result.base_hamiltonian
+                if isinstance(H, Qobj):
+                    eigenvalues = H.eigenenergies()
+                    if len(eigenvalues) >= 2:
+                        energy_gap = abs(eigenvalues[1] - eigenvalues[0]) * std_result.applied_scaling_factor
+            except:
+                pass
     
-    # Default energy gap
-    energy_gap = 1.0
+    # If still not found, try phi_recursive_results
+    if energy_gap is None and factor in phi_results:
+        phi_result = phi_results[factor]
+        if hasattr(phi_result, 'energy_gap'):
+            energy_gap = phi_result.energy_gap
     
-    # Try to extract energy gap information if available
-    if factor in std_results and hasattr(std_results[factor], 'energy_gap'):
-        energy_gap = std_results[factor].energy_gap
-    elif factor in phi_results and hasattr(phi_results[factor], 'energy_gap'):
-        energy_gap = phi_results[factor].energy_gap
+    # If we couldn't extract any energy gap, use a default
+    if energy_gap is None or energy_gap <= 0:
+        # Default gap is small but positive to allow perturbation effect
+        energy_gap = 0.1  
     
-    # Apply perturbation effect (exponential decay with strength)
-    perturbed_gap = energy_gap * np.exp(-5.0 * perturbation_strength)
+    # Apply perturbation effect consistently across all factors
+    # Higher perturbation = smaller gap (exponential decay)
+    perturbed_gap = energy_gap * np.exp(-3.0 * perturbation_strength)
     
-    # Apply factor-dependent protection (stronger at phi)
-    protection = perturbed_gap * (1.0 + phi_proximity * (1.0 - perturbation_strength)**2)
+    # Protection is directly related to the perturbed gap
+    protection = perturbed_gap
     
-    # If no gap data available, model based on scaling factor relationship to phi
-    if energy_gap == 1.0:
-        # Phi-proximity model: protection peaks near phi
-        peak_term = 1.2 * np.exp(-(scaling_factor - phi)**2 / 0.05)
-        
-        # Unit-proximity model: secondary peak near unit scaling
-        unit_term = 0.8 * np.exp(-(scaling_factor - 1.0)**2 / 0.1)
-        
-        # Combine models
-        base_protection = peak_term + unit_term
-        
-        # Apply perturbation effect
-        protection = base_protection * np.exp(-3.0 * perturbation_strength)
-    
-    return max(0.0, min(protection, 2.0))  # Clamp to reasonable range [0, 2]
+    return max(0.0, protection)  # Ensure non-negative
 
 
 def plot_robustness_under_perturbations(results, output_dir):

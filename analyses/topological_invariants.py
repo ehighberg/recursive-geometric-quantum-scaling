@@ -189,7 +189,12 @@ def compute_z2_index(eigenstates, k_points):
 
 def compute_phi_sensitive_winding(eigenstates, k_points, scaling_factor):
     """
-    Compute winding number with phi-sensitive scaling properties.
+    Compute winding number using proper topological definition.
+    
+    This function calculates the winding number in a way that respects the
+    mathematical definition without artificially enhancing effects near phi.
+    Any special behavior near the golden ratio will emerge naturally from
+    the underlying quantum dynamics.
     
     Parameters:
         eigenstates (list of Qobj]): List of eigenstates indexed by momentum.
@@ -197,7 +202,7 @@ def compute_phi_sensitive_winding(eigenstates, k_points, scaling_factor):
         scaling_factor (float): Scaling factor used in the simulation.
         
     Returns:
-        float: Winding number with potential phi-resonance.
+        float: Winding number (topological invariant).
     """
     phases = []
     for psi in eigenstates:
@@ -209,39 +214,37 @@ def compute_phi_sensitive_winding(eigenstates, k_points, scaling_factor):
             _, states = psi.eigenstates()
             psi = states[0]
             
-        # Extract phase with geometric scaling considerations
+        # Extract phase properly without artificial weighting
         psi_vec = psi.full().flatten()
         significant_indices = np.where(np.abs(psi_vec) > 1e-8)[0]
         
         if len(significant_indices) > 0:
             idx = significant_indices[0]
-            
-            # Extract phase with sensitivity to golden ratio
-            phi = PHI
-            phase_factor = np.exp(-(scaling_factor - phi)**2)  # Max sensitivity at phi
-            phase = np.angle(psi_vec[idx]) * phase_factor
+            phase = np.angle(psi_vec[idx])
         else:
             phase = 0.0
             
         phases.append(phase)
     
-    # Compute winding with phi-dependent unwrapping
+    # Compute winding using standard method
     phases = np.unwrap(phases)
     delta_phase = phases[-1] - phases[0]
     
-    # Non-linear scaling near phi
-    phi = PHI
-    phi_proximity = 1.0 / (1.0 + 10.0 * abs(scaling_factor - phi))
+    # Standard winding number definition
+    winding = delta_phase / (2.0 * np.pi)
     
-    # Enhanced sensitivity near phi
-    winding = (delta_phase / (2.0 * np.pi)) * (1.0 + phi_proximity)
-    
-    return float(winding)  # Return floating point value for detecting subtle effects
+    # Return the actual topological invariant without artificial enhancement
+    return float(winding)
 
 
 def compute_phi_sensitive_z2(eigenstates, k_points, scaling_factor):
     """
-    Compute Z2 index with phi-sensitive properties.
+    Compute Z2 index using proper mathematical definition.
+    
+    This function calculates the Z2 topological invariant without
+    artificially enhancing phi-related effects. Any special behavior
+    at the golden ratio should emerge from the physics, not from
+    artificial modifications to the topological invariant.
     
     Parameters:
         eigenstates (list of Qobj]): List of eigenstates indexed by momentum.
@@ -249,30 +252,14 @@ def compute_phi_sensitive_z2(eigenstates, k_points, scaling_factor):
         scaling_factor (float): Scaling factor used in the simulation.
         
     Returns:
-        float: Z2 index with potential phi-resonance.
+        int: Z2 index (0 or 1) as a proper topological invariant.
     """
-    phi = PHI
-    
-    # For values near phi, compute modified Z2 index
-    phi_proximity = np.exp(-(scaling_factor - phi)**2 / 0.1)  # Gaussian centered at phi
-    
-    # Standard Z2 calculation (either 0 or 1)
+    # Compute the standard Z2 index (either 0 or 1)
+    # This is the mathematically correct definition
     standard_z2 = compute_z2_index(eigenstates, k_points)
     
-    # For values close to phi, enhance sensitivity
-    if phi_proximity > 0.9:
-        # Calculate phi-sensitive winding
-        winding = compute_phi_sensitive_winding(eigenstates, k_points, scaling_factor)
-        
-        # Compute non-integer Z2 index that can reveal subtle topology
-        enhanced_z2 = abs(winding) % 2
-        
-        # Make index slightly non-integer to show phi sensitivity
-        z2_index = enhanced_z2 + 0.01 * phi_proximity * np.sin(scaling_factor * np.pi)
-    else:
-        z2_index = float(standard_z2)
-    
-    return z2_index
+    # Return the proper Z2 index without artificial modifications
+    return standard_z2
 
 
 def compute_berry_phase(eigenstates, closed_path=True):
@@ -346,7 +333,12 @@ def compute_berry_phase(eigenstates, closed_path=True):
 
 def compute_phi_resonant_berry_phase(eigenstates, scaling_factor, closed_path=True):
     """
-    Compute Berry phase with enhanced sensitivity to the golden ratio.
+    Compute Berry phase using proper geometric definition.
+    
+    This function calculates the Berry phase without artificially enhancing
+    phi-related effects. The Berry phase is a geometric property of the
+    quantum state evolution, and any special behavior near phi should
+    emerge naturally from the underlying physics.
     
     Parameters:
         eigenstates (list of Qobj]): List of eigenstates along the path.
@@ -354,25 +346,7 @@ def compute_phi_resonant_berry_phase(eigenstates, scaling_factor, closed_path=Tr
         closed_path (bool): Whether the path is closed.
         
     Returns:
-        float: Berry phase with potential phi-resonance.
+        float: Berry phase in radians, normalized to [-π, π].
     """
-    # Standard Berry phase calculation
-    standard_phase = compute_berry_phase(eigenstates, closed_path)
-    
-    # Calculate phi proximity
-    phi = PHI
-    phi_proximity = np.exp(-(scaling_factor - phi)**2 / 0.05)  # Sharper Gaussian at phi
-    
-    # For values near phi, apply non-linear amplification
-    if phi_proximity > 0.5:
-        # Apply non-linear function that peaks at phi
-        # This creates a resonance effect in the Berry phase
-        resonance_factor = np.sin(np.pi * scaling_factor / phi) * phi_proximity
-        
-        # Modified Berry phase with resonance
-        modified_phase = standard_phase * (1 + 0.2 * resonance_factor)
-        
-        # Ensure result is in valid range
-        return np.mod(modified_phase + np.pi, 2 * np.pi) - np.pi
-    else:
-        return standard_phase
+    # Use the standard Berry phase calculation
+    return compute_berry_phase(eigenstates, closed_path)

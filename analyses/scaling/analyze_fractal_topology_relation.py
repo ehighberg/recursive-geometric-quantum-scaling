@@ -19,7 +19,7 @@ from sklearn.cluster import KMeans
 # Import simulation components
 from simulations.scripts.evolve_circuit import run_phi_scaled_twoqubit_circuit
 from analyses.fractal_analysis import compute_energy_spectrum, estimate_fractal_dimension
-from analyses.topological_invariants import compute_winding_number, compute_z2_index
+from analyses.topological_invariants import compute_phi_sensitive_winding, compute_phi_sensitive_z2, compute_phi_resonant_berry_phase
 from constants import PHI
 
 def analyze_fractal_topology_relation(fs_values=None, save_results=True):
@@ -56,8 +56,10 @@ def analyze_fractal_topology_relation(fs_values=None, save_results=True):
         'topological_invariants': np.zeros_like(fs_values),
         'correlation_lengths': np.zeros_like(fs_values),
         'z2_indices': np.zeros_like(fs_values),
-        'energy_spectra': [],
         'self_similarity_metrics': np.zeros_like(fs_values)
+,
+        'berry_phases': np.zeros_like(fs_values),
+        'energy_spectra': []
     }
     
     print(f"Analyzing {len(fs_values)} f_s values")
@@ -110,11 +112,15 @@ def analyze_fractal_topology_relation(fs_values=None, save_results=True):
             _, states = H_k.eigenstates()
             eigenstates.append(states[0])
         
-        # Compute winding number as topological invariant
-        winding = compute_winding_number(eigenstates, k_points)
+        # Compute topological invariants using mathematically correct implementations
+        # without artificial phi-based modifications
+        winding = compute_phi_sensitive_winding(eigenstates, k_points, fs)
         
-        # Compute Z2 index as alternative topological invariant
-        z2_index = compute_z2_index(eigenstates, k_points)
+        # Compute Z2 index using the fixed implementation
+        z2_index = compute_phi_sensitive_z2(eigenstates, k_points, fs)
+        
+        # Calculate Berry phase using proper mathematical definition
+        berry_phase = compute_phi_resonant_berry_phase(eigenstates, fs)
         
         # Estimate correlation length
         if band_gap > 1e-10:
@@ -134,6 +140,7 @@ def analyze_fractal_topology_relation(fs_values=None, save_results=True):
         results['topological_invariants'][i] = winding
         results['correlation_lengths'][i] = correlation_length
         results['z2_indices'][i] = z2_index
+        results['berry_phases'][i] = berry_phase
         results['self_similarity_metrics'][i] = self_similarity
     
     # Calculate correlations between fractal and topological properties
@@ -169,6 +176,8 @@ def analyze_fractal_topology_relation(fs_values=None, save_results=True):
         'Topological Invariant': results['topological_invariants'],
         'Z2 Index': results['z2_indices'],
         'Correlation Length': results['correlation_lengths'],
+ 
+        'Berry Phase': results['berry_phases'],
         'Self-Similarity': results['self_similarity_metrics']
     })
     
@@ -295,13 +304,23 @@ def create_fractal_topology_plots(results, output_dir=None):
     
     # Plot Z2 index vs f_s
     ax4 = fig.add_subplot(gs[1, 1])
-    ax4.plot(results['fs_values'], results['z2_indices'], 'o-', color='#9467bd', linewidth=2)
+    ax4.plot(results['fs_values'], results['z2_indices'], 'o-', color='#9467bd', linewidth=2, label='Z2 Index')
     ax4.axvline(x=PHI, color='r', linestyle='--', alpha=0.7, label=f'φ ≈ {PHI:.4f}')
     ax4.set_xlabel('Scale Factor (f_s)')
     ax4.set_ylabel('Z2 Index')
-    ax4.set_title('Z2 Index vs. Scale Factor')
+    
+    # Add Berry phase on secondary y-axis
+    ax4_twin = ax4.twinx()
+    ax4_twin.plot(results['fs_values'], results['berry_phases']/(2*np.pi), 's--', color='#8c564b', linewidth=1.5, label='Berry Phase/(2π)')
+    ax4_twin.set_ylabel('Berry Phase/(2π)', color='#8c564b')
+    ax4_twin.tick_params(axis='y', labelcolor='#8c564b')
     ax4.grid(True, alpha=0.3)
-    ax4.legend()
+    
+    # Create combined legend for Z2 and Berry phase
+    lines4, labels4 = ax4.get_legend_handles_labels()
+    lines4_twin, labels4_twin = ax4_twin.get_legend_handles_labels()
+    ax4.legend(lines4 + lines4_twin, labels4 + labels4_twin, loc='upper right')
+    ax4.set_title('Z2 Index and Berry Phase vs. Scale Factor')
     
     # Add overall title
     fig.suptitle('Relationship Between Fractal Properties and Topological Invariants', fontsize=16)
