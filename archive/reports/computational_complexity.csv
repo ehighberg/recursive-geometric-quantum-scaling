@@ -1,0 +1,6 @@
+System Size,Method,Time,Memory,Error
+1 qubit,State Evolution,~20 sec,~50 MB,<0.1%
+2 qubits,State Evolution,~2 min,~200 MB,<0.5%
+3 qubits,State Evolution,~10 min,~800 MB,<1%
+4 qubits,State Evolution,~1 hour,~3 GB,<2%
+5 qubits,State Evolution,~8 hours,~12 GB,<5%
