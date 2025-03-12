@@ -60,6 +60,7 @@ results/
 *.npz
 test_*.png
 test_*.gif
+archive/
 
 # Jupyter Notebook
 .ipynb_checkpoints
