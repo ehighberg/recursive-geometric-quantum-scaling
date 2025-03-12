@@ -61,6 +61,8 @@ results/
 test_*.png
 test_*.gif
 archive/
+file_backups_*/
+cleanup_report.txt
 
 # Jupyter Notebook
 .ipynb_checkpoints
