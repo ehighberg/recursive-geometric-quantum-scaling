@@ -526,7 +526,10 @@ def plot_wavepacket_spacetime(
     ax = fig.add_subplot(111)
 
     # Plot spacetime diagram
-    extent = [coordinates[0], coordinates[-1], times[0], times[-1]] if times else [0, 1, 0, 1]
+    if isinstance(times, (list, np.ndarray)) and len(times) > 0:
+        extent = [coordinates[0], coordinates[-1], times[0], times[-1]]
+    else:
+        extent = [0.0, 1.0, 0.0, 1.0]
     im = ax.imshow(spacetime, aspect='auto', origin='lower',
                   extent=extent, cmap=colormap)
 

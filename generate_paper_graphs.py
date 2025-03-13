@@ -700,12 +700,26 @@ def generate_topological_invariants_graph(output_dir):
         # Calculate winding number (topological invariant)
         from analyses.topological_invariants import compute_standard_winding
         winding = compute_standard_winding(eigenstates, k_points, f_s)
-        winding_numbers.append(np.round(winding))  # Round to nearest integer
+        
+        # Extract winding number from result (handles both float and dict returns)
+        if isinstance(winding, dict) and 'winding' in winding:
+            winding_value = winding['winding']
+        else:
+            winding_value = winding
+            
+        winding_numbers.append(np.round(winding_value))  # Round to nearest integer
         
         # Calculate Berry phase
         from analyses.topological_invariants import compute_berry_phase_standard
         berry_phase = compute_berry_phase_standard(eigenstates, f_s)
-        berry_phases.append(berry_phase)
+        
+        # Extract berry phase from result (handles both float and dict returns)
+        if isinstance(berry_phase, dict) and 'berry_phase' in berry_phase:
+            berry_phase_value = berry_phase['berry_phase']
+        else:
+            berry_phase_value = berry_phase
+            
+        berry_phases.append(berry_phase_value)
     
     # Convert to numpy arrays
     winding_numbers = np.array(winding_numbers, dtype=float)
