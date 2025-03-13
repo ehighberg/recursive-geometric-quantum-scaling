@@ -1,8 +1,8 @@
 """
 Module: topological_invariants.py
 This module provides functions to compute topological invariants such as Chern numbers, 
-winding numbers, and ℤ₂ indices. It also includes phi-sensitive topological metrics
-that can reveal special behavior at or near the golden ratio.
+winding numbers, and ℤ₂ indices for quantum systems. It implements standard mathematical
+definitions for these invariants that can be applied to systems with any scaling factor.
 """
 
 import numpy as np
@@ -187,19 +187,19 @@ def compute_z2_index(eigenstates, k_points):
     return abs(winding) % 2
 
 
-def compute_phi_sensitive_winding(eigenstates, k_points, scaling_factor):
+def compute_standard_winding(eigenstates, k_points, scaling_factor=None):
     """
-    Compute winding number using proper topological definition.
+    Compute winding number using standard topological definition.
     
-    This function calculates the winding number in a way that respects the
-    mathematical definition without artificially enhancing effects near phi.
-    Any special behavior near the golden ratio will emerge naturally from
-    the underlying quantum dynamics.
+    This function calculates the winding number following the mathematical
+    definition of a topological invariant, applicable to any scaling factor.
     
     Parameters:
         eigenstates (list of Qobj]): List of eigenstates indexed by momentum.
         k_points (np.ndarray): 1D numpy array of momentum values.
-        scaling_factor (float): Scaling factor used in the simulation.
+        scaling_factor (float, optional): Scaling factor used in the simulation.
+            This parameter is included for API compatibility but does not affect
+            the calculation.
         
     Returns:
         float: Winding number (topological invariant).
@@ -237,19 +237,20 @@ def compute_phi_sensitive_winding(eigenstates, k_points, scaling_factor):
     return float(winding)
 
 
-def compute_phi_sensitive_z2(eigenstates, k_points, scaling_factor):
+def compute_standard_z2_index(eigenstates, k_points, scaling_factor=None):
     """
-    Compute Z2 index using proper mathematical definition.
+    Compute Z2 index using standard mathematical definition.
     
-    This function calculates the Z2 topological invariant without
-    artificially enhancing phi-related effects. Any special behavior
-    at the golden ratio should emerge from the physics, not from
-    artificial modifications to the topological invariant.
+    This function calculates the Z2 topological invariant following
+    the standard mathematical definition used in topological band theory.
+    It can be applied to systems with any scaling factor.
     
     Parameters:
         eigenstates (list of Qobj]): List of eigenstates indexed by momentum.
         k_points (np.ndarray): 1D numpy array of momentum values.
-        scaling_factor (float): Scaling factor used in the simulation.
+        scaling_factor (float, optional): Scaling factor used in the simulation.
+            This parameter is included for API compatibility but does not affect
+            the calculation.
         
     Returns:
         int: Z2 index (0 or 1) as a proper topological invariant.
@@ -331,18 +332,19 @@ def compute_berry_phase(eigenstates, closed_path=True):
     return berry_phase
 
 
-def compute_phi_resonant_berry_phase(eigenstates, scaling_factor, closed_path=True):
+def compute_berry_phase_standard(eigenstates, scaling_factor=None, closed_path=True):
     """
-    Compute Berry phase using proper geometric definition.
+    Compute Berry phase using standard geometric definition.
     
-    This function calculates the Berry phase without artificially enhancing
-    phi-related effects. The Berry phase is a geometric property of the
-    quantum state evolution, and any special behavior near phi should
-    emerge naturally from the underlying physics.
+    This function calculates the Berry phase following the standard geometric
+    definition used in quantum mechanics. The Berry phase represents the 
+    geometric phase acquired during adiabatic evolution along a closed path.
     
     Parameters:
         eigenstates (list of Qobj]): List of eigenstates along the path.
-        scaling_factor (float): Scaling factor used in the simulation.
+        scaling_factor (float, optional): Scaling factor used in the simulation.
+            This parameter is included for API compatibility but does not affect
+            the calculation.
         closed_path (bool): Whether the path is closed.
         
     Returns:
