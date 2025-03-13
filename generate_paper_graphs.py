@@ -646,20 +646,17 @@ def generate_topological_invariants_graph(output_dir):
     """
     print("Generating topological invariants graph...")
     
-    # Define scaling factors to analyze
-    scaling_factors = np.linspace(0.5, 3.0, 20)
-    
-    # Add statistical validation
-    from analyses.statistical_validation import StatisticalValidator
-    validator = StatisticalValidator()
+    # Define scaling factors to analyze with higher density near phi
+    phi = PHI
+    scaling_factors = np.sort(np.unique(np.concatenate([
+        np.linspace(0.5, 3.0, 15),  # Regular grid
+        np.linspace(phi - 0.2, phi + 0.2, 10)  # Higher density near phi
+    ])))
     
     # Run quantum simulations for each scaling factor
-    scatter_dims = []
-    scatter_invariants = []
-    
-    # Store all states and eigenstate information for statistical analysis
-    all_states = {}
-    all_eigenstates = {}
+    winding_numbers = []
+    berry_phases = []
+    fractal_dims = []
     
     # Use proper topological invariant calculations from fixed implementation
     for f_s in tqdm(scaling_factors, desc="Computing topological invariants"):
@@ -678,7 +675,6 @@ def generate_topological_invariants_graph(output_dir):
         
         # Extract final state
         final_state = result.states[-1]
-        all_states[f_s] = final_state
         
         # Calculate fractal dimension using fixed implementation
         from analyses.fractal_analysis_fixed import fractal_dimension
@@ -686,6 +682,7 @@ def generate_topological_invariants_graph(output_dir):
         # Convert to a format suitable for fractal dimension calculation
         state_data = np.abs(final_state.full().flatten())**2
         fd = fractal_dimension(state_data)
+        fractal_dims.append(fd)
         
         # Create a parameter space for topological invariant calculation
         k_points = np.linspace(0, 2*np.pi, 50)
@@ -697,73 +694,113 @@ def generate_topological_invariants_graph(output_dir):
             H_k = f_s * H0 + f_s * 0.1 * k * tensor(sigmax(), sigmax())
             
             # Get eigenstates (ground state)
-            _, states = H_k.eigenstates()
+            eigenvalues, states = H_k.eigenstates()
             eigenstates.append(states[0])
         
-        # Store eigenstates for future analysis
-        all_eigenstates[f_s] = eigenstates
-        
-        # Calculate topological invariant using standard method
+        # Calculate winding number (topological invariant)
         from analyses.topological_invariants import compute_standard_winding
         winding = compute_standard_winding(eigenstates, k_points, f_s)
+        winding_numbers.append(np.round(winding))  # Round to nearest integer
         
-        # Calculate Berry phase using standard method
+        # Calculate Berry phase
         from analyses.topological_invariants import compute_berry_phase_standard
         berry_phase = compute_berry_phase_standard(eigenstates, f_s)
-        
-        # Use absolute Berry phase normalized to [0,1] as topological invariant measure
-        topo_invariant = abs(berry_phase) / np.pi
-        
-        # Store results
-        scatter_dims.append(fd)
-        scatter_invariants.append(topo_invariant)
+        berry_phases.append(berry_phase)
     
-    # Create plot
-    plt.figure(figsize=(10, 8))
+    # Convert to numpy arrays
+    winding_numbers = np.array(winding_numbers, dtype=float)
+    berry_phases = np.array(berry_phases, dtype=float)
+    fractal_dims = np.array(fractal_dims, dtype=float)
     
-    # Plot phase diagram
-    scatter = plt.scatter(scatter_dims, scatter_invariants, c=scaling_factors, cmap='viridis', 
-                         s=50, alpha=0.8)
+    # Calculate normalized Berry phase (0 to 1 scale)
+    normalized_berry = np.abs(berry_phases) / np.pi
+    
+    # Create plot with two subplots
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12), gridspec_kw={'height_ratios': [1, 2]})
+    
+    # First subplot: Winding numbers and Berry phase vs. scaling factor
+    ax1.plot(scaling_factors, winding_numbers, 'o-', label='Winding Number (W)', color='#1f77b4')
+    ax1.set_ylabel('Winding Number', color='#1f77b4')
+    ax1.tick_params(axis='y', labelcolor='#1f77b4')
+    
+    ax1_twin = ax1.twinx()
+    ax1_twin.plot(scaling_factors, normalized_berry, 's-', label='Normalized Berry Phase', color='#ff7f0e')
+    ax1_twin.set_ylabel('|Berry Phase|/π', color='#ff7f0e')
+    ax1_twin.tick_params(axis='y', labelcolor='#ff7f0e')
+    
+    # Highlight phi value
+    ax1.axvline(x=PHI, color='g', linestyle='--', alpha=0.7, label=f'φ ≈ {PHI:.6f}')
+    
+    # Create custom legend for first subplot
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax1_twin.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
+    
+    ax1.set_title('Topological Invariants vs. Scaling Factor')
+    ax1.grid(True, alpha=0.3)
+    
+    # Second subplot: Phase diagram (Fractal Dimension vs. Topological Invariant)
+    scatter = ax2.scatter(fractal_dims, normalized_berry, c=scaling_factors, cmap='plasma', 
+                         s=80, alpha=0.8)
+    
+    # Identify and label different topological phases
+    trivial_phase = (winding_numbers == 0)
+    topological_phase = (winding_numbers != 0)
+    
+    # Add phase annotations
+    if np.any(trivial_phase):
+        trivial_x = np.median(fractal_dims[trivial_phase])
+        trivial_y = np.median(normalized_berry[trivial_phase])
+        ax2.annotate('Trivial Phase (W=0)',
+                    xy=(trivial_x, trivial_y),
+                    xytext=(trivial_x - 0.2, trivial_y + 0.2),
+                    arrowprops=dict(facecolor='black', shrink=0.05, width=1),
+                    fontsize=10, fontweight='bold')
+    
+    if np.any(topological_phase):
+        topo_x = np.median(fractal_dims[topological_phase])
+        topo_y = np.median(normalized_berry[topological_phase])
+        ax2.annotate('Topological Phase (W≠0)',
+                    xy=(topo_x, topo_y),
+                    xytext=(topo_x + 0.1, topo_y - 0.2),
+                    arrowprops=dict(facecolor='black', shrink=0.05, width=1),
+                    fontsize=10, fontweight='bold')
     
     # Highlight phi point
     phi_idx = np.argmin(np.abs(scaling_factors - PHI))
-    plt.scatter([scatter_dims[phi_idx]], [scatter_invariants[phi_idx]], 
-               c='red', s=100, marker='o', edgecolors='black', label=f'φ ≈ {PHI:.6f}')
+    ax2.scatter([fractal_dims[phi_idx]], [normalized_berry[phi_idx]], 
+               c='red', s=150, marker='*', edgecolors='black', label=f'φ ≈ {PHI:.6f}')
     
-    # Add trend line to show the relationship
-    from scipy.stats import linregress
+    # Add colorbar for scaling factors
+    cbar = fig.colorbar(scatter, ax=ax2)
+    cbar.set_label('Scale Factor (f_s)')
     
-    # Only use points with non-zero invariants for the trend line
-    nonzero_indices = [i for i, inv in enumerate(scatter_invariants) if inv > 0.001]
-    if nonzero_indices:
-        x_trend = [scatter_dims[i] for i in nonzero_indices]
-        y_trend = [scatter_invariants[i] for i in nonzero_indices]
+    # Draw boundary lines between phases if they exist
+    if np.any(trivial_phase) and np.any(topological_phase):
+        # Find approximate phase boundary
+        sorted_indices = np.argsort(scaling_factors)
+        phase_changes = np.where(np.diff(winding_numbers[sorted_indices]) != 0)[0]
         
-        if len(x_trend) > 1:  # Need at least 2 points for regression
-            slope, intercept, r_value, p_value, std_err = linregress(x_trend, y_trend)
-            x_fit = np.linspace(min(scatter_dims), max(scatter_dims), 100)
-            y_fit = slope * x_fit + intercept
-            
-            # Plot trend line
-            plt.plot(x_fit, y_fit, 'k--', alpha=0.5)
-            
-            # Add annotation about correlation
-            plt.annotate(f"Correlation: r = {r_value:.2f}",
-                        xy=(0.05, 0.95),
-                        xycoords='axes fraction',
-                        fontsize=10,
-                        bbox=dict(facecolor='white', alpha=0.8))
+        for idx in phase_changes:
+            boundary_fs = (scaling_factors[sorted_indices[idx]] + scaling_factors[sorted_indices[idx+1]]) / 2
+            ax2.axvline(x=fractal_dims[sorted_indices[idx+1]], color='r', linestyle='--', alpha=0.5)
+            ax2.annotate(f'Phase Boundary\nf_s ≈ {boundary_fs:.2f}',
+                        xy=(fractal_dims[sorted_indices[idx+1]], 0.5),
+                        xytext=(fractal_dims[sorted_indices[idx+1]] + 0.05, 0.5),
+                        arrowprops=dict(facecolor='red', shrink=0.05),
+                        fontsize=9)
     
     # Add labels and title
-    plt.xlabel('Fractal Dimension')
-    plt.ylabel('Topological Invariant')
-    plt.title('Phase Diagram: Fractal Dimension vs. Topological Invariant')
-    plt.colorbar(label='Scale Factor (f_s)')
-    plt.grid(True, alpha=0.3)
-    plt.legend()
+    ax2.set_xlabel('Fractal Dimension (D)')
+    ax2.set_ylabel('Topological Invariant (|Berry Phase|/π)')
+    ax2.set_title('Phase Diagram: Fractal Dimension vs. Topological Invariant')
+    ax2.grid(True, alpha=0.3)
+    ax2.legend(loc='lower right')
+    
+    # Tight layout to avoid overlapping
+    plt.tight_layout()
     
     # Save figure
-    plt.tight_layout()
     plt.savefig(output_dir / "fractal_topology_phase_diagram.png", dpi=300, bbox_inches='tight')
     print(f"Topological invariants graph saved to {output_dir / 'fractal_topology_phase_diagram.png'}")
     plt.close()
@@ -1392,17 +1429,23 @@ def create_parameter_tables(output_dir):
     with open(output_dir / "computational_complexity.html", 'w', encoding='utf-8') as f:
         f.write(styled_html)
     
-    # Create phase diagram summary table
-    phase_diagram = [
-        {'f_s Range': 'f_s < 0.8', 'Phase Type': 'Trivial', 'Topological Invariant': '0', 'Fractal Dimension': 'Low (~0.8-1.0)', 'Gap Size': 'Large'},
-        {'f_s Range': '0.8 < f_s < 1.4', 'Phase Type': 'Weakly Topological', 'Topological Invariant': '±1', 'Fractal Dimension': 'Medium (~1.0-1.2)', 'Gap Size': 'Medium'},
-        {'f_s Range': f'f_s ≈ φ ({PHI:.6f})', 'Phase Type': 'Strongly Topological', 'Topological Invariant': '±1', 'Fractal Dimension': 'High (~1.2-1.5)', 'Gap Size': 'Small'},
-        {'f_s Range': '1.8 < f_s < 2.4', 'Phase Type': 'Weakly Topological', 'Topological Invariant': '±1', 'Fractal Dimension': 'Medium (~1.0-1.2)', 'Gap Size': 'Medium'},
-        {'f_s Range': 'f_s > 2.4', 'Phase Type': 'Trivial', 'Topological Invariant': '0', 'Fractal Dimension': 'Low (~0.8-1.0)', 'Gap Size': 'Large'},
-    ]
+    # Load existing phase diagram summary table or create it if it doesn't exist
+    phase_diagram_path = Path("paper_graphs/phase_diagram_summary.csv")
+    if phase_diagram_path.exists():
+        phase_df = pd.read_csv(phase_diagram_path)
+        print(f"Loaded phase diagram from {phase_diagram_path}")
+    else:
+        # Use default phase diagram data with statistically accurate information
+        phase_diagram = [
+            {'f_s Range': 'f_s < 0.8', 'Phase Type': 'Trivial', 'Topological Invariant': '0', 'Fractal Dimension': 'Low (~0.8-1.0)', 'Gap Size': 'Large', 'Statistical Notes': ''},
+            {'f_s Range': '0.8 < f_s < 1.4', 'Phase Type': 'Weakly Topological', 'Topological Invariant': '±1', 'Fractal Dimension': 'Medium (~1.0-1.2)', 'Gap Size': 'Medium', 'Statistical Notes': ''},
+            {'f_s Range': f'f_s ≈ φ ({PHI:.6f})', 'Phase Type': 'Strongly Topological', 'Topological Invariant': '±1', 'Fractal Dimension': 'Statistically similar to others (~1.0-1.2)', 'Gap Size': 'Small', 'Statistical Notes': 'p=0.915, effect size=0.015 (negligible)'},
+            {'f_s Range': '1.8 < f_s < 2.4', 'Phase Type': 'Weakly Topological', 'Topological Invariant': '±1', 'Fractal Dimension': 'Medium (~1.0-1.2)', 'Gap Size': 'Medium', 'Statistical Notes': ''},
+            {'f_s Range': 'f_s > 2.4', 'Phase Type': 'Trivial', 'Topological Invariant': '0', 'Fractal Dimension': 'Low (~0.8-1.0)', 'Gap Size': 'Large', 'Statistical Notes': ''},
+        ]
+        phase_df = pd.DataFrame(phase_diagram)
     
-    # Create DataFrame
-    phase_df = pd.DataFrame(phase_diagram)
+    # We don't need to create the DataFrame again, we already have it from above
     
     # Save as CSV
     phase_df.to_csv(output_dir / "phase_diagram_summary.csv", index=False)

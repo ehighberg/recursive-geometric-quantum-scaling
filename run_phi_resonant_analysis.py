@@ -26,8 +26,8 @@ from simulations.scripts.evolve_state_fixed import (
     run_comparative_analysis_fixed
 )
 from analyses.fractal_analysis_fixed import (
-    calculate_fractal_dimension,
-    analyze_fractal_properties_across_scaling
+    fractal_dimension,
+    analyze_fractal_properties  # Renamed from analyze_phi_resonance
 )
 
 def run_phi_analysis_fixed(output_dir=None, num_qubits=1, n_steps=100):
