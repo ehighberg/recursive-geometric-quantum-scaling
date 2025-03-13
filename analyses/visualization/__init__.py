@@ -10,11 +10,9 @@ from .state_plots import (
 
 from .metric_plots import (
     plot_metric_evolution,
-    plot_metric_comparison,
+    plot_comparative_metrics,
     plot_metric_distribution,
-    plot_noise_metrics,
-    plot_quantum_metrics,
-    animate_metric_evolution
+    plot_noise_metrics
 )
 
 from .style_config import (
@@ -32,15 +30,13 @@ __all__ = [
     'plot_state_evolution',
     'plot_bloch_sphere',
     'plot_state_matrix',
-    
+
     # Metric visualization
     'plot_metric_evolution',
-    'plot_metric_comparison',
+    'plot_comparative_metrics',
     'plot_metric_distribution',
     'plot_noise_metrics',
-    'plot_quantum_metrics',
-    'animate_metric_evolution',
-    
+
     # Style configuration
     'set_style',
     'configure_axis',

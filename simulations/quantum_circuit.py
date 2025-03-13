@@ -1,10 +1,17 @@
 """
 Quantum circuit implementations using qutip and qutip-qip.
+
+This module includes:
+- Standard circuit evolution
+- Scale-dependent quantum evolution
+- Fibonacci braiding operations
+- Optimized Hamiltonian creation for large systems
+- Selective subspace evolution for performance
 """
 
 import numpy as np
-from typing import List, Optional
-from qutip import Qobj, ket2dm, mesolve, Options, sigmax, sigmaz
+from typing import List, Optional, Tuple, Dict, Union, Any
+from qutip import Qobj, ket2dm, mesolve, Options, sigmax, sigmaz, identity, tensor
 from qutip_qip.circuit import QubitCircuit
 from qutip_qip.noise import Noise
 from qutip_qip.operations import Gate
@@ -12,8 +19,9 @@ from .config import load_config
 from constants import PHI
 # Import canonical unitary scaling functions from scaled_unitary.py
 from .scaled_unitary import get_scaled_unitary, get_phi_recursive_unitary
-# Import scipy.linalg.polar for other parts of the code that might need it
+# Import scipy functions
 from scipy.linalg import polar
+from scipy import sparse
 
 class EvolutionResult:
     """Result object for quantum evolution containing states and times."""
@@ -474,6 +482,488 @@ class ScaledCircuit(QuantumCircuit):
         result.e_ops = []
         result.options = {}
         return result
+
+def create_optimized_hamiltonian(
+    num_qubits: int, 
+    hamiltonian_type: str = "x", 
+    sparse_threshold: int = 3,
+    enable_memory_optimization: bool = True
+) -> Union[Qobj, sparse.csr_matrix]:
+    """
+    Create optimized Hamiltonian representation for quantum systems.
+    
+    This function automatically selects the most efficient representation based on
+    system size, using dense matrices for small systems (<= sparse_threshold qubits)
+    and sparse matrices for larger systems to minimize memory requirements.
+    
+    Parameters:
+    -----------
+    num_qubits : int
+        Number of qubits in the system
+    hamiltonian_type : str, optional
+        Type of Hamiltonian to create:
+        - "x": Sum of sigma_x operators on each qubit
+        - "z": Sum of sigma_z operators on each qubit
+        - "y": Sum of sigma_y operators on each qubit
+        - "xy": Heisenberg XY model with nearest-neighbor coupling
+        - "ising": Transverse field Ising model
+    sparse_threshold : int, optional
+        Threshold (in number of qubits) above which to use sparse representation
+    enable_memory_optimization : bool, optional
+        Whether to enable memory optimizations for very large systems
+    
+    Returns:
+    --------
+    Union[Qobj, sparse.csr_matrix]
+        Optimized Hamiltonian representation
+    """
+    # For small systems, use standard dense representation
+    if num_qubits <= sparse_threshold:
+        # Use the built-in StandardCircuit approach for small systems
+        if hamiltonian_type == "x":
+            H = sum(tensor([sigmax() if i == j else identity(2) for j in range(num_qubits)]) 
+                   for i in range(num_qubits))
+        elif hamiltonian_type == "z":
+            H = sum(tensor([sigmaz() if i == j else identity(2) for j in range(num_qubits)]) 
+                   for i in range(num_qubits))
+        elif hamiltonian_type == "y":
+            from qutip import sigmay
+            H = sum(tensor([sigmay() if i == j else identity(2) for j in range(num_qubits)]) 
+                   for i in range(num_qubits))
+        elif hamiltonian_type == "xy":
+            from qutip import sigmap, sigmam
+            # XY model with nearest-neighbor coupling
+            H = sum(tensor([sigmap() if i == j else sigmam() if i == j+1 % num_qubits else identity(2) 
+                          for j in range(num_qubits)]) 
+                   for i in range(num_qubits-1))
+            H += H.dag()  # Make Hermitian
+        elif hamiltonian_type == "ising":
+            # Transverse field Ising model with periodic boundary conditions
+            h_field = 1.0  # Transverse field strength
+            J = 1.0  # Coupling strength
+            
+            # Field term
+            H_field = sum(tensor([sigmax() if i == j else identity(2) for j in range(num_qubits)]) 
+                         for i in range(num_qubits))
+            
+            # Interaction term
+            H_int = sum(tensor([sigmaz() if i == j or i == (j+1) % num_qubits else identity(2) 
+                              for j in range(num_qubits)]) 
+                       for i in range(num_qubits))
+            
+            H = -h_field * H_field - J * H_int
+        else:
+            raise ValueError(f"Unknown Hamiltonian type: {hamiltonian_type}")
+            
+        return H
+    
+    # For larger systems, use sparse representation
+    else:
+        # Define single-qubit operators as sparse matrices
+        sx = sparse.csr_matrix([[0, 1], [1, 0]])
+        sy = sparse.csr_matrix([[0, -1j], [1j, 0]])
+        sz = sparse.csr_matrix([[1, 0], [0, -1]])
+        sm = sparse.csr_matrix([[0, 0], [1, 0]])
+        sp = sparse.csr_matrix([[0, 1], [0, 0]])
+        si = sparse.eye(2, format='csr')  # Sparse identity
+        
+        # Select operator based on Hamiltonian type
+        if hamiltonian_type == "x":
+            single_op = sx
+        elif hamiltonian_type == "y":
+            single_op = sy
+        elif hamiltonian_type == "z":
+            single_op = sz
+        elif hamiltonian_type in ["xy", "ising"]:
+            # These models need special handling due to multi-site interactions
+            return _construct_multisite_hamiltonian_sparse(num_qubits, hamiltonian_type, 
+                                                         enable_memory_optimization)
+        else:
+            raise ValueError(f"Unknown Hamiltonian type: {hamiltonian_type}")
+
+        # Build full Hamiltonian efficiently using sparse operations
+        hamiltonian = None
+        
+        # Create operators that act on each qubit
+        for i in range(num_qubits):
+            # Create the terms list - identity on all qubits except target
+            terms = [si] * num_qubits
+            terms[i] = single_op
+            
+            # Compute tensor product efficiently
+            term_op = _sparse_tensor_product(terms)
+            
+            # Add to Hamiltonian
+            if hamiltonian is None:
+                hamiltonian = term_op
+            else:
+                hamiltonian += term_op
+        
+        # Optionally convert to Qobj for compatibility with QuTiP functions
+        if not enable_memory_optimization:
+            return Qobj(hamiltonian, dims=[[2]*num_qubits, [2]*num_qubits])
+        else:
+            # Return raw sparse matrix for maximum memory efficiency
+            return hamiltonian
+
+def _sparse_tensor_product(operators: List[sparse.spmatrix]) -> sparse.csr_matrix:
+    """
+    Compute tensor product of sparse matrices efficiently.
+    
+    Parameters:
+    -----------
+    operators : List[sparse.spmatrix]
+        List of sparse matrices to tensor together
+    
+    Returns:
+    --------
+    sparse.csr_matrix
+        Sparse tensor product result
+    """
+    # Base case for recursion
+    if len(operators) == 1:
+        return operators[0]
+    
+    # Start with the first operator
+    result = operators[0]
+    
+    # Iterate through remaining operators using sparse kron
+    for op in operators[1:]:
+        result = sparse.kron(result, op, format='csr')
+    
+    return result
+
+def _construct_multisite_hamiltonian_sparse(
+    num_qubits: int, 
+    hamiltonian_type: str,
+    memory_optimization: bool = True
+) -> Union[Qobj, sparse.csr_matrix]:
+    """
+    Construct multi-site interaction Hamiltonian using sparse matrices.
+    
+    Parameters:
+    -----------
+    num_qubits : int
+        Number of qubits in the system
+    hamiltonian_type : str
+        Type of Hamiltonian ("xy" or "ising")
+    memory_optimization : bool
+        Whether to return raw sparse matrix instead of Qobj
+    
+    Returns:
+    --------
+    Union[Qobj, sparse.csr_matrix]
+        Sparse Hamiltonian
+    """
+    # Define single-qubit operators as sparse matrices
+    sx = sparse.csr_matrix([[0, 1], [1, 0]])
+    sy = sparse.csr_matrix([[0, -1j], [1j, 0]])
+    sz = sparse.csr_matrix([[1, 0], [0, -1]])
+    sm = sparse.csr_matrix([[0, 0], [1, 0]])
+    sp = sparse.csr_matrix([[0, 1], [0, 0]])
+    si = sparse.eye(2, format='csr')  # Sparse identity
+    
+    hamiltonian = None
+    
+    if hamiltonian_type == "xy":
+        # XY model with nearest neighbor interactions
+        for i in range(num_qubits - 1):
+            # Create terms for i, i+1 interaction (X_i X_{i+1} + Y_i Y_{i+1})
+            
+            # X_i X_{i+1} term
+            terms_xx = [si] * num_qubits
+            terms_xx[i] = sx
+            terms_xx[i+1] = sx
+            xx_term = _sparse_tensor_product(terms_xx)
+            
+            # Y_i Y_{i+1} term
+            terms_yy = [si] * num_qubits
+            terms_yy[i] = sy
+            terms_yy[i+1] = sy
+            yy_term = _sparse_tensor_product(terms_yy)
+            
+            # Add to Hamiltonian
+            if hamiltonian is None:
+                hamiltonian = xx_term + yy_term
+            else:
+                hamiltonian += xx_term + yy_term
+                
+    elif hamiltonian_type == "ising":
+        # Transverse field Ising model
+        h_field = 1.0  # Transverse field strength
+        J = 1.0  # Coupling strength
+        
+        # Field term: sum_i X_i
+        field_term = None
+        for i in range(num_qubits):
+            terms = [si] * num_qubits
+            terms[i] = sx
+            term_op = _sparse_tensor_product(terms)
+            
+            if field_term is None:
+                field_term = term_op
+            else:
+                field_term += term_op
+        
+        # Interaction term: sum_i Z_i Z_{i+1}
+        interact_term = None
+        for i in range(num_qubits - 1):
+            terms = [si] * num_qubits
+            terms[i] = sz
+            terms[i+1] = sz
+            term_op = _sparse_tensor_product(terms)
+            
+            if interact_term is None:
+                interact_term = term_op
+            else:
+                interact_term += term_op
+                
+        # Add periodic boundary term if more than 2 qubits
+        if num_qubits > 2:
+            terms = [si] * num_qubits
+            terms[0] = sz
+            terms[num_qubits-1] = sz
+            interact_term += _sparse_tensor_product(terms)
+        
+        # Combine terms with appropriate coefficients
+        hamiltonian = -h_field * field_term - J * interact_term
+        
+    # Return either Qobj or raw sparse matrix
+    if not memory_optimization:
+        return Qobj(hamiltonian, dims=[[2]*num_qubits, [2]*num_qubits])
+    else:
+        return hamiltonian
+
+def evolve_selective_subspace(
+    initial_state: Qobj,
+    hamiltonian: Union[Qobj, sparse.spmatrix],
+    times: np.ndarray,
+    importance_threshold: float = 0.01,
+    important_states_mask: Optional[np.ndarray] = None,
+    c_ops: Optional[List] = None
+) -> List[Qobj]:
+    """
+    Evolve only the most relevant part of the state vector for efficient large-system simulation.
+    
+    This function identifies the most significant basis states in the initial wavefunction 
+    and evolves only that subspace, which can dramatically improve performance for large systems
+    where most of the Hilbert space remains unpopulated.
+    
+    Parameters:
+    -----------
+    initial_state : Qobj
+        Initial quantum state
+    hamiltonian : Union[Qobj, sparse.spmatrix]
+        Hamiltonian for the evolution (can be sparse or dense)
+    times : np.ndarray
+        Array of time points for evolution
+    importance_threshold : float, optional
+        Threshold for amplitude magnitude to be considered important (ignored if mask provided)
+    important_states_mask : Optional[np.ndarray], optional
+        Boolean mask specifying which basis states to include in the evolution
+    c_ops : Optional[List], optional
+        List of collapse operators for open system evolution
+        
+    Returns:
+    --------
+    List[Qobj]
+        List of evolved quantum states
+    """
+    # Convert to ket if density matrix
+    is_dm_input = not initial_state.isket
+    if is_dm_input:
+        # Extract diagonal for importance analysis
+        diag_elems = np.abs(initial_state.diag())
+        state_for_mask = initial_state
+    else:
+        # Use amplitudes for importance analysis
+        diag_elems = np.abs(initial_state.full().flatten())**2
+        state_for_mask = initial_state
+    
+    # Identify important basis states if mask not provided
+    if important_states_mask is None:
+        # Determine threshold adaptively if not manually set
+        if importance_threshold <= 0:
+            # Use cumulative probability method: keep states that make up 99.9% of total probability
+            sorted_probs = np.sort(diag_elems)[::-1]  # Descending order
+            cumulative = np.cumsum(sorted_probs)
+            cutoff_idx = np.searchsorted(cumulative, 0.999)
+            adaptive_threshold = sorted_probs[min(cutoff_idx, len(sorted_probs)-1)]
+            importance_threshold = max(adaptive_threshold, 1e-6)  # Ensure minimum threshold
+        
+        # Create mask for states above threshold
+        important_states_mask = diag_elems > importance_threshold
+        
+        # Ensure at least a few states are included
+        if np.sum(important_states_mask) < 5:
+            # Take top 5 states
+            top_indices = np.argsort(diag_elems)[-5:]
+            important_states_mask[top_indices] = True
+    
+    # Check if reduction is worthwhile
+    n_important = np.sum(important_states_mask)
+    total_states = len(diag_elems)
+    
+    if n_important > 0.5 * total_states:
+        # If more than half the states are important, use regular evolution
+        # This is more efficient than the reduction overhead
+        return _evolve_full_system(initial_state, hamiltonian, times, c_ops)
+    
+    # Get indices of important states
+    important_indices = np.where(important_states_mask)[0]
+    
+    # Project initial state to subspace
+    if is_dm_input:
+        # For density matrix, extract submatrix
+        reduced_state = _extract_submatrix(state_for_mask, important_indices)
+    else:
+        # For ket, extract amplitudes
+        amplitudes = initial_state.full().flatten()
+        reduced_amplitudes = amplitudes[important_indices]
+        # Normalize
+        norm = np.sqrt(np.sum(np.abs(reduced_amplitudes)**2))
+        if norm > 0:
+            reduced_amplitudes = reduced_amplitudes / norm
+        # Create reduced state
+        reduced_state = Qobj(reduced_amplitudes.reshape(-1, 1))
+    
+    # Project Hamiltonian to subspace
+    if isinstance(hamiltonian, Qobj):
+        # QuTiP Hamiltonian
+        H_matrix = hamiltonian.full()
+        reduced_H_matrix = H_matrix[np.ix_(important_indices, important_indices)]
+        reduced_H = Qobj(reduced_H_matrix)
+    else:
+        # Sparse Hamiltonian
+        reduced_H_matrix = hamiltonian[np.ix_(important_indices, important_indices)]
+        reduced_H = Qobj(reduced_H_matrix)
+    
+    # Project collapse operators to subspace if provided
+    reduced_c_ops = None
+    if c_ops:
+        reduced_c_ops = []
+        for c_op in c_ops:
+            if isinstance(c_op, Qobj):
+                c_matrix = c_op.full()
+                reduced_c_matrix = c_matrix[np.ix_(important_indices, important_indices)]
+                reduced_c_ops.append(Qobj(reduced_c_matrix))
+            else:
+                # Handle non-Qobj c_ops (e.g., function callbacks)
+                # Skip if can't be projected
+                pass
+    
+    # Evolve the reduced system
+    if reduced_c_ops:
+        # Open system evolution
+        result = mesolve(reduced_H, reduced_state, times, reduced_c_ops, options=Options(store_states=True))
+        reduced_states = result.states
+    else:
+        # Closed system evolution
+        if is_dm_input:
+            # Use mesolve for density matrices even in closed system
+            result = mesolve(reduced_H, reduced_state, times, [], options=Options(store_states=True))
+            reduced_states = result.states
+        else:
+            # Use faster method for pure states
+            from qutip import sesolve
+            result = sesolve(reduced_H, reduced_state, times, options=Options(store_states=True))
+            reduced_states = result.states
+    
+    # Project back to full Hilbert space
+    full_states = []
+    for reduced_state in reduced_states:
+        if reduced_state.isket:
+            # Expand ket state
+            full_vector = np.zeros(total_states, dtype=complex)
+            full_vector[important_indices] = reduced_state.full().flatten()
+            full_state = Qobj(full_vector.reshape(-1, 1))
+        else:
+            # Expand density matrix
+            full_matrix = np.zeros((total_states, total_states), dtype=complex)
+            reduced_matrix = reduced_state.full()
+            for i, row_idx in enumerate(important_indices):
+                for j, col_idx in enumerate(important_indices):
+                    full_matrix[row_idx, col_idx] = reduced_matrix[i, j]
+            full_state = Qobj(full_matrix)
+        
+        full_states.append(full_state)
+    
+    return full_states
+
+def _extract_submatrix(dm: Qobj, indices: np.ndarray) -> Qobj:
+    """
+    Extract submatrix from density matrix corresponding to selected indices.
+    
+    Parameters:
+    -----------
+    dm : Qobj
+        Density matrix to extract from
+    indices : np.ndarray
+        Indices to include in submatrix
+    
+    Returns:
+    --------
+    Qobj
+        Reduced density matrix
+    """
+    if dm.isket:
+        # Handle ket state
+        full_vector = dm.full().flatten()
+        reduced_vector = full_vector[indices]
+        # Normalize
+        norm = np.sqrt(np.sum(np.abs(reduced_vector)**2))
+        if norm > 0:
+            reduced_vector = reduced_vector / norm
+        return Qobj(reduced_vector.reshape(-1, 1))
+    else:
+        # Extract submatrix from density matrix
+        full_matrix = dm.full()
+        reduced_matrix = full_matrix[np.ix_(indices, indices)]
+        # Normalize if trace != 1
+        trace = np.trace(reduced_matrix)
+        if abs(trace) > 1e-10:
+            reduced_matrix = reduced_matrix / trace
+        return Qobj(reduced_matrix)
+
+def _evolve_full_system(
+    initial_state: Qobj,
+    hamiltonian: Union[Qobj, sparse.spmatrix],
+    times: np.ndarray,
+    c_ops: Optional[List] = None
+) -> List[Qobj]:
+    """
+    Evolve the full system without any dimension reduction.
+    
+    Parameters:
+    -----------
+    initial_state : Qobj
+        Initial quantum state
+    hamiltonian : Union[Qobj, sparse.spmatrix]
+        Hamiltonian for the evolution
+    times : np.ndarray
+        Array of time points for evolution
+    c_ops : Optional[List], optional
+        List of collapse operators for open system evolution
+        
+    Returns:
+    --------
+    List[Qobj]
+        List of evolved quantum states
+    """
+    # Ensure Hamiltonian is Qobj
+    if not isinstance(hamiltonian, Qobj):
+        hamiltonian = Qobj(hamiltonian)
+    
+    # Determine evolution type
+    if c_ops or not initial_state.isket:
+        # Open system evolution or density matrix input
+        result = mesolve(hamiltonian, initial_state, times, c_ops or [], options=Options(store_states=True))
+    else:
+        # Closed system evolution with pure state
+        from qutip import sesolve
+        result = sesolve(hamiltonian, initial_state, times, options=Options(store_states=True))
+    
+    return result.states
 
 class FibonacciBraidingCircuit(QuantumCircuit):
     """

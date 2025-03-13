@@ -1,0 +1,34 @@
+{
+  "phi_mean": 0.5,
+  "phi_std": 0.0,
+  "control_mean": 0.5,
+  "control_std": 0.0,
+  "difference": 0.0,
+  "t_test": {
+    "statistic": NaN,
+    "p_value": NaN,
+    "significant": false
+  },
+  "mannwhitney": {
+    "statistic": 4000.0,
+    "p_value": 1.0,
+    "significant": false
+  },
+  "ks_test": {
+    "statistic": 0.0,
+    "p_value": 1.0,
+    "significant": false
+  },
+  "effect_size": NaN,
+  "phi_ci": [
+    0.5,
+    0.5
+  ],
+  "control_ci": [
+    0.5,
+    0.5
+  ],
+  "ci_overlap": true,
+  "significant": false,
+  "effect_size_category": "large"
+}
