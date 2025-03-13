@@ -14,9 +14,10 @@ import pandas as pd
 from qutip import Qobj, tensor, sigmaz, sigmax, qeye, basis
 from pathlib import Path
 
-# Import simulation components
+# Import simulation components with fixed implementations 
 from simulations.scripts.evolve_circuit import run_phi_scaled_twoqubit_circuit
-from simulations.scripts.evolve_state import run_state_evolution
+from simulations.scripts.evolve_state_fixed import run_state_evolution_fixed
+from simulations.scripts.evolve_state import run_state_evolution  # Keep for backward compatibility
 from analyses.fractal_analysis import compute_energy_spectrum, estimate_fractal_dimension
 from analyses.topological_invariants import compute_standard_winding, compute_standard_z2_index, compute_berry_phase_standard
 from constants import PHI
@@ -76,16 +77,24 @@ def analyze_phi_significance(fine_resolution=True, save_results=True):
         # Run circuit simulation with current f_s
         circuit_result = run_phi_scaled_twoqubit_circuit(scaling_factor=fs)
         
-        # Also run state evolution for comparison
-        state_result = run_state_evolution(
+        # Run state evolution using fixed implementation for more accurate results
+        state_result = run_state_evolution_fixed(
             num_qubits=1,
             state_label="plus",
             n_steps=50,
             scaling_factor=fs
         )
         
-        # Extract Hamiltonian function
-        H_func = circuit_result.hamiltonian
+        # Create a consistent Hamiltonian function that applies scaling correctly
+        from simulations.scripts.evolve_state_fixed import create_system_hamiltonian
+        
+        # Create base Hamiltonian (unscaled)
+        H0 = create_system_hamiltonian(num_qubits=1, hamiltonian_type="x")
+        
+        # Define the Hamiltonian function with proper scaling application
+        def H_func(scaling):
+            # Apply scaling once, consistent with fixed implementations
+            return scaling * H0
         
         # Compute energy spectrum
         f_s_sweep, energies, spectrum_analysis = compute_energy_spectrum(
@@ -132,10 +141,16 @@ def analyze_phi_significance(fine_resolution=True, save_results=True):
         # Create k-points for topological analysis
         k_points = np.linspace(0, 2*np.pi, 100)
         
-        # Create eigenstates for topological analysis
+        # Create eigenstates for topological analysis using consistent Hamiltonian
         eigenstates = []
+        # Create parameterized Hamiltonian that's consistent with our H_func definition
         for k in k_points:
-            H_k = fs * (tensor(sigmaz(), qeye(2)) + k * tensor(qeye(2), sigmax()))
+            # Use the same Hamiltonian construction approach as in evolve_state_fixed
+            H_base = create_system_hamiltonian(2, hamiltonian_type="ising")
+            # Add k-dependent term with proper scaling
+            H_k = fs * H_base + fs * 0.1 * k * tensor(sigmax(), sigmax())
+            
+            # Get eigenstates
             _, states = H_k.eigenstates()
             eigenstates.append(states[0])
         

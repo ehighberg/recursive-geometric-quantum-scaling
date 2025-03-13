@@ -475,6 +475,46 @@ def run_comparative_analysis_fixed(
     
     return results
 
+def simulate_noise_evolution(H, psi0, times, c_ops):
+    """
+    Simulate quantum evolution with noise (collapse operators).
+    
+    Parameters:
+    -----------
+    H : Qobj
+        System Hamiltonian (already properly scaled).
+    psi0 : Qobj
+        Initial quantum state.
+    times : array
+        Array of time points for the evolution.
+    c_ops : list
+        List of collapse operators (noise operators).
+        
+    Returns:
+    --------
+    EvolutionResult
+        Result of the quantum evolution with noise.
+    """
+    from qutip import mesolve
+    
+    print(f"Simulating noise evolution with {len(c_ops)} collapse operators...")
+    
+    # Run the evolution with noise using QuTiP's solver
+    result = mesolve(H, psi0, times, c_ops=c_ops)
+    
+    # Create and return our standard result format
+    evolution_result = EvolutionResult(
+        states=result.states,
+        times=times,
+        scaling_factor=1.0,  # We don't track scaling factor here since H is already scaled
+        params={
+            'num_qubits': psi0.dims[0][0],  # Extract from state dimensions
+            'noise_operators': len(c_ops)
+        }
+    )
+    
+    return evolution_result
+
 # For demonstration and testing
 if __name__ == "__main__":
     # Run a simple test
