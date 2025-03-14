@@ -24,10 +24,10 @@ from simulations.quantum_state import (
 )
 from analyses.fractal_analysis import phi_sensitive_dimension
 from analyses.topological_invariants import (
-    compute_phi_sensitive_winding, compute_phi_resonant_berry_phase
+    compute_standard_winding, compute_berry_phase
 )
-from simulations.scripts.evolve_state import (
-    run_phi_recursive_evolution, run_comparative_analysis
+from simulations.scripts.evolve_state_fixed import (
+    run_quantum_evolution, run_comparative_analysis_fixed
 )
 
 class TestPhiResonantFeatures(unittest.TestCase):
@@ -114,10 +114,10 @@ class TestPhiResonantFeatures(unittest.TestCase):
             eigenstates.append(states[0])
         
         # Compute phi-sensitive winding at phi
-        winding_phi = compute_phi_sensitive_winding(eigenstates, k_points, self.phi)
+        winding_phi = compute_standard_winding(eigenstates, k_points, self.phi)
         
         # Compute phi-sensitive winding away from phi
-        winding_other = compute_phi_sensitive_winding(eigenstates, k_points, 3.0)
+        winding_other = compute_standard_winding(eigenstates, k_points, 3.0)
         
         # Verify winding numbers are valid
         self.assertTrue(isinstance(winding_phi, float),
@@ -126,7 +126,7 @@ class TestPhiResonantFeatures(unittest.TestCase):
                        "Phi-sensitive winding should be a float")
         
         # Compute phi-resonant Berry phase
-        berry_phi = compute_phi_resonant_berry_phase(eigenstates, self.phi)
+        berry_phi = compute_berry_phase(eigenstates, self.phi)
         
         # Verify Berry phase is valid
         self.assertTrue(-np.pi <= berry_phi <= np.pi,
@@ -135,13 +135,12 @@ class TestPhiResonantFeatures(unittest.TestCase):
     def test_phi_recursive_evolution(self):
         """Test phi-recursive evolution."""
         # Run phi-recursive evolution with minimal steps
-        result = run_phi_recursive_evolution(
+        result = run_quantum_evolution(
             num_qubits=1,
             state_label="plus",
             n_steps=5,
             scaling_factor=self.phi,
             recursion_depth=2,
-            analyze_phi=True
         )
         
         # Verify result contains expected attributes
@@ -163,7 +162,7 @@ class TestPhiResonantFeatures(unittest.TestCase):
     def test_comparative_analysis(self):
         """Test comparative analysis."""
         # Run comparative analysis with minimal settings
-        results = run_comparative_analysis(
+        results = run_comparative_analysis_fixed(
             scaling_factors=[self.phi, 2.0],
             num_qubits=1,
             state_label="plus",
