@@ -77,19 +77,33 @@ def plot_energy_spectrum(
                 color=COLORS['primary'], label='Energy Band')
     
     # Highlight and annotate self-similar regions
-    for i, (start1, end1, start2, end2) in enumerate(analysis['self_similar_regions']):
-        # Highlight first region
-        ax.axvspan(start1, end1, color=COLORS['accent'], alpha=0.2)
-        # Highlight corresponding similar region
-        ax.axvspan(start2, end2, color=COLORS['accent'], alpha=0.2)
-        
-        # Add connecting arrow
-        mid1 = (start1 + end1) / 2
-        mid2 = (start2 + end2) / 2
-        y_pos = ax.get_ylim()[1]
-        ax.annotate('', xy=(mid2, y_pos), xytext=(mid1, y_pos),
-                   arrowprops=dict(arrowstyle='<->',
-                                 color=COLORS['accent']))
+    if 'self_similar_regions' in analysis and analysis['self_similar_regions']:
+        for i, region in enumerate(analysis['self_similar_regions']):
+            # Handle both tuple formats (flexible handling)
+            if len(region) == 4:
+                start1, end1, start2, end2 = region
+            elif len(region) == 2:
+                # If we only have two points, treat them as a single region
+                start1, end1 = region
+                start2, end2 = start1, end1  # No corresponding region
+            else:
+                # Skip invalid regions
+                continue
+                
+            # Highlight first region
+            ax.axvspan(start1, end1, color=COLORS['accent'], alpha=0.2)
+            
+            # Highlight corresponding similar region (if different)
+            if start2 != start1 or end2 != end1:
+                ax.axvspan(start2, end2, color=COLORS['accent'], alpha=0.2)
+                
+                # Add connecting arrow
+                mid1 = (start1 + end1) / 2
+                mid2 = (start2 + end2) / 2
+                y_pos = ax.get_ylim()[1]
+                ax.annotate('', xy=(mid2, y_pos), xytext=(mid1, y_pos),
+                           arrowprops=dict(arrowstyle='<->',
+                                         color=COLORS['accent']))
         
         # Add region labels
         ax.text(mid1, y_pos, f'R{i+1}a',

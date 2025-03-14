@@ -1,6 +1,0 @@
-f_s Range,Phase Type,Topological Invariant,Fractal Dimension,Gap Size
-f_s < 0.8,Trivial,0,Low (~0.8-1.0),Large
-0.8 < f_s < 1.4,Weakly Topological,±1,Medium (~1.0-1.2),Medium
-f_s ≈ φ (1.618...),Strongly Topological,±1,High (~1.2-1.5),Small
-1.8 < f_s < 2.4,Weakly Topological,±1,Medium (~1.0-1.2),Medium
-f_s > 2.4,Trivial,0,Low (~0.8-1.0),Large

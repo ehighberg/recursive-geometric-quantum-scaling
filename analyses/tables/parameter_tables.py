@@ -24,10 +24,25 @@ def generate_parameter_overview_table() -> pd.DataFrame:
         "Units/Dimensions": "dimensionless"
     })
     
+    # Mathematical constants used as scaling factors
     parameters.append({
         "Symbol": "φ",
-        "Physical Meaning": "Golden ratio (scaling factor)",
-        "Typical Range/Values": f"{PHI:.6f}",
+        "Physical Meaning": "Golden ratio",
+        "Typical Range/Values": "≈1.618",
+        "Units/Dimensions": "dimensionless"
+    })
+    
+    parameters.append({
+        "Symbol": "π",
+        "Physical Meaning": "Pi constant",
+        "Typical Range/Values": "≈3.142",
+        "Units/Dimensions": "dimensionless"
+    })
+    
+    parameters.append({
+        "Symbol": "e",
+        "Physical Meaning": "Euler's number",
+        "Typical Range/Values": "≈2.718",
         "Units/Dimensions": "dimensionless"
     })
     
@@ -41,7 +56,7 @@ def generate_parameter_overview_table() -> pd.DataFrame:
     
     parameters.append({
         "Symbol": "f_s",
-        "Physical Meaning": "Scaling factor",
+        "Physical Meaning": "General scaling factor",
         "Typical Range/Values": "0.5-3.0",
         "Units/Dimensions": "dimensionless"
     })

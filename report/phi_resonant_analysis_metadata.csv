@@ -1,0 +1,2 @@
+Implementation,Phi Value,Statistical Tests,Significance Threshold,Scaling Factors,Measurement Error Handling,Data Collection Method,state_overlap Significant,state_overlap p-value,state_overlap z-score
+Fixed,1.618033988749895,Two-tailed t-test,0.05,26,Included in statistical analysis,"Unbiased, consistent algorithm across all scaling factors",True,0.014467187235646476,0.5381131645706767

@@ -433,7 +433,7 @@ def estimate_fractal_dimension(
 def phi_sensitive_dimension(
     data: np.ndarray,
     box_sizes: Optional[np.ndarray] = None,
-    scaling_factor: float = None
+    scaling_factor: Optional[float] = None
 ) -> float:
     """
     Estimate fractal dimension with phi-sensitivity.
@@ -451,6 +451,8 @@ def phi_sensitive_dimension(
     --------
     float
         Fractal dimension with potential phi-resonance.
+    
+    Note: This is a modified version that now maintains mathematical rigor by separating standard calculation from phi analysis.
     """
     # Use PHI as default scaling factor if none provided
     if scaling_factor is None:
@@ -458,8 +460,9 @@ def phi_sensitive_dimension(
     
     phi = PHI
     
-    # Create analysis sensitive to golden ratio
+    # Calculate proximity to phi - only used for logging, not data modification
     phi_proximity = np.exp(-(scaling_factor - phi)**2 / 0.1)  # Gaussian centered at phi
+    phi_resonant = abs(scaling_factor - phi) < 0.1  # Boolean flag for phi proximity
     
     # Ensure data is properly normalized
     data = np.abs(data)  # Handle complex values
@@ -481,8 +484,9 @@ def phi_sensitive_dimension(
     valid_boxes = []
     
     for box in box_sizes:
-        # Dynamic thresholding with phi sensitivity
-        threshold = 0.1 * np.mean(data) * (1 + phi_proximity * (box - 0.5)**2)
+        # Standard dynamic thresholding WITHOUT phi-specific modifications
+        # Fixed: Using constant threshold factor for all scaling factors
+        threshold = 0.1 * np.mean(data)
         
         # Calculate number of segments safely
         n_segments = min(int(1/box), MAX_SEGMENTS)
@@ -518,11 +522,7 @@ def phi_sensitive_dimension(
         log_boxes = np.log(1.0 / np.array(valid_boxes))
         log_counts = np.log(np.array(counts))
         
-        # Non-linear fit near phi
-        if abs(scaling_factor - phi) < 0.1:
-            # Apply phi-specific correction
-            log_counts = log_counts * (1 + 0.2 * phi_proximity)
-            
+        # Standard linear regression without phi-based modifications
         slope, _, _, _, _ = linregress(log_boxes, log_counts)
         return slope
     else:
@@ -552,6 +552,10 @@ def compute_multifractal_spectrum(
     Returns:
     --------
     Dict[str, np.ndarray]
+        Dictionary containing multifractal spectrum data with the following keys:
+        - 'q_values': Array of q values used in the analysis
+        - 'tq': Array of generalized dimensions τ(q) for each q value
+        - 'alpha': Array of Lipschitz-Hölder exponents α(q)
         Dictionary containing multifractal spectrum data.
     """
     # Set default parameters if not provided
@@ -612,7 +616,7 @@ def compute_multifractal_spectrum(
                     segment = data[start_idx:end_idx]
                     
                     # Apply phi-sensitive threshold
-                    threshold = 0.05 * np.mean(data) * (1 + phi_proximity * (box - 0.5)**2)
+                    threshold = 0.05 * np.mean(data)  # Fixed: Removed phi-dependency
                     if np.any(segment > threshold):
                         # Compute measure (probability) for this segment
                         measure = np.sum(segment) / np.sum(data)
@@ -623,8 +627,8 @@ def compute_multifractal_spectrum(
                 measures = []
                 
                 for segment in segments:
-                    # Apply phi-sensitive threshold
-                    threshold = 0.05 * np.mean(data) * (1 + phi_proximity * (box - 0.5)**2)
+                    # Standard threshold
+                    threshold = 0.05 * np.mean(data)  # Fixed: Removed phi-dependency
                     if np.any(segment > threshold):
                         # Compute measure (probability) for this segment
                         measure = np.sum(segment) / np.sum(data)
@@ -647,9 +651,8 @@ def compute_multifractal_spectrum(
             log_partitions = np.log([p[1] for p in partition_values])
             
             # Apply phi-resonant correction near phi
-            if abs(scaling_factor - phi) < 0.1:
-                log_partitions = log_partitions * (1 + 0.1 * phi_proximity * np.sin(q * np.pi))
-            
+            # Fixed: Removed phi-based log_partitions modification
+                
             slope, _, _, _, _ = linregress(log_boxes, log_partitions)
             
             # For q≠1, tau(q) = (q-1)*D_q
@@ -686,8 +689,8 @@ def compute_multifractal_spectrum(
                 end_idx = min((j + 1) * segment_size, len(data))
                 segment = data[start_idx:end_idx]
                 
-                threshold = 0.05 * np.mean(data) * (1 + phi_proximity * (box - 0.5)**2)
-                if np.any(segment > threshold):
+                standard_threshold = 0.05 * np.mean(data)  # Fixed: Removed phi-dependency 
+                if np.any(segment > standard_threshold):
                     measure = np.sum(segment) / np.sum(data)
                     if measure > 0:
                         entropy -= measure * np.log(measure)
@@ -697,8 +700,8 @@ def compute_multifractal_spectrum(
             segments = np.array_split(data, n_segments)
             
             for segment in segments:
-                threshold = 0.05 * np.mean(data) * (1 + phi_proximity * (box - 0.5)**2)
-                if np.any(segment > threshold):
+                standard_threshold = 0.05 * np.mean(data)  # Fixed: Removed phi-dependency
+                if np.any(segment > standard_threshold):
                     measure = np.sum(segment) / np.sum(data)
                     if measure > 0:
                         entropy -= measure * np.log(measure)
@@ -715,10 +718,6 @@ def compute_multifractal_spectrum(
     if len(partition_values_q1) >= 5:
         log_boxes = np.log([1.0/p[0] for p in partition_values_q1])
         entropies = [p[1] for p in partition_values_q1]
-        
-        # Apply phi-resonant correction
-        if abs(scaling_factor - phi) < 0.1:
-            entropies = [e * (1 + 0.1 * phi_proximity) for e in entropies]
         
         slope, _, _, _, _ = linregress(log_boxes, entropies)
         
@@ -783,6 +782,7 @@ def analyze_phi_resonance(
     phi_sensitivity = np.zeros(n_factors)
     correlation_scores = np.zeros(n_factors)
     
+    standard_dimensions = np.zeros(n_factors)  # Track standard dimension separately
     # Compute fractal dimension and phi sensitivity for each scaling factor
     for i, factor in enumerate(scaling_factors):
         # Get data for this scaling factor
@@ -795,15 +795,18 @@ def analyze_phi_resonance(
                 phi_sensitivity[i] = np.nan
                 correlation_scores[i] = np.nan
                 continue
-                
+            
             # Compute regular fractal dimension
             dim, info = estimate_fractal_dimension(data)
-            dimensions[i] = dim
+            standard_dimensions[i] = dim
+  # Store standard dimension
             
-            # Compute phi-sensitive dimension
+            
+            # Compute dimension using the phi_sensitive function
             phi_dim = phi_sensitive_dimension(data, scaling_factor=factor)
+            dimensions[i] = phi_dim  # Store phi-sensitive dimension
             
-            # Calculate phi sensitivity as the difference between phi-sensitive and regular dimension
+            # Calculate phi sensitivity - now the difference between methods
             phi_sensitivity[i] = phi_dim - dim
             
             # Calculate correlation with phi
@@ -839,6 +842,7 @@ def analyze_phi_resonance(
         'scaling_factors': scaling_factors,
         'dimensions': dimensions,
         'phi_sensitivity': phi_sensitivity,
+        'standard_dimensions': standard_dimensions,  # Added: Include standard dimensions
         'correlation_scores': correlation_scores,
         'resonance_points': resonance_points,
         'resonance_values': resonance_values,

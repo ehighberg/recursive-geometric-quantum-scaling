@@ -1,0 +1,98 @@
+
+    <html>
+    <head>
+        <style>
+            table {
+                border-collapse: collapse;
+                width: 100%;
+                font-family: Arial, sans-serif;
+            }
+            th, td {
+                text-align: left;
+                padding: 8px;
+                border: 1px solid #ddd;
+            }
+            th {
+                background-color: #4CAF50;
+                color: white;
+            }
+            tr:nth-child(even) {
+                background-color: #f2f2f2;
+            }
+            tr:hover {
+                background-color: #ddd;
+            }
+            .significant {
+                font-weight: bold;
+                color: green;
+            }
+            .insignificant {
+                color: gray;
+            }
+        </style>
+    </head>
+    <body>
+        <h2>Statistical Validation of Phi (φ ≈ 1.618034) Significance</h2>
+        <table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: left;">
+      <th>Metric</th>
+      <th>p-value</th>
+      <th>Adjusted p-value</th>
+      <th>Effect Size</th>
+      <th>Effect Category</th>
+      <th>Significant (raw)</th>
+      <th>Significant (adjusted)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>entanglement_rate</td>
+      <td>1.532806e-18</td>
+      <td>7.664030e-18</td>
+      <td>2.209943</td>
+      <td>large</td>
+      <td>True</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <td>topological_robustness</td>
+      <td>7.742666e-10</td>
+      <td>1.935667e-09</td>
+      <td>1.535182</td>
+      <td>large</td>
+      <td>True</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <td>fractal_dimension</td>
+      <td>9.152630e-01</td>
+      <td>9.152630e-01</td>
+      <td>0.015267</td>
+      <td>negligible</td>
+      <td>False</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>energy_gap</td>
+      <td>2.399007e-02</td>
+      <td>3.998345e-02</td>
+      <td>-0.340490</td>
+      <td>small</td>
+      <td>True</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <td>stability</td>
+      <td>6.831511e-01</td>
+      <td>8.539388e-01</td>
+      <td>-0.087311</td>
+      <td>negligible</td>
+      <td>False</td>
+      <td>False</td>
+    </tr>
+  </tbody>
+</table>
+    </body>
+    </html>
+    

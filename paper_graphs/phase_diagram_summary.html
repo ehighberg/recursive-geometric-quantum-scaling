@@ -1,0 +1,94 @@
+
+    <html>
+    <head>
+        <style>
+            table {
+                border-collapse: collapse;
+                width: 100%;
+                font-family: Arial, sans-serif;
+            }
+            th, td {
+                text-align: left;
+                padding: 8px;
+                border: 1px solid #ddd;
+            }
+            th {
+                background-color: #9370DB;
+                color: white;
+            }
+            tr:nth-child(even) {
+                background-color: #f2f2f2;
+            }
+            tr:hover {
+                background-color: #ddd;
+            }
+            tr:nth-child(3) {
+                background-color: #FFEB3B;
+                font-weight: bold;
+            }
+            caption {
+                font-size: 1.5em;
+                margin-bottom: 10px;
+                font-weight: bold;
+            }
+        </style>
+    </head>
+    <body>
+        <h2>Phase Diagram Summary</h2>
+        <table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: left;">
+      <th>f_s Range</th>
+      <th>Phase Type</th>
+      <th>Topological Invariant</th>
+      <th>Fractal Dimension</th>
+      <th>Gap Size</th>
+      <th>Statistical Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>f_s &lt; 0.8</td>
+      <td>Trivial</td>
+      <td>0</td>
+      <td>Low (~0.8-1.0)</td>
+      <td>Large</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <td>0.8 &lt; f_s &lt; 1.4</td>
+      <td>Weakly Topological</td>
+      <td>±1</td>
+      <td>Medium (~1.0-1.2)</td>
+      <td>Medium</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <td>f_s ≈ φ (1.618034)</td>
+      <td>Strongly Topological</td>
+      <td>±1</td>
+      <td>Statistically similar to others (~1.0-1.2)</td>
+      <td>Small</td>
+      <td>p=0.915, effect size=0.015 (negligible)</td>
+    </tr>
+    <tr>
+      <td>1.8 &lt; f_s &lt; 2.4</td>
+      <td>Weakly Topological</td>
+      <td>±1</td>
+      <td>Medium (~1.0-1.2)</td>
+      <td>Medium</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <td>f_s &gt; 2.4</td>
+      <td>Trivial</td>
+      <td>0</td>
+      <td>Low (~0.8-1.0)</td>
+      <td>Large</td>
+      <td>NaN</td>
+    </tr>
+  </tbody>
+</table>
+    </body>
+    </html>
+    

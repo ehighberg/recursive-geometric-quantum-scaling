@@ -124,76 +124,50 @@ def get_phi_recursive_unitary(H, time, scaling_factor=1.0, recursion_depth=3,
                              gaussian_width=None, phi_threshold=None, 
                              correction_cutoff=None):
     """
-    Create a unitary with recursive golden-ratio-based structure.
+    Create a unitary with recursive golden-ratio-based structure by implementing
+    the recursion relation U_φ(t) = U(t/φ) · U(t/φ²), which creates self-similar
+    patterns in the quantum evolution.
     
-    This function implements a phi-resonant scaling of quantum operations. When the
-    scaling factor is close to φ, it creates a recursive pattern based on the Fibonacci
-    sequence. Otherwise, it applies a standard scaling with nonlinear corrections.
+    Mathematical model:
+    U_φ(t) = U(t/φ) · U(t/φ²)
+    
+    where U(t) = exp(-i·H·t·scaling_factor)
     
     Parameters:
     -----------
-    H (Qobj): Hamiltonian operator
-    time (float): Evolution time
-    scaling_factor (float): Factor to scale the unitary
-    recursion_depth (int): Depth of recursion for phi-based patterns
-    gaussian_width (float, optional): Width of the Gaussian for phi-proximity
-                                     (Default: PHI_GAUSSIAN_WIDTH)
-    phi_threshold (float, optional): Threshold for phi proximity effect
-                                    (Default: PHI_THRESHOLD)
-    correction_cutoff (float, optional): Cutoff to decide if correction is applied
-                                        (Default: CORRECTION_CUTOFF)
-    
+    H : Qobj
+        Hamiltonian operator
+ (unscaled)
+    time : float
+        Evolution time
+    scaling_factor : float
+        Scaling factor for the Hamiltonian (applied consistently at each level)
+    recursion_depth : int
+        Recursion depth (0 means no recursion)
+        
     Returns:
     --------
-    Qobj: Scaled unitary with potential phi-resonance
-    
-    Notes:
-    ------
-    The recursive structure at φ models the self-similar patterns of golden-ratio-based
-    systems in nature. The recursive formula: U_φ = U_φ/φ * U_φ/φ² creates a pattern
-    that exhibits fibonacci-like properties in the quantum evolution.
+    Qobj: Unitary evolution operator
     """
-    # Use default values from config if not specified
-    if gaussian_width is None:
-        gaussian_width = PHI_GAUSSIAN_WIDTH
-    if phi_threshold is None:
-        phi_threshold = PHI_THRESHOLD
-    if correction_cutoff is None:
-        correction_cutoff = CORRECTION_CUTOFF
-        
-    # Use matrix exponentiation directly instead of propagator to avoid integration issues
-    U_base = (-1j * H * time).expm()
+    # Base case: no recursion or invalid recursion depth
+    if recursion_depth <= 0:
+        # Apply standard time evolution with scaling_factor
     
-    # Base case for recursion
-    if recursion_depth <= 0 or scaling_factor == 1.0:
-        return U_base
+   #: The scaling factor is applied ONCE here
+        H_scaled = scaling_factor * H
+        return (-1j * H_scaled * time).expm()
     
-    phi = PHI  # Golden ratio
+    # Recursive case: implement the mathematical relation U_φ(t) = U(t/φ) · U(t/φ²)
+    # Apply recursion with proper parameter passing:
+    # - Pass the SAME scaling_factor down the recursion chain
+    # - Only modify the time parameter with phi divisions
+    U_phi1 = get_phi_recursive_unitary(
+H, time/PHI, scaling_factor, recursion_depth-1)
+    U_phi2 = get_phi_recursive_unitary(
+H, time/(PHI**2), scaling_factor, recursion_depth-1)
     
-    # Calculate proximity to phi for resonance effects
-    phi_proximity = _calculate_phi_proximity(scaling_factor, gaussian_width)
-    
-    if phi_proximity > phi_threshold:  # Close to phi
-        # At phi, create recursive operator structure 
-        U_phi1 = get_phi_recursive_unitary(
-            H, time/phi, scaling_factor/phi, recursion_depth-1,
-            gaussian_width, phi_threshold, correction_cutoff
-        )
-        U_phi2 = get_phi_recursive_unitary(
-            H, time/phi**2, scaling_factor/phi**2, recursion_depth-1,
-            gaussian_width, phi_threshold, correction_cutoff
-        )
-        return U_phi1 * U_phi2
-    else:
-        # For non-phi values, use different composition rule
-        logU = U_base.logm()
-        U_scaled = (scaling_factor * logU).expm()
-        
-        # Add non-linear term that's most significant near phi
-        correction_factor = scaling_factor/(1 + abs(scaling_factor - phi))
-        correction = (correction_factor * logU**2).expm() if correction_factor > correction_cutoff else Qobj(np.eye(U_base.shape[0]))
-        
-        return U_scaled * correction
+    # Combine recursive unitaries
+    return U_phi1 * U_phi2
 
 def simulate_scaled_unitary(scaling_factor=1.0):
     """
@@ -367,7 +341,7 @@ def analyze_phi_recursion_properties(H, time, scaling_factors, recursion_depths=
             results['phi_sensitivity'][depth].append(float(phi_sensitivity))
     
     return results
-
+ 
 
 def create_phi_resonant_gate(H, time, scaling_factor=PHI, recursion_depth=2):
     """
@@ -386,7 +360,7 @@ def create_phi_resonant_gate(H, time, scaling_factor=PHI, recursion_depth=2):
     U_phi = get_phi_recursive_unitary(H, time, scaling_factor, recursion_depth)
     
     # Create custom gate
-    gate = Gate(name=f"PHI_RESONANT_{scaling_factor:.3f}_d{recursion_depth}", targets=[0])
+    gate = Gate(name=f"PHI_RESONANT_{scaling_factor:.4f}_d{recursion_depth}", targets=[0])
     gate.matrix = U_phi.full()
     
     return gate
