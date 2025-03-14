@@ -482,13 +482,9 @@ def generate_fractal_dimension_vs_recursion(output_dir):
     plt.ylim(0.8, 2.0)
     plt.tight_layout()
     
-    # Save the figure using proper syntax (commas between parameters)
-    # Debug prints for tracing
-    print("Debug - recursion_depths:", recursion_depths)
-    print("Debug - phi_dimensions:", phi_dimensions)
+    # Save the figure 
     fig = plt.gcf()
     fig_width, fig_height = fig.get_size_inches()
-    print("Debug - figure size before validation:", fig_width, fig_height)
     if not np.isfinite(fig_height) or fig_height > 100:
         print(f"WARNING: Invalid figure height detected: {fig_height}. Resetting to 8 inches.")
         fig.set_figheight(8)
