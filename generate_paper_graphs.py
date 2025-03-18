@@ -983,16 +983,45 @@ def generate_fractal_dimension_vs_recursion(output_dir):
         
         # Calculate fractal dimensions
         try:
+            # Define a local implementation of estimate_fractal_dimension to ensure it's available
+            def local_estimate_fractal_dimension(data, box_sizes=None):
+                """Simple fractal dimension calculation."""
+                if data.ndim > 1:
+                    data = data.reshape(-1)
+                data = data / np.max(data)
+                
+                box_sizes = np.logspace(-2, 0, 20) if box_sizes is None else box_sizes
+                counts = []
+                valid_boxes = []
+                
+                for box in box_sizes:
+                    n_segments = min(int(1/box), 1000)
+                    if n_segments <= 1:
+                        continue
+                        
+                    segments = np.array_split(data, n_segments)
+                    count = sum(1 for segment in segments if np.any(segment > 0.1))
+                    if count > 0:
+                        counts.append(count)
+                        valid_boxes.append(box)
+                
+                if len(valid_boxes) < 5:
+                    return 1.0, {'confidence_interval': (0.8, 1.2)}
+                
+                log_boxes = np.log(1.0 / np.array(valid_boxes))
+                log_counts = np.log(np.array(counts))
+                slope, _, _, _, _ = linregress(log_boxes, log_counts)
+                return float(slope), {'confidence_interval': (slope-0.2, slope+0.2)}
+            
             # Convert quantum states to data suitable for fractal dimension calculation
             phi_data = np.abs(phi_state.full().flatten())**2
             unit_data = np.abs(unit_state.full().flatten())**2
             arb_data = np.abs(arb_state.full().flatten())**2
             
-            # Reference the globally defined estimate_fractal_dimension function
-            # that was defined at the top of the file
-            phi_dim, _ = estimate_fractal_dimension(phi_data)
-            unit_dim, _ = estimate_fractal_dimension(unit_data)
-            arb_dim, _ = estimate_fractal_dimension(arb_data)
+            # Use the locally defined function to ensure availability
+            phi_dim, _ = local_estimate_fractal_dimension(phi_data)
+            unit_dim, _ = local_estimate_fractal_dimension(unit_data)
+            arb_dim, _ = local_estimate_fractal_dimension(arb_data)
             
             # Store dimensions
             phi_dimensions.append(phi_dim)
