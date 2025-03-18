@@ -315,8 +315,15 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     
     # TODO: extract the following analysis code to an analysis script, they don't need to be part of the Result.
     # Store Hamiltonian function for fractal analysis
+    # FIXED: Don't apply scaling_factor again since it's already applied in the evolution
     def hamiltonian(f_s):
-        return f_s * H0
+        if f_s == scaling_factor:
+            # If using the exact same scaling factor, return the already-scaled Hamiltonian
+            return H0
+        else:
+            # If a different scaling factor is requested (e.g., for analysis),
+            # apply correct scaling relative to current factor
+            return (f_s / scaling_factor) * H0
     result.hamiltonian = hamiltonian
     
     # Store additional metadata
@@ -590,6 +597,17 @@ def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor
     result.scaling_factor = scaling_factor
     result.state_label = state_label
     result.recursion_depth = recursion_depth
+    
+    # Store Hamiltonian function for fractal analysis - similar to the fix in run_state_evolution
+    def hamiltonian(f_s):
+        if f_s == scaling_factor:
+            # If using the exact same scaling factor, return the already-scaled Hamiltonian
+            return H0
+        else:
+            # If a different scaling factor is requested (e.g., for analysis),
+            # apply correct scaling relative to current factor
+            return (f_s / scaling_factor) * H0
+    result.hamiltonian = hamiltonian
     
     # Perform phi-sensitive analysis if requested
     if analyze_phi:

@@ -88,8 +88,15 @@ def run_phi_scaled_twoqubit_circuit(scaling_factor=1.0, noise_config=None):
         result = pcirc.evolve_closed(psi_init, n_steps=5)
     
     # Store Hamiltonian function for fractal analysis
+    # FIXED: Don't apply scaling_factor again since it's already applied in the ScaledCircuit
     def hamiltonian(f_s):
-        return float(f_s) * H0
+        if f_s == scaling_factor:
+            # If using the exact same scaling factor, return the already-scaled Hamiltonian
+            return H0
+        else:
+            # If a different scaling factor is requested (e.g., for analysis), 
+            # apply correct scaling relative to current factor
+            return (f_s / scaling_factor) * H0
     result.hamiltonian = hamiltonian
     
     # Ensure e_ops and options are set

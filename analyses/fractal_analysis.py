@@ -134,15 +134,16 @@ def compute_energy_spectrum(
     config: Optional[Dict] = None,
     eigen_index: int = 0
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, Union[List[Tuple[float, float, float, float]], np.ndarray, Dict[str, float]]]]:
-    #TODO: refactor to make the application of f_s meaningful. currently this scales the hamiltonian from the end of the evolution by a range of f_s values, even though the hamiltonian is based on the initial choice of the scaling factor.
     """
     Compute energy spectrum over f_s parameter range with enhanced analysis of
-    self-similar regions.
-
+    self-similar regions. The scaling factor f_s is applied directly and only once 
+    at the Hamiltonian level through the H_func.
+    
     Parameters:
     -----------
     H_func : Callable[[float], Union[Qobj, np.ndarray]]
-        Function that takes f_s parameter and returns Hamiltonian (either Qobj or numpy array).
+        Function that takes f_s parameter and returns the correctly scaled Hamiltonian.
+        This function should apply the scaling factor f_s exactly once.
     config : Optional[Dict]
         Configuration dictionary. If None, loads from evolution_config.yaml.
     eigen_index : int

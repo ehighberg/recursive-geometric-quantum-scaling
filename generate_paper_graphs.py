@@ -1183,19 +1183,15 @@ def generate_topological_invariants_graph(output_dir):
             eigenvalues, states = H_k.eigenstates()
             eigenstates.append(states[0])
         
-        # Define functions for computing standard winding number and berry phase
-        def compute_standard_winding(eigenstates, k_points, scaling_factor):
-            """Compute standard winding number for eigenstates."""
-            # Simple implementation for demonstration
-            return round(scaling_factor % 2)  # Just returns 0 or 1 based on scaling factor
+        # Use the proper topological invariant calculations from the analysis module
+        # instead of simplified placeholder implementations
+        from analyses.topological_invariants import compute_winding_number, compute_berry_phase
         
-        def compute_berry_phase_standard(eigenstates, scaling_factor):
-            """Compute Berry phase for eigenstates."""
-            # Simple implementation for demonstration
-            return np.pi * (scaling_factor % 1)  # Returns value between 0 and pi
+        # Calculate winding number using the proper implementation
+        winding = compute_winding_number(eigenstates, k_points)
         
-        # Calculate winding number (topological invariant)
-        winding = compute_standard_winding(eigenstates, k_points, f_s)
+        # Calculate Berry phase using the proper implementation
+        berry_phase = compute_berry_phase(eigenstates)
         
         # Extract winding number (handles both float and dict returns)
         if isinstance(winding, dict) and 'winding' in winding:
@@ -1204,9 +1200,6 @@ def generate_topological_invariants_graph(output_dir):
             winding_value = winding
             
         winding_numbers.append(np.round(winding_value))  # Round to nearest integer
-        
-        # Calculate Berry phase
-        berry_phase = compute_berry_phase_standard(eigenstates, f_s)
         
         # Extract berry phase (handles both float and dict returns)
         if isinstance(berry_phase, dict) and 'berry_phase' in berry_phase:
