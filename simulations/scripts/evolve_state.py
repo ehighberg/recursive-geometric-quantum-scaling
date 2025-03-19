@@ -179,107 +179,20 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     - state_label (str): Label for initial state ("zero", "one", "plus", "ghz", "w", "fractal", "fibonacci", "phi_sensitive")
     - n_steps (int): Number of evolution steps
     - scaling_factor (float): Factor to scale the Hamiltonian (default: 1)
-    - noise_config (dict): Noise configuration dictionary (see simulate_evolution docstring)
+    - noise_config (dict): Noise configuration dictionary
     - pulse_type (str): Type of pulse shape ("Square", "Gaussian", "DRAG", "PhiResonant")
     - analyze_fractal (bool): Whether to perform fractal analysis (computationally expensive)
     
     Returns:
     - qutip.Result: Result object containing evolution data
+    
+    Note: The scaling_factor is applied EXACTLY ONCE at the Hamiltonian level.
+    DO NOT apply the scaling factor again to any Hamiltonian or unitary objects.
     """
     print(f"Running state evolution with scaling factor {scaling_factor:.6f}...")
     
     # Construct appropriate n-qubit Hamiltonian
     H0 = construct_nqubit_hamiltonian(num_qubits)
-    
-    # Scale Hamiltonian by factor
-    # Determine effective Hamiltonian based on pulse_type
-    if pulse_type == "Square":
-        H_effective = scaling_factor * H0
-    elif pulse_type == "Gaussian":
-        T = 10.0
-        def gaussian_envelope(t, args):
-            return np.exp(-((t - T/2)**2)/((T/4)**2))
-        H_effective = lambda t, args: scaling_factor * gaussian_envelope(t, args) * H0
-    elif pulse_type == "DRAG":
-        T = 10.0
-        def drag_envelope(t, args):
-            return np.exp(-((t - T/2)**2)/((T/4)**2)) * (1 + 0.1*(t - T/2))
-        H_effective = lambda t, args: scaling_factor * drag_envelope(t, args) * H0
-    elif pulse_type == "PhiResonant":
-        # Create phi-resonant Hamiltonian with recursive structure
-        phi = PHI
-        phi_proximity = np.exp(-(scaling_factor - phi)**2 / 0.1)  # Gaussian centered at phi
-        
-        # Add phi-resonant terms to Hamiltonian
-        H_phi = H0.copy()
-        
-        # For multi-qubit systems, add Fibonacci-pattern couplings
-        if num_qubits > 1:
-            # Generate Fibonacci sequence
-            fib = [1, 1]
-            while len(fib) < num_qubits * 2:  # Generate more Fibonacci numbers
-                fib.append(fib[-1] + fib[-2])
-            
-            # Add interactions between qubits at Fibonacci-separated indices
-            for i in range(num_qubits):
-                for j in range(num_qubits):
-                    if i != j and abs(j-i) in fib:
-                        # Create operators for interaction - use both XX and ZZ interactions
-                        # XX interactions (transverse coupling)
-                        op_list_xx = [qeye(2) for _ in range(num_qubits)]
-                        op_list_xx[i] = sigmax()
-                        op_list_xx[j] = sigmax()
-                        
-                        # ZZ interactions (longitudinal coupling)
-                        op_list_zz = [qeye(2) for _ in range(num_qubits)]
-                        op_list_zz[i] = sigmaz()
-                        op_list_zz[j] = sigmaz()
-                        
-                        # Add interaction terms with phi-dependent strength
-                        fib_idx = fib.index(abs(j-i))
-                        
-                        # Scale coupling strength by phi^(-fib_idx) to create hierarchical structure
-                        xx_coupling = scaling_factor * phi**(-fib_idx) * phi_proximity
-                        zz_coupling = scaling_factor * 0.7 * phi**(-fib_idx) * phi_proximity
-                        
-                        # Add both types of interactions
-                        H_phi += xx_coupling * tensor(op_list_xx)
-                        H_phi += zz_coupling * tensor(op_list_zz)
-            
-            # Add special phi-resonant three-body interactions for systems with 3+ qubits
-            if num_qubits >= 3:
-                for i in range(num_qubits - 2):
-                    # Create three-body interaction operators
-                    op_list_3body = [qeye(2) for _ in range(num_qubits)]
-                    op_list_3body[i] = sigmax()
-                    op_list_3body[i+1] = sigmaz()
-                    op_list_3body[i+2] = sigmax()
-                    
-                    # Add with phi-dependent coupling
-                    three_body_coupling = 0.2 * scaling_factor * phi_proximity
-                    H_phi += three_body_coupling * tensor(op_list_3body)
-        
-        # Create time-dependent envelope with phi-resonant properties
-        T = 10.0
-        def phi_envelope(t, args):
-            # Create envelope with Fibonacci-like time structure
-            t_norm = t / T
-            
-            # Enhanced envelope with phi-resonant modulation
-            # Base Gaussian envelope
-            gaussian = np.exp(-((t - T/2)**2)/((T/4)**2))
-            
-            # Phi-resonant modulation with multiple harmonics
-            modulation = (1 + 0.1 * np.sin(2*np.pi*phi*t_norm) + 
-                          0.05 * np.sin(2*np.pi*phi**2*t_norm) +
-                          0.025 * np.sin(2*np.pi*phi**3*t_norm))
-            
-            return gaussian * modulation
-        
-        # Create time-dependent Hamiltonian
-        H_effective = lambda t, args: phi_envelope(t, args) * H_phi
-    else:
-        H_effective = scaling_factor * H0
     
     # Initialize state with correct dimensions
     # Handle standard states
@@ -308,32 +221,96 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     # Add measurement operators for observables
     e_ops = [sigmaz()] if num_qubits == 1 else [tensor([sigmaz() if i == j else qeye(2) for i in range(num_qubits)]) for j in range(num_qubits)]
     
-    # Run evolution with noise if configured
-    print("Simulating quantum evolution...")
-    result = simulate_evolution(H_effective, psi_init, times, noise_config, e_ops)
-    result.times = times  # Store times for visualization
+    # Import improved evolution function
+    from simulations.quantum_utils import evolve_quantum_state
     
-    # TODO: extract the following analysis code to an analysis script, they don't need to be part of the Result.
-    # Store Hamiltonian function for fractal analysis
-    # FIXED: Don't apply scaling_factor again since it's already applied in the evolution
-    def hamiltonian(f_s):
-        if f_s == scaling_factor:
-            # If using the exact same scaling factor, return the already-scaled Hamiltonian
-            return H0
+    print("Simulating quantum evolution...")
+    
+    # Setup pulse modulation if needed
+    kwargs = {}
+    
+    if pulse_type == "PhiResonant":
+        # Use phi-recursive evolution for PhiResonant pulse type
+        result = evolve_quantum_state(
+            initial_state=psi_init,
+            hamiltonian=H0,
+            times=times,
+            scaling_factor=scaling_factor,
+            noise_config=noise_config,
+            phi_recursive=True,
+            recursion_depth=3,
+            e_ops=e_ops
+        )
+    elif pulse_type in ["Gaussian", "DRAG"]:
+        # For time-dependent pulses, use the standard evolution with a time-dependent Hamiltonian
+        if pulse_type == "Gaussian":
+            T = 10.0
+            def gaussian_envelope(t, args):
+                return np.exp(-((t - T/2)**2)/((T/4)**2))
+            H_td = lambda t, args: gaussian_envelope(t, args) * H0
+        else:  # DRAG
+            T = 10.0
+            def drag_envelope(t, args):
+                return np.exp(-((t - T/2)**2)/((T/4)**2)) * (1 + 0.1*(t - T/2))
+            H_td = lambda t, args: drag_envelope(t, args) * H0
+            
+        # Time-dependent evolution requires different approach
+        # We'll use QuTiP's sesolve directly for this case
+        from qutip import Options, sesolve, mesolve
+        
+        options = Options(store_states=True)
+        
+        if noise_config:
+            # Handle noise with mesolve
+            if 'c_ops' in noise_config:
+                c_ops = noise_config['c_ops']
+            else:
+                # Setup standard noise operators
+                c_ops = []
+                for i in range(num_qubits):
+                    op_list_x = [qeye(2) for _ in range(num_qubits)]
+                    op_list_z = [qeye(2) for _ in range(num_qubits)]
+                    
+                    if noise_config.get('relaxation', 0) > 0:
+                        op_list_x[i] = sigmax()
+                        c_ops.append(np.sqrt(noise_config['relaxation']) * tensor(op_list_x))
+                    
+                    if noise_config.get('dephasing', 0) > 0:
+                        op_list_z[i] = sigmaz()
+                        c_ops.append(np.sqrt(noise_config['dephasing']) * tensor(op_list_z))
+                        
+            options.nsteps = 10000
+            result = mesolve([scaling_factor * H0, [H_td, 'sin(t)']], psi_init, times, c_ops, e_ops, options=options)
         else:
-            # If a different scaling factor is requested (e.g., for analysis),
-            # apply correct scaling relative to current factor
-            return (f_s / scaling_factor) * H0
-    result.hamiltonian = hamiltonian
+            result = sesolve([scaling_factor * H0, [H_td, 'sin(t)']], psi_init, times, e_ops, options=options)
+    else:
+        # Use standard evolution with linear scaling for Square pulse
+        result = evolve_quantum_state(
+            initial_state=psi_init,
+            hamiltonian=H0,
+            times=times,
+            scaling_factor=scaling_factor,
+            noise_config=noise_config,
+            phi_recursive=False,
+            e_ops=e_ops
+        )
     
     # Store additional metadata
     result.scaling_factor = scaling_factor
     result.state_label = state_label
     result.pulse_type = pulse_type
     
+    # Create Hamiltonian function that applies scaling correctly
+    def hamiltonian(f_s):
+        """Return correctly scaled Hamiltonian for a given scaling factor."""
+        return f_s * H0  # Apply scaling ONCE
+    
+    result.hamiltonian = hamiltonian
+    
     # Only perform fractal analysis if explicitly requested
     if analyze_fractal:
         from analyses.fractal_analysis import compute_wavefunction_profile, estimate_fractal_dimension
+        from simulations.quantum_utils import compute_eigenvalues
         
         print("Performing fractal analysis...")
         
@@ -376,9 +353,9 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
                            0.02 * np.sin(k) * tensor(sz_list) +
                            0.015 * np.cos(2*k) * tensor(sx_list))
 
-            # Get eigenvalues and ensure consistent shape
-            evals = np.sort(H_k.eigenenergies())
-            energies[k_idx, :] = evals
+            # Get eigenvalues using standardized function
+            evals = compute_eigenvalues(H_k)
+            energies[k_idx, :] = evals[:num_levels]  # Only store up to num_levels
 
         result.energies = energies
 
@@ -459,9 +436,12 @@ def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor
     - scaling_factor (float): Scaling factor (default: PHI)
     - recursion_depth (int): Depth of recursion for phi-based patterns
     - analyze_phi (bool): Whether to perform phi-sensitive analysis
+    - noise_config (dict): Noise configuration dictionary
     
     Returns:
     - qutip.Result: Result object containing evolution data
+    
+    Note: The scaling_factor is applied EXACTLY ONCE at the Hamiltonian level.
     """
     print(f"Running phi-recursive evolution with scaling factor {scaling_factor:.6f}...")
     
@@ -504,109 +484,28 @@ def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor
     # Add measurement operators for observables
     e_ops = [sigmaz()] if num_qubits == 1 else [tensor([sigmaz() if i == j else qeye(2) for i in range(num_qubits)]) for j in range(num_qubits)]
     
-    # Create phi-recursive unitary for each time step
-    print("Creating phi-recursive unitaries...")
-    unitaries = []
-    for t in tqdm(times, desc="Creating unitaries", unit="time step"):
-        U = get_phi_recursive_unitary(H0, t, scaling_factor, recursion_depth)
-        unitaries.append(U)
+    # Use the standardized quantum evolution function with phi_recursive=True
+    from simulations.quantum_utils import evolve_quantum_state
     
-    # Manually evolve the state using the unitaries
-    print("Evolving quantum state...")
-    states = []  # Initialize states list
-    current_state = psi_init
+    result = evolve_quantum_state(
+        initial_state=psi_init,
+        hamiltonian=H0,
+        times=times,
+        scaling_factor=scaling_factor,
+        noise_config=noise_config,
+        phi_recursive=True,
+        recursion_depth=recursion_depth,
+        e_ops=e_ops
+    )
     
-    for i, U in enumerate(tqdm(unitaries, desc="Applying unitaries", unit="step")):
-        # Apply unitary evolution
-        evolved_state = U * current_state
-        
-        # If noise is configured, apply noise effects manually
-        if noise_config:
-            # Convert to density matrix if it's a ket
-            if evolved_state.isket:
-                evolved_state = evolved_state * evolved_state.dag()
-            
-            # Apply dephasing noise (diagonal terms decay)
-            if noise_config.get('dephasing', 0) > 0:
-                dephasing = noise_config['dephasing']
-                # For each element in the density matrix
-                data = evolved_state.full()
-                for j in range(data.shape[0]):
-                    for k in range(data.shape[1]):
-                        if j != k:  # Off-diagonal elements
-                            # Apply exponential decay to off-diagonal elements
-                            data[j, k] *= np.exp(-dephasing * times[i])
-                
-                # Create new density matrix with decayed elements
-                from qutip import Qobj
-                evolved_state = Qobj(data, dims=evolved_state.dims)
-            
-            # Apply relaxation noise (population decay to ground state)
-            if noise_config.get('relaxation', 0) > 0:
-                relaxation = noise_config['relaxation']
-                # For each element in the density matrix
-                data = evolved_state.full()
-                # Diagonal elements decay toward ground state
-                for j in range(1, data.shape[0]):  # Skip ground state
-                    # Population decay
-                    decay_factor = np.exp(-relaxation * times[i])
-                    # Population transfers to ground state
-                    ground_transfer = (1 - decay_factor) * data[j, j]
-                    # Update diagonal elements
-                    data[j, j] *= decay_factor
-                    data[0, 0] += ground_transfer
-                
-                # Create new density matrix with decayed populations
-                from qutip import Qobj
-                evolved_state = Qobj(data, dims=evolved_state.dims)
-        
-        # Add state to list
-        states.append(evolved_state)
-    
-    # Create a custom result object instead of using QuTiP's Result class
-    class CustomResult:
-        def __init__(self):
-            self.times = None
-            self.states = None
-            self.e_ops = None
-            self.options = {}
-            self.expect = []
-    
-    result = CustomResult()
-    result.times = times
-    result.states = states
-    result.e_ops = e_ops
-    
-    # Compute expectation values
-    print("Computing expectation values...")
-    for op in e_ops:
-        expect_values = []
-        for state in tqdm(states, desc=f"Computing <{op}>", unit="state", leave=False):
-            # Handle the case where the result is already a complex number
-            expectation = state.dag() * op * state
-            if hasattr(expectation, 'tr'):
-                # If it's a QuTiP object with a trace method
-                expectation = expectation.tr()
-            # Ensure the result is a real number if it's supposed to be
-            if isinstance(expectation, complex) and abs(expectation.imag) < 1e-10:
-                expectation = expectation.real
-            expect_values.append(expectation)
-        result.expect.append(np.array(expect_values))
-    
-    # Store metadata
-    result.scaling_factor = scaling_factor
+    # Store additional metadata
     result.state_label = state_label
-    result.recursion_depth = recursion_depth
     
-    # Store Hamiltonian function for fractal analysis - similar to the fix in run_state_evolution
+    # Create Hamiltonian function that applies scaling correctly
     def hamiltonian(f_s):
-        if f_s == scaling_factor:
-            # If using the exact same scaling factor, return the already-scaled Hamiltonian
-            return H0
-        else:
-            # If a different scaling factor is requested (e.g., for analysis),
-            # apply correct scaling relative to current factor
-            return (f_s / scaling_factor) * H0
+        """Return correctly scaled Hamiltonian for a given scaling factor."""
+        return f_s * H0  # Apply scaling ONCE
+    
     result.hamiltonian = hamiltonian
     
     # Perform phi-sensitive analysis if requested
@@ -617,7 +516,7 @@ def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor
         print("Performing phi-sensitive analysis...")
         
         # Compute phi-sensitive fractal dimension
-        final_state = states[-1]
+        final_state = result.states[-1]  # Use result.states instead of states
         wf_data = np.abs(final_state.full().flatten())**2
         
         # Compute phi-sensitive dimension
@@ -641,7 +540,8 @@ def run_phi_recursive_evolution(num_qubits, state_label, n_steps, scaling_factor
             # Create k-dependent Hamiltonian
             H_k = H0 + k * sigmax() if num_qubits == 1 else H0
             
-            # Get phi-recursive unitary
+            # Get phi-recursive unitary from the canonical source
+            from simulations.scaled_unitary import get_phi_recursive_unitary
             U_k = get_phi_recursive_unitary(H_k, 1.0, scaling_factor, recursion_depth)
             
             # Apply to initial state

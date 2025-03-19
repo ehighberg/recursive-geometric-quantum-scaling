@@ -134,6 +134,7 @@ def compute_energy_spectrum(
     config: Optional[Dict] = None,
     eigen_index: int = 0
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, Union[List[Tuple[float, float, float, float]], np.ndarray, Dict[str, float]]]]:
+    from simulations.quantum_utils import compute_eigenvalues
     """
     Compute energy spectrum over f_s parameter range with enhanced analysis of
     self-similar regions. The scaling factor f_s is applied directly and only once 
@@ -177,28 +178,13 @@ def compute_energy_spectrum(
     for f_s in f_s_values:
         H = H_func(f_s)
         
-        # Handle different types of Hamiltonian objects
-        if isinstance(H, Qobj):
-            # Use QuTiP's eigenenergies method for Qobj
-            evals = np.sort(H.eigenenergies())
-        elif isinstance(H, np.ndarray):
-            # Use numpy's eigvals for numpy arrays
-            if H.ndim == 2 and H.shape[0] == H.shape[1]:  # Check if square matrix
-                evals = np.sort(np.linalg.eigvals(H))
-            else:
-                # If not a square matrix, treat as diagonal Hamiltonian
-                evals = np.sort(np.diag(H) if H.ndim == 2 else H)
-        else:
-            # For other types, try to convert to numpy array
-            try:
-                H_array = np.array(H)
-                if H_array.ndim == 2 and H_array.shape[0] == H_array.shape[1]:
-                    evals = np.sort(np.linalg.eigvals(H_array))
-                else:
-                    evals = np.sort(np.diag(H_array) if H_array.ndim == 2 else H_array)
-            except:
-                # Fallback: return a single eigenvalue
-                evals = np.array([0.0])
+        # Use standardized eigenvalue computation function
+        try:
+            evals = compute_eigenvalues(H)
+        except (TypeError, ValueError) as e:
+            # Log error and return fallback value
+            print(f"Error computing eigenvalues: {e}")
+            evals = np.array([0.0])
                 
         energies.append(evals)
     

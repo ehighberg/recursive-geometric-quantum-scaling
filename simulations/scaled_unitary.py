@@ -1,10 +1,12 @@
 """
 Scaled unitary operator implementation using qutip's features.
 
-This module includes implementations for:
+This module includes canonical implementations for:
 - Linear scaling of unitary operators
 - Non-linear phi-resonant scaling
 - Recursive geometric scaling with golden ratio properties
+
+All functions in this module apply scaling factors EXACTLY ONCE.
 """
 
 import numpy as np
@@ -14,7 +16,6 @@ from qutip_qip.operations import Gate
 from qutip_qip.circuit import QubitCircuit
 from constants import PHI
 
-#TODO: use these functions instead of existing code with the same purpose, or remove them
 def get_scaled_unitary(H, time, scaling_factor=1.0):
     """
     Get the linearly scaled unitary operator for a given Hamiltonian.
