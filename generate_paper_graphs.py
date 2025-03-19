@@ -81,7 +81,7 @@ def create_initial_state(num_qubits, state_label):
 
 def create_system_hamiltonian(num_qubits, hamiltonian_type="x", scaling_factor=1.0):
     """
-    Create a system Hamiltonian of the specified type using the standardized HamiltonianFactory.
+    Create a system Hamiltonian of the specified type.
     
     Parameters:
     -----------
@@ -97,19 +97,66 @@ def create_system_hamiltonian(num_qubits, hamiltonian_type="x", scaling_factor=1
     Qobj
         QuTiP quantum object representing the scaled Hamiltonian
     """
-    from simulations.quantum_utils import HamiltonianFactory
-    
-    # Use the factory to create a properly scaled Hamiltonian
-    parameters = {}
-    if hamiltonian_type == "ising":
-        parameters = {'field_strength': 0.5}  # Match original field strength
+    # Try to use the HamiltonianFactory if available
+    try:
+        from simulations.quantum_utils import HamiltonianFactory
         
-    return HamiltonianFactory.create_hamiltonian(
-        hamiltonian_type=hamiltonian_type,
-        num_qubits=num_qubits,
-        scaling_factor=scaling_factor,
-        parameters=parameters
-    )
+        # Use the factory to create a properly scaled Hamiltonian
+        parameters = {}
+        if hamiltonian_type == "ising":
+            parameters = {'field_strength': 0.5}  # Match original field strength
+            
+        return HamiltonianFactory.create_hamiltonian(
+            hamiltonian_type=hamiltonian_type,
+            num_qubits=num_qubits,
+            scaling_factor=scaling_factor,
+            parameters=parameters
+        )
+    except ImportError:
+        # Fall back to direct implementation if factory isn't available
+        if hamiltonian_type == "z":
+            if num_qubits == 1:
+                return scaling_factor * sigmaz()
+            else:
+                H = 0
+                for i in range(num_qubits):
+                    op_list = [qeye(2) for _ in range(num_qubits)]
+                    op_list[i] = sigmaz()
+                    H += tensor(op_list)
+                return scaling_factor * H
+                
+        elif hamiltonian_type == "x":
+            if num_qubits == 1:
+                return scaling_factor * sigmax()
+            else:
+                H = 0
+                for i in range(num_qubits):
+                    op_list = [qeye(2) for _ in range(num_qubits)]
+                    op_list[i] = sigmax()
+                    H += tensor(op_list)
+                return scaling_factor * H
+                
+        elif hamiltonian_type == "ising":
+            if num_qubits == 1:
+                return scaling_factor * sigmaz()
+            else:
+                H = 0
+                # Add Z-Z coupling between neighbors
+                for i in range(num_qubits-1):
+                    op_list = [qeye(2) for _ in range(num_qubits)]
+                    op_list[i] = sigmaz()
+                    op_list[i+1] = sigmaz()
+                    H += tensor(op_list)
+                # Add X terms
+                for i in range(num_qubits):
+                    op_list = [qeye(2) for _ in range(num_qubits)]
+                    op_list[i] = sigmax()
+                    H += 0.5 * tensor(op_list)
+                return scaling_factor * H
+                
+        else:
+            # Default to X Hamiltonian
+            return create_system_hamiltonian(num_qubits, "x", scaling_factor)
 
 # Polyfill for EvolutionResult when needed
 class FixedEvolutionResult:
@@ -239,7 +286,8 @@ from analyses.visualization.fractal_plots import (
 )
 from analyses.visualization.wavepacket_plots import (
     plot_wavepacket_evolution,
-    plot_wavepacket_spacetime
+    plot_wavepacket_spacetime,
+    plot_comparative_wavepacket_evolution
 )
 from analyses.entanglement_dynamics import (
     plot_entanglement_entropy_vs_time,
@@ -1181,44 +1229,52 @@ def generate_topological_invariants_graph(output_dir):
         berry_phase = compute_berry_phase(eigenstates)
         
         # Extract winding number (handles different return types)
-        # Fix Pylint errors by using safe dictionary access patterns
-        if isinstance(winding, dict):
-            # Dictionary-style lookup with fallbacks
-            if 'winding' in winding.keys():
-                winding_value = winding['winding']
-            elif 'value' in winding.keys():
-                winding_value = winding['value'] 
-            elif len(winding) > 0:
-                # Extract first value if keys are unknown
-                first_key = list(winding.keys())[0]
-                winding_value = winding[first_key]
-            else:
-                winding_value = 0.0
-        else:
-            # If it's not a dictionary, use directly
-            winding_value = winding if winding is not None else 0.0
+        # Use more robust approach for all possible return types
+        winding_value = 0.0
+        try:
+            if winding is not None:
+                if isinstance(winding, dict):
+                    # Check for known keys in dictionary
+                    if 'winding' in winding:
+                        winding_value = winding['winding']
+                    elif 'value' in winding:
+                        winding_value = winding['value']
+                    elif winding:  # If dictionary is not empty
+                        # If keys are unknown but dictionary is not empty, try first key
+                        first_key = next(iter(winding))
+                        winding_value = winding[first_key]
+                else:
+                    # If it's a direct value (not dict), use it directly
+                    winding_value = float(winding)
+        except (TypeError, ValueError, KeyError, AttributeError) as e:
+            print(f"Warning: Could not extract winding number: {e}")
+            # Default to 0.0 if all approaches fail
             
         winding_numbers.append(np.round(winding_value))  # Round to nearest integer
         
         # Extract berry phase (handles different return types)
-        # Similar safe approach for berry_phase
-        if isinstance(berry_phase, dict):
-            # Dictionary-style lookup with fallbacks
-            if 'berry_phase' in berry_phase.keys():
-                berry_phase_value = berry_phase['berry_phase']
-            elif 'phase' in berry_phase.keys():
-                berry_phase_value = berry_phase['phase']
-            elif 'value' in berry_phase.keys():
-                berry_phase_value = berry_phase['value']
-            elif len(berry_phase) > 0:
-                # Extract first value if keys are unknown
-                first_key = list(berry_phase.keys())[0]
-                berry_phase_value = berry_phase[first_key]
-            else:
-                berry_phase_value = 0.0
-        else:
-            # If it's not a dictionary, use directly
-            berry_phase_value = berry_phase if berry_phase is not None else 0.0
+        # Use more robust approach similar to winding number extraction
+        berry_phase_value = 0.0
+        try:
+            if berry_phase is not None:
+                if isinstance(berry_phase, dict):
+                    # Check for known keys in dictionary
+                    if 'berry_phase' in berry_phase:
+                        berry_phase_value = berry_phase['berry_phase']
+                    elif 'phase' in berry_phase:
+                        berry_phase_value = berry_phase['phase']
+                    elif 'value' in berry_phase:
+                        berry_phase_value = berry_phase['value']
+                    elif berry_phase:  # If dictionary is not empty
+                        # If keys are unknown but dictionary is not empty, try first key
+                        first_key = next(iter(berry_phase))
+                        berry_phase_value = berry_phase[first_key]
+                else:
+                    # If it's a direct value (not dict), use it directly
+                    berry_phase_value = float(berry_phase)
+        except (TypeError, ValueError, KeyError, AttributeError) as e:
+            print(f"Warning: Could not extract Berry phase: {e}")
+            # Default to 0.0 if all approaches fail
             
         berry_phases.append(berry_phase_value)
     
@@ -1715,7 +1771,7 @@ def generate_wavepacket_evolution(output_dir):
     print(f"Wavepacket evolution (unit) saved to {output_dir / 'wavepacket_evolution_unit.png'}")
     
     # Plot wavepacket spacetime diagram for phi scaling
-    fig_spacetime = plot_wavepacket_spacetime(
+    fig_spacetime_phi = plot_wavepacket_spacetime(
         states_phi, 
         times, 
         coordinates=x, 
@@ -1723,8 +1779,35 @@ def generate_wavepacket_evolution(output_dir):
     )
     
     # Save figure
-    fig_spacetime.savefig(output_dir / "wavepacket_spacetime_phi.png", dpi=300, bbox_inches='tight')
-    print(f"Wavepacket spacetime saved to {output_dir / 'wavepacket_spacetime_phi.png'}")
+    fig_spacetime_phi.savefig(output_dir / "wavepacket_spacetime_phi.png", dpi=300, bbox_inches='tight')
+    print(f"Wavepacket spacetime (phi) saved to {output_dir / 'wavepacket_spacetime_phi.png'}")
+    
+    # Plot wavepacket spacetime diagram for unit scaling
+    fig_spacetime_unit = plot_wavepacket_spacetime(
+        states_unit, 
+        times, 
+        coordinates=x, 
+        title='Wavepacket Spacetime (Unit Scaling)'
+    )
+    
+    # Save figure
+    fig_spacetime_unit.savefig(output_dir / "wavepacket_spacetime_unit.png", dpi=300, bbox_inches='tight')
+    print(f"Wavepacket spacetime (unit) saved to {output_dir / 'wavepacket_spacetime_unit.png'}")
+    
+    # Generate direct comparison between phi and unit scaling
+    print("Generating comparative wavepacket visualization...")
+    fig_comparison = plot_comparative_wavepacket_evolution(
+        states_unit,  # Trivial case (unit scaling)
+        states_phi,   # Non-trivial case (phi scaling)
+        times,
+        coordinates=x,
+        title=f'Phi vs. Unit Scaling: Wavepacket Evolution Comparison'
+    )
+    
+    # Save comparison figure
+    fig_comparison.savefig(output_dir / "wavepacket_evolution_comparison.png", dpi=300, bbox_inches='tight')
+    print(f"Wavepacket comparison saved to {output_dir / 'wavepacket_evolution_comparison.png'}")
+    
     plt.close('all')
 
 def generate_entanglement_entropy(output_dir):
@@ -1738,38 +1821,39 @@ def generate_entanglement_entropy(output_dir):
     """
     print("Generating entanglement entropy graphs...")
     
-    # Create initial state
+    # Create initial states
     num_qubits = 2
     psi0_phi = create_initial_state(num_qubits, state_label="bell")
     psi0_unit = create_initial_state(num_qubits, state_label="bell")
     
-    # Create Hamiltonians
-    H_phi = create_system_hamiltonian(num_qubits, hamiltonian_type="ising")
-    H_unit = create_system_hamiltonian(num_qubits, hamiltonian_type="ising")
+    # Create base Hamiltonians (unscaled)
+    H_phi = create_system_hamiltonian(num_qubits, hamiltonian_type="ising", scaling_factor=1.0)
+    H_unit = create_system_hamiltonian(num_qubits, hamiltonian_type="ising", scaling_factor=1.0)
     
     # Define time evolution
     times = np.linspace(0, 10.0, 100)
-    dt = times[1] - times[0]
     
-    # Evolve states
-    states_phi = [psi0_phi]
-    states_unit = [psi0_unit]
+    # Import standardized evolution function
+    from simulations.quantum_utils import evolve_quantum_state
     
-    # Apply phi scaling to Hamiltonian
-    H_phi_scaled = PHI * H_phi
-    H_unit_scaled = 1.0 * H_unit
+    # Evolve states using standardized function (applies scaling exactly once)
+    print("Evolving phi-scaled state...")
+    result_phi = evolve_quantum_state(
+        initial_state=psi0_phi,
+        hamiltonian=H_phi,
+        times=times,
+        scaling_factor=PHI
+    )
+    states_phi = result_phi.states
     
-    # Evolve states
-    for _ in range(len(times) - 1):
-        # Phi scaling
-        U_phi = (-1j * H_phi_scaled * dt).expm()
-        psi_phi = U_phi * states_phi[-1]
-        states_phi.append(psi_phi)
-        
-        # Unit scaling
-        U_unit = (-1j * H_unit_scaled * dt).expm()
-        psi_unit = U_unit * states_unit[-1]
-        states_unit.append(psi_unit)
+    print("Evolving unit-scaled state...")
+    result_unit = evolve_quantum_state(
+        initial_state=psi0_unit,
+        hamiltonian=H_unit,
+        times=times,
+        scaling_factor=1.0
+    )
+    states_unit = result_unit.states
     
     # Plot entanglement entropy for phi scaling
     fig_phi = plot_entanglement_entropy_vs_time(

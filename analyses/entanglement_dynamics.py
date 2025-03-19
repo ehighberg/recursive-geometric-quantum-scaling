@@ -29,20 +29,39 @@ def compute_entanglement_entropy_vs_time(
     Returns:
         List of entanglement entropy values
     """
+    if not states:
+        return []
+        
     entropies = []
     
-    for state in states:
-        # Determine subsystem partition if not provided
-        if subsystem_partition is None:
-            # Default to first half of qubits
-            if state.isket:
-                num_qubits = len(state.dims[0])
-            else:
-                num_qubits = len(state.dims[0])
-            subsystem_partition = list(range(num_qubits // 2))
+    # Determine subsystem partition once (don't redefine for each state)
+    if subsystem_partition is None:
+        # Get number of qubits from first state
+        first_state = states[0]
+        if first_state.isket:
+            num_qubits = len(first_state.dims[0])
+        else:
+            num_qubits = len(first_state.dims[0])
+            
+        # Default to first half of qubits
+        subsystem_partition = list(range(num_qubits // 2))
+    
+    # Validate subsystem partition
+    if not subsystem_partition:
+        raise ValueError("Subsystem partition cannot be empty")
         
-        # Compute entanglement entropy
-        entropy = entanglement_entropy(state, subsys=subsystem_partition[0])
+    for state in states:
+        # Validate state dimensions match subsystem requirements
+        if state.isket:
+            num_qubits = len(state.dims[0])
+        else:
+            num_qubits = len(state.dims[0])
+            
+        if max(subsystem_partition, default=0) >= num_qubits:
+            raise ValueError(f"Subsystem partition {subsystem_partition} exceeds system size {num_qubits}")
+        
+        # Compute entanglement entropy using the full subsystem partition
+        entropy = entanglement_entropy(state, subsys=subsystem_partition)
         entropies.append(entropy)
     
     return entropies
