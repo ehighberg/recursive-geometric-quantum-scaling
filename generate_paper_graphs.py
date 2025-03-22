@@ -719,8 +719,9 @@ def generate_topological_invariants_graph(output_dir):
     # Calculate normalized Berry phase (0 to 1 scale)
     normalized_berry = np.abs(berry_phases) / np.pi
     
-    # Create plot with two subplots
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12), gridspec_kw={'height_ratios': [1, 2]})
+    # Create plot with two subplots with improved proportions
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10), 
+                                 gridspec_kw={'height_ratios': [1, 1.5], 'hspace': 0.3})
     
     # First subplot: Winding numbers and Berry phase vs. scaling factor
     ax1.plot(scaling_factors, winding_numbers, 'o-', label='Winding Number (W)', color='#1f77b4')
@@ -744,8 +745,8 @@ def generate_topological_invariants_graph(output_dir):
     ax1.grid(True, alpha=0.3)
     
     # Second subplot: Phase diagram (Fractal Dimension vs. Topological Invariant)
-    scatter = ax2.scatter(fractal_dims, normalized_berry, c=scaling_factors, cmap='plasma', 
-                         s=80, alpha=0.8)
+    scatter = ax2.scatter(fractal_dims, normalized_berry, c=scaling_factors, 
+                         cmap='viridis', s=100, alpha=0.7, edgecolors='k', linewidths=0.5)
     
     # Identify and label different topological phases
     trivial_phase = (winding_numbers == 0)
@@ -770,29 +771,43 @@ def generate_topological_invariants_graph(output_dir):
                     arrowprops=dict(facecolor='black', shrink=0.05, width=1),
                     fontsize=10, fontweight='bold')
     
-    # Highlight phi point
+    # Highlight phi point with more prominence
     phi_idx = np.argmin(np.abs(scaling_factors - PHI))
     ax2.scatter([fractal_dims[phi_idx]], [normalized_berry[phi_idx]], 
-               c='red', s=150, marker='*', edgecolors='black', label=f'φ ≈ {PHI:.6f}')
+               c='red', s=200, marker='*', edgecolors='white', linewidths=2,
+               zorder=10, label=f'φ ≈ {PHI:.6f}')
     
     # Add colorbar for scaling factors
     cbar = fig.colorbar(scatter, ax=ax2)
     cbar.set_label('Scale Factor (f_s)')
     
-    # Draw boundary lines between phases if they exist
+    # Draw boundary lines between phases if they exist with improved error handling
     if np.any(trivial_phase) and np.any(topological_phase):
-        # Find approximate phase boundary
-        sorted_indices = np.argsort(scaling_factors)
-        phase_changes = np.where(np.diff(winding_numbers[sorted_indices]) != 0)[0]
-        
-        for idx in phase_changes:
-            boundary_fs = (scaling_factors[sorted_indices[idx]] + scaling_factors[sorted_indices[idx+1]]) / 2
-            ax2.axvline(x=fractal_dims[sorted_indices[idx+1]], color='r', linestyle='--', alpha=0.5)
-            ax2.annotate(f'Phase Boundary\nf_s ≈ {boundary_fs:.2f}',
-                        xy=(fractal_dims[sorted_indices[idx+1]], 0.5),
-                        xytext=(fractal_dims[sorted_indices[idx+1]] + 0.05, 0.5),
-                        arrowprops=dict(facecolor='red', shrink=0.05),
-                        fontsize=9)
+        try:
+            # Find approximate phase boundary
+            sorted_indices = np.argsort(scaling_factors)
+            phase_changes = np.where(np.diff(winding_numbers[sorted_indices]) != 0)[0]
+            
+            # Only proceed if phase changes detected
+            if len(phase_changes) > 0:
+                for idx in phase_changes:
+                    if idx < len(sorted_indices)-1:  # Ensure valid index
+                        boundary_fs = (scaling_factors[sorted_indices[idx]] + 
+                                     scaling_factors[sorted_indices[idx+1]]) / 2
+                        
+                        # Add vertical line at phase boundary
+                        ax2.axvline(x=fractal_dims[sorted_indices[idx+1]], 
+                                   color='r', linestyle='--', alpha=0.5)
+                        
+                        # Add clearer annotation with white background
+                        ax2.annotate(f'Phase Boundary\nf_s ≈ {boundary_fs:.2f}',
+                                    xy=(fractal_dims[sorted_indices[idx+1]], 0.5),
+                                    xytext=(fractal_dims[sorted_indices[idx+1]] + 0.1, 0.5),
+                                    arrowprops=dict(facecolor='red', shrink=0.05, width=2),
+                                    fontsize=10, 
+                                    bbox=dict(facecolor='white', alpha=0.7))
+        except Exception as e:
+            print(f"Warning: Phase boundary detection failed: {e}")
     
     # Add labels and title
     ax2.set_xlabel('Fractal Dimension (D)')
@@ -1059,35 +1074,62 @@ def generate_scale_factor_dependence(output_dir):
         else:
             metrics['phi_dimensions'].append(np.nan)
     
-    # Create plot
+    # Create enhanced plot
     fig, ax = plt.subplots(figsize=(10, 6))
     
-    # Plot state overlap
+    # Plot state overlap with more visible markers
     ax.plot(metrics['scaling_factors'], metrics['state_overlaps'], 'o-', 
-           color='#1f77b4', label='State Overlap')
+           color='#1f77b4', label='State Overlap', linewidth=2, markersize=6)
     
-    # Plot dimension difference
+    # Plot dimension difference with improved visibility
     ax_twin = ax.twinx()
     ax_twin.plot(metrics['scaling_factors'], metrics['dimension_differences'], 's-', 
-                color='#ff7f0e', label='Dimension Difference')
+                color='#ff7f0e', label='Dimension Difference', linewidth=2, markersize=6)
     
-    # Add phi line
-    ax.axvline(x=PHI, color='r', linestyle='--', alpha=0.7, label=f'φ ≈ {PHI:.6f}')
+    # Set explicit y-limits based on data range for better visibility of dimension differences
+    dim_diff = np.array(metrics['dimension_differences'])
+    valid_diffs = dim_diff[~np.isnan(dim_diff)]
+    if len(valid_diffs) > 0:
+        diff_min, diff_max = np.nanmin(valid_diffs), np.nanmax(valid_diffs)
+        # Amplify the range for better visibility
+        diff_range = diff_max - diff_min
+        if diff_range > 0:
+            ax_twin.set_ylim(diff_min - 0.1 * diff_range, diff_max + 0.1 * diff_range)
     
-    # Configure axes
-    ax.set_xlabel('Scale Factor (f_s)')
-    ax.set_ylabel('State Overlap', color='#1f77b4')
+    # Add prominent phi line
+    ax.axvline(x=PHI, color='red', linestyle='--', alpha=0.7, linewidth=2, 
+              label=f'φ ≈ {PHI:.6f}')
+    
+    # Configure axes with better grid
+    ax.set_xlabel('Scale Factor (f_s)', fontsize=12)
+    ax.set_ylabel('State Overlap', color='#1f77b4', fontsize=12)
     ax.tick_params(axis='y', labelcolor='#1f77b4')
-    ax_twin.set_ylabel('Dimension Difference', color='#ff7f0e')
+    ax_twin.set_ylabel('Dimension Difference', color='#ff7f0e', fontsize=12)
     ax_twin.tick_params(axis='y', labelcolor='#ff7f0e')
     
-    # Add title
-    plt.title('Scale Factor Dependence of Quantum Properties')
+    # Add grid for better readability
+    ax.grid(True, axis='x', alpha=0.3, linestyle='-')
+    ax.grid(True, axis='y', alpha=0.3, linestyle='-')
     
-    # Create combined legend
+    # Annotate maximum dimension difference
+    if len(valid_diffs) > 0:
+        max_diff_idx = np.nanargmax(np.abs(metrics['dimension_differences']))
+        max_diff_x = metrics['scaling_factors'][max_diff_idx]
+        max_diff_y = metrics['dimension_differences'][max_diff_idx]
+        
+        ax_twin.annotate(f'Max difference: {max_diff_y:.3f}',
+                       xy=(max_diff_x, max_diff_y),
+                       xytext=(max_diff_x + 0.2, max_diff_y),
+                       arrowprops=dict(facecolor='#ff7f0e', shrink=0.05),
+                       fontsize=10, bbox=dict(facecolor='white', alpha=0.7))
+    
+    # Add title with increased font size
+    plt.title('Scale Factor Dependence of Quantum Properties', fontsize=14, fontweight='bold')
+    
+    # Create combined legend with better placement
     lines1, labels1 = ax.get_legend_handles_labels()
     lines2, labels2 = ax_twin.get_legend_handles_labels()
-    ax.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
+    ax.legend(lines1 + lines2, labels1 + labels2, loc='upper right', framealpha=0.9)
     
     # Save figure
     plt.tight_layout()
@@ -1246,25 +1288,121 @@ def generate_entanglement_entropy(output_dir):
         psi_unit = U_unit * states_unit[-1]
         states_unit.append(psi_unit)
     
-    # Plot entanglement entropy for phi scaling
+    # Create a more informative comparison plot for entanglement entropy
+    plt.figure(figsize=(10, 6))
+    
+    # Plot both entropies on the same figure with enhanced styling
+    S_phi = []
+    S_unit = []
+    
+    # Calculate entanglement entropy for each state
+    for phi_state, unit_state in zip(states_phi, states_unit):
+        # Extract entropy values using the implemented functions
+        try:
+            from analyses.entanglement_dynamics import calculate_entanglement_entropy
+            S_phi.append(calculate_entanglement_entropy(phi_state))
+            S_unit.append(calculate_entanglement_entropy(unit_state))
+        except (ImportError, AttributeError):
+            # Fallback calculation if the function is not available
+            # Von Neumann entropy from reduced density matrix
+            d = int(np.sqrt(phi_state.shape[0]))  # Extract dimension
+            rho_phi_reduced = phi_state.ptrace(0)  # Partial trace
+            rho_unit_reduced = unit_state.ptrace(0)
+            
+            # Calculate entropy using eigenvalues
+            phi_eigs = rho_phi_reduced.eigenenergies()
+            unit_eigs = rho_unit_reduced.eigenenergies()
+            
+            # S = -∑λᵢlog(λᵢ)
+            S_phi.append(-np.sum(phi_eigs * np.log2(phi_eigs + 1e-10)))
+            S_unit.append(-np.sum(unit_eigs * np.log2(unit_eigs + 1e-10)))
+    
+    # Plot with enhanced visual styling
+    plt.plot(times, S_phi, 'o-', color='#1f77b4', lw=2, 
+             label=f'φ-Scaling (f_s = {PHI:.4f})', markersize=5)
+    plt.plot(times, S_unit, 's-', color='#ff7f0e', lw=2, 
+             label=f'Unit Scaling (f_s = 1.0)', markersize=5)
+    
+    # Add theoretical maximum line
+    max_entropy = np.log2(2)  # Maximum entropy for a qubit system
+    plt.axhline(y=max_entropy, color='red', linestyle='--', alpha=0.7, 
+               label='Maximum Entropy (1 bit)')
+    
+    # Highlight regions of significant difference
+    diff = np.array(S_phi) - np.array(S_unit)
+    sig_diff_indices = np.where(np.abs(diff) > 0.1)[0]
+    if len(sig_diff_indices) > 0:
+        # Group consecutive indices
+        from itertools import groupby
+        from operator import itemgetter
+        
+        for k, g in groupby(enumerate(sig_diff_indices), lambda ix: ix[0] - ix[1]):
+            indices = list(map(itemgetter(1), g))
+            if len(indices) > 5:  # Only highlight substantial regions
+                start_idx, end_idx = indices[0], indices[-1]
+                plt.axvspan(times[start_idx], times[end_idx], 
+                           alpha=0.2, color='green', 
+                           label='Significant Difference' if start_idx == indices[0] else "")
+    
+    # Add annotations
+    # Find maximum entropy difference
+    max_diff_idx = np.argmax(np.abs(diff))
+    if max_diff_idx > 0:
+        plt.annotate(f"Max difference: {diff[max_diff_idx]:.3f}",
+                    xy=(times[max_diff_idx], max(S_phi[max_diff_idx], S_unit[max_diff_idx])),
+                    xytext=(times[max_diff_idx] + 1, max(S_phi[max_diff_idx], S_unit[max_diff_idx]) + 0.1),
+                    arrowprops=dict(facecolor='black', shrink=0.05, width=1.5),
+                    fontsize=10, bbox=dict(facecolor='white', alpha=0.7))
+    
+    # Calculate oscillation frequencies
+    if len(S_phi) > 20:
+        from scipy import signal
+        try:
+            # Find peaks for frequency analysis
+            phi_peaks, _ = signal.find_peaks(S_phi)
+            unit_peaks, _ = signal.find_peaks(S_unit)
+            
+            if len(phi_peaks) >= 2 and len(unit_peaks) >= 2:
+                # Calculate average period
+                phi_period = np.mean(np.diff(times[phi_peaks]))
+                unit_period = np.mean(np.diff(times[unit_peaks]))
+                
+                # Annotate oscillation frequencies
+                plt.text(0.02, 0.05, 
+                        f"φ oscillation period: {phi_period:.2f}\nUnit oscillation period: {unit_period:.2f}",
+                        transform=plt.gca().transAxes,
+                        bbox=dict(facecolor='white', alpha=0.7))
+        except Exception as e:
+            print(f"Could not analyze oscillation frequencies: {e}")
+    
+    # Improve plot aesthetics
+    plt.grid(True, alpha=0.3)
+    plt.xlabel('Time', fontsize=12)
+    plt.ylabel('Entanglement Entropy (bits)', fontsize=12)
+    plt.title('Comparative Entanglement Entropy Evolution', fontsize=14, fontweight='bold')
+    plt.legend(loc='best')
+    plt.tight_layout()
+    
+    # Save enhanced comparison figure
+    plt.savefig(output_dir / "entanglement_entropy_comparison.png", dpi=300, bbox_inches='tight')
+    print(f"Comparison entanglement entropy saved to {output_dir / 'entanglement_entropy_comparison.png'}")
+    
+    # Individual plots still needed for detailed view of each case
+    # Plot entanglement entropy for phi scaling with improved style
     fig_phi = plot_entanglement_entropy_vs_time(
         states_phi, 
         times, 
         title=f'Entanglement Entropy Evolution (φ={PHI:.4f})'
     )
-    
-    # Save figure
     fig_phi.savefig(output_dir / "entanglement_entropy_phi.png", dpi=300, bbox_inches='tight')
     print(f"Entanglement entropy (phi) saved to {output_dir / 'entanglement_entropy_phi.png'}")
     
-    # Plot entanglement entropy for unit scaling
+    # Plot entanglement entropy for unit scaling with improved style
     fig_unit = plot_entanglement_entropy_vs_time(
         states_unit, 
         times, 
         title='Entanglement Entropy Evolution (Unit Scaling)'
     )
-    
-    # Save figure
     fig_unit.savefig(output_dir / "entanglement_entropy_unit.png", dpi=300, bbox_inches='tight')
     print(f"Entanglement entropy (unit) saved to {output_dir / 'entanglement_entropy_unit.png'}")
     
@@ -1293,7 +1431,7 @@ def generate_entanglement_entropy(output_dir):
 
 def create_parameter_tables(output_dir):
     """
-    Create parameter tables for the paper.
+    Create comprehensive parameter tables for the paper.
     
     Parameters:
     -----------
@@ -1302,20 +1440,23 @@ def create_parameter_tables(output_dir):
     """
     print("Creating parameter tables...")
     
-    # Parameter overview table
+    # Comprehensive parameter overview table with extended descriptions
     parameters = [
-        {'Symbol': 'f_s', 'Meaning': 'Scaling Factor', 'Range': '0.5-3.0', 'Units': 'Dimensionless'},
-        {'Symbol': 'φ', 'Meaning': 'Golden Ratio', 'Range': '≈1.618034', 'Units': 'Dimensionless'},
-        {'Symbol': 'D', 'Meaning': 'Fractal Dimension', 'Range': '0.5-2.0', 'Units': 'Dimensionless'},
-        {'Symbol': 'W', 'Meaning': 'Winding Number', 'Range': '0, ±1', 'Units': 'Integer'},
-        {'Symbol': 'Z₂', 'Meaning': 'Z₂ Index', 'Range': '0, 1', 'Units': 'Binary'},
-        {'Symbol': 'θ_B', 'Meaning': 'Berry Phase', 'Range': '[-π, π]', 'Units': 'Radians'},
-        {'Symbol': 'S', 'Meaning': 'Entanglement Entropy', 'Range': '0-ln(d)', 'Units': 'Dimensionless'},
-        {'Symbol': 'ΔE', 'Meaning': 'Energy Gap', 'Range': '>0', 'Units': 'Energy'},
-        {'Symbol': 'n', 'Meaning': 'Recursion Depth', 'Range': '1-8', 'Units': 'Integer'},
-        {'Symbol': 'δ', 'Meaning': 'Perturbation Strength', 'Range': '0-0.5', 'Units': 'Dimensionless'},
-        {'Symbol': 'ρ', 'Meaning': 'φ Proximity', 'Range': '0-1', 'Units': 'Dimensionless'},
-        {'Symbol': 'C', 'Meaning': 'Chern Number', 'Range': 'Integer', 'Units': 'Dimensionless'},
+        {'Symbol': 'f_s', 'Meaning': 'Scaling Factor', 'Range': '0.5-3.0', 'Units': 'Dimensionless', 'Notes': 'Primary control parameter that scales the Hamiltonian'},
+        {'Symbol': 'φ', 'Meaning': 'Golden Ratio', 'Range': f'≈{PHI:.6f}', 'Units': 'Dimensionless', 'Notes': 'Special value where topological protection is hypothesized'},
+        {'Symbol': 'D', 'Meaning': 'Fractal Dimension', 'Range': '0.5-2.0', 'Units': 'Dimensionless', 'Notes': 'Measures self-similarity of quantum states'},
+        {'Symbol': 'W', 'Meaning': 'Winding Number', 'Range': '0, ±1', 'Units': 'Integer', 'Notes': 'Topological invariant counting closed loops in parameter space'},
+        {'Symbol': 'Z₂', 'Meaning': 'Z₂ Index', 'Range': '0, 1', 'Units': 'Binary', 'Notes': 'Binary topological invariant indicating phase'},
+        {'Symbol': 'θ_B', 'Meaning': 'Berry Phase', 'Range': '[-π, π]', 'Units': 'Radians', 'Notes': 'Geometric phase acquired during adiabatic evolution'},
+        {'Symbol': 'S', 'Meaning': 'Entanglement Entropy', 'Range': '0-ln(d)', 'Units': 'Dimensionless', 'Notes': 'Quantifies quantum entanglement between subsystems'},
+        {'Symbol': 'ΔE', 'Meaning': 'Energy Gap', 'Range': '>0', 'Units': 'Energy', 'Notes': 'Separation between energy levels, controls protection'},
+        {'Symbol': 'n', 'Meaning': 'Recursion Depth', 'Range': '1-8', 'Units': 'Integer', 'Notes': 'Number of recursive scaling operations applied'},
+        {'Symbol': 'δ', 'Meaning': 'Perturbation Strength', 'Range': '0-0.5', 'Units': 'Dimensionless', 'Notes': 'Magnitude of noise/perturbation applied to system'},
+        {'Symbol': 'ρ', 'Meaning': 'φ Proximity', 'Range': '0-1', 'Units': 'Dimensionless', 'Notes': 'Measures how close f_s is to φ'},
+        {'Symbol': 'C', 'Meaning': 'Chern Number', 'Range': 'Integer', 'Units': 'Dimensionless', 'Notes': 'Topological invariant for 2D systems'},
+        {'Symbol': 'H₀', 'Meaning': 'Base Hamiltonian', 'Range': 'Various', 'Units': 'Energy', 'Notes': 'Unscaled quantum system Hamiltonian'},
+        {'Symbol': 'τ', 'Meaning': 'Fibonacci Anyon', 'Range': f'{(1 + np.sqrt(5))/2:.4f}', 'Units': 'Dimensionless', 'Notes': 'Quantum dimension of Fibonacci anyon, equal to φ'},
+        {'Symbol': 'C_l1', 'Meaning': 'l1-norm Coherence', 'Range': '≥0', 'Units': 'Dimensionless', 'Notes': 'Quantifies quantum coherence, sensitive to φ-scaling'},
     ]
     
     # Create DataFrame

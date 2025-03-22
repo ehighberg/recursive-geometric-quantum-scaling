@@ -1,13 +1,16 @@
-Symbol,Meaning,Range,Units
-f_s,Scaling Factor,0.5-3.0,Dimensionless
-φ,Golden Ratio,≈1.618034,Dimensionless
-D,Fractal Dimension,0.5-2.0,Dimensionless
-W,Winding Number,"0, ±1",Integer
-Z₂,Z₂ Index,"0, 1",Binary
-θ_B,Berry Phase,"[-π, π]",Radians
-S,Entanglement Entropy,0-ln(d),Dimensionless
-ΔE,Energy Gap,>0,Energy
-n,Recursion Depth,1-8,Integer
-δ,Perturbation Strength,0-0.5,Dimensionless
-ρ,φ Proximity,0-1,Dimensionless
-C,Chern Number,Integer,Dimensionless
+Symbol,Meaning,Range,Units,Notes
+f_s,Scaling Factor,0.5-3.0,Dimensionless,Primary control parameter that scales the Hamiltonian
+φ,Golden Ratio,≈1.618034,Dimensionless,Special value where topological protection is hypothesized
+D,Fractal Dimension,0.5-2.0,Dimensionless,Measures self-similarity of quantum states
+W,Winding Number,"0, ±1",Integer,Topological invariant counting closed loops in parameter space
+Z₂,Z₂ Index,"0, 1",Binary,Binary topological invariant indicating phase
+θ_B,Berry Phase,"[-π, π]",Radians,Geometric phase acquired during adiabatic evolution
+S,Entanglement Entropy,0-ln(d),Dimensionless,Quantifies quantum entanglement between subsystems
+ΔE,Energy Gap,>0,Energy,"Separation between energy levels, controls protection"
+n,Recursion Depth,1-8,Integer,Number of recursive scaling operations applied
+δ,Perturbation Strength,0-0.5,Dimensionless,Magnitude of noise/perturbation applied to system
+ρ,φ Proximity,0-1,Dimensionless,Measures how close f_s is to φ
+C,Chern Number,Integer,Dimensionless,Topological invariant for 2D systems
+H₀,Base Hamiltonian,Various,Energy,Unscaled quantum system Hamiltonian
+τ,Fibonacci Anyon,1.6180,Dimensionless,"Quantum dimension of Fibonacci anyon, equal to φ"
+C_l1,l1-norm Coherence,≥0,Dimensionless,"Quantifies quantum coherence, sensitive to φ-scaling"
