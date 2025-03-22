@@ -14,6 +14,21 @@ from typing import List, Dict, Optional, Tuple, Union, Callable
 from analyses.entanglement import entanglement_entropy
 from analyses.visualization.style_config import configure_axis, COLORS, PLOT_STYLE
 
+def calculate_entanglement_entropy(state: Qobj, subsys: Optional[int] = 0) -> float:
+    """
+    Calculate the entanglement entropy of a quantum state.
+    
+    This is a simplified wrapper around entanglement_entropy for use in the paper graphs.
+    
+    Parameters:
+        state: Quantum state (ket or density matrix)
+        subsys: Index of subsystem to trace over (default: 0)
+    
+    Returns:
+        Entanglement entropy value
+    """
+    return entanglement_entropy(state, subsys=subsys)
+
 def compute_entanglement_entropy_vs_time(
     states: List[Qobj],
     subsystem_partition: Optional[List[int]] = None
