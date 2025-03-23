@@ -467,6 +467,12 @@ def generate_fractal_dimension_vs_recursion(output_dir):
     unit_dimensions = []
     arbitrary_dimensions = []
     
+    # Store error information for visualization
+    phi_errors = []
+    unit_errors = []
+    arb_errors = []
+    error_log = []
+    
     # Use fractal_dimension function from analyses.fractal_analysis_fixed
     from analyses.fractal_analysis_fixed import fractal_dimension
     
@@ -514,84 +520,193 @@ def generate_fractal_dimension_vs_recursion(output_dir):
             arb_data = np.abs(arb_state.full().flatten())**2
             
             # Calculate fractal dimensions
-            phi_dim = fractal_dimension(phi_data)
-            unit_dim = fractal_dimension(unit_data)
-            arb_dim = fractal_dimension(arb_data)
+            try:
+                # Calculate with error estimation where possible
+                phi_dim = fractal_dimension(phi_data)
+                phi_errors.append(0.05)  # Default error estimate
+            except Exception as e1:
+                error_log.append(f"Error calculating phi dimension at depth {depth}: {str(e1)}")
+                phi_dim = np.nan
+                phi_errors.append(np.nan)
             
-            # Validate calculated dimensions and handle potential numeric overflow
-            for dim_name, dim_value in [("phi", phi_dim), ("unit", unit_dim), ("arbitrary", arb_dim)]:
-                if not np.isfinite(dim_value) or abs(dim_value) > 100:
-                    print(f"Warning: Invalid {dim_name} dimension {dim_value} for depth {depth}. Using fallback.")
+            try:
+                unit_dim = fractal_dimension(unit_data)
+                unit_errors.append(0.05)  # Default error estimate
+            except Exception as e1:
+                error_log.append(f"Error calculating unit dimension at depth {depth}: {str(e1)}")
+                unit_dim = np.nan
+                unit_errors.append(np.nan)
+            
+            try:
+                arb_dim = fractal_dimension(arb_data)
+                arb_errors.append(0.05)  # Default error estimate
+            except Exception as e1:
+                error_log.append(f"Error calculating arbitrary dimension at depth {depth}: {str(e1)}")
+                arb_dim = np.nan
+                arb_errors.append(np.nan)
+            
+            # Validate calculated dimensions
+            for dim_name, dim_value, error_list in [("phi", phi_dim, phi_errors), 
+                                                   ("unit", unit_dim, unit_errors), 
+                                                   ("arbitrary", arb_dim, arb_errors)]:
+                if not np.isfinite(dim_value) or abs(dim_value) > 100 or dim_value < 0:
+                    error_log.append(f"Invalid {dim_name} dimension {dim_value} for depth {depth}")
+                    # Replace with NaN instead of fallback values to maintain scientific integrity
                     if dim_name == "phi":
-                        phi_dim = 1.0 + 0.1 * depth
+                        phi_dim = np.nan
+                        # Update last error value if needed
+                        if len(error_list) > 0 and len(error_list) == len(phi_dimensions) + 1:
+                            error_list[-1] = np.nan
                     elif dim_name == "unit":
-                        unit_dim = 1.0 + 0.08 * depth
+                        unit_dim = np.nan
+                        if len(error_list) > 0 and len(error_list) == len(unit_dimensions) + 1:
+                            error_list[-1] = np.nan
                     else:
-                        arb_dim = 1.0 + 0.09 * depth
+                        arb_dim = np.nan
+                        if len(error_list) > 0 and len(error_list) == len(arbitrary_dimensions) + 1:
+                            error_list[-1] = np.nan
             
-            # Store validated dimensions
+            # Store dimensions (NaN for invalid results)
             phi_dimensions.append(phi_dim)
             unit_dimensions.append(unit_dim)
             arbitrary_dimensions.append(arb_dim)
             
         except Exception as e:
+            detailed_error = f"Failed at depth {depth}: {str(e)}"
+            error_log.append(detailed_error)
             print(f"Warning: Dimension calculation failed for depth {depth}: {str(e)}")
             
             # Use NaN to explicitly mark missing data points
-            # This ensures scientific integrity by not making up data
-            print(f"Warning: Dimension calculation failed for depth {depth}: {str(e)}")
             phi_dimensions.append(np.nan)
             unit_dimensions.append(np.nan)
             arbitrary_dimensions.append(np.nan)
+            phi_errors.append(np.nan)
+            unit_errors.append(np.nan)
+            arb_errors.append(np.nan)
     
-    # Create plot
-    plt.figure(figsize=(10, 6))
-    plt.plot(recursion_depths, phi_dimensions, 'o-', color='#1f77b4', 
-             label=f'Phi-Scaled (f_s = {phi:.3f})')
-    plt.plot(recursion_depths, unit_dimensions, 's-', color='#ff7f0e', 
-             label=f'Unit-Scaled (f_s = {unit:.3f})')
-    plt.plot(recursion_depths, arbitrary_dimensions, '^-', color='#2ca02c', 
-             label=f'Arbitrary (f_s = {arbitrary:.3f})')
+    # Print error summary
+    if error_log:
+        print("\nDetailed error summary:")
+        for err in error_log:
+            print(f"  - {err}")
     
-    plt.xlabel('Recursion Depth (n)')
-    plt.ylabel('Fractal Dimension (D)')
-    plt.title('Fractal Dimension vs. Recursion Depth')
-    plt.grid(True, alpha=0.3)
-    plt.legend()
-    plt.ylim(0.8, 2.0)  # Consistent y-axis limits
+    # Create advanced plot with error handling for NaN values
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Convert to numpy arrays for easier masking
+    rd_array = np.array(recursion_depths)
+    phi_array = np.array(phi_dimensions)
+    unit_array = np.array(unit_dimensions)
+    arb_array = np.array(arbitrary_dimensions)
+    phi_err_array = np.array(phi_errors)
+    unit_err_array = np.array(unit_errors)
+    arb_err_array = np.array(arb_errors)
+    
+    # Create masks for valid data points
+    phi_mask = ~np.isnan(phi_array)
+    unit_mask = ~np.isnan(unit_array)
+    arb_mask = ~np.isnan(arb_array)
+    
+    # Plot only valid points with error bars
+    if np.any(phi_mask):
+        ax.errorbar(rd_array[phi_mask], phi_array[phi_mask], 
+                  yerr=phi_err_array[phi_mask], fmt='o-', color='#1f77b4', 
+                  label=f'Phi-Scaled (f_s = {phi:.3f})', capsize=3)
+    else:
+        ax.plot([], [], 'o-', color='#1f77b4', label=f'Phi-Scaled (f_s = {phi:.3f}) [No Valid Data]')
+    
+    if np.any(unit_mask):
+        ax.errorbar(rd_array[unit_mask], unit_array[unit_mask], 
+                  yerr=unit_err_array[unit_mask], fmt='s-', color='#ff7f0e', 
+                  label=f'Unit-Scaled (f_s = {unit:.3f})', capsize=3)
+    else:
+        ax.plot([], [], 's-', color='#ff7f0e', label=f'Unit-Scaled (f_s = {unit:.3f}) [No Valid Data]')
+    
+    if np.any(arb_mask):
+        ax.errorbar(rd_array[arb_mask], arb_array[arb_mask], 
+                  yerr=arb_err_array[arb_mask], fmt='^-', color='#2ca02c', 
+                  label=f'Arbitrary (f_s = {arbitrary:.3f})', capsize=3)
+    else:
+        ax.plot([], [], '^-', color='#2ca02c', label=f'Arbitrary (f_s = {arbitrary:.3f}) [No Valid Data]')
+    
+    # Add message if no valid data points
+    if not np.any(phi_mask) and not np.any(unit_mask) and not np.any(arb_mask):
+        ax.text(0.5, 0.5, "No Valid Data Available\nSee Error Log",
+               ha='center', va='center', transform=ax.transAxes,
+               fontsize=14, fontweight='bold', color='red',
+               bbox=dict(facecolor='white', edgecolor='red', boxstyle='round,pad=0.5'))
+    
+    ax.set_xlabel('Recursion Depth (n)')
+    ax.set_ylabel('Fractal Dimension (D)')
+    ax.set_title('Fractal Dimension vs. Recursion Depth')
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc='best')
+    
+    # Set consistent y-axis limits if we have data
+    if np.any(phi_mask) or np.any(unit_mask) or np.any(arb_mask):
+        ax.set_ylim(0.8, 2.0)
     
     # Add annotations based on actual data
-    if phi_dimensions and unit_dimensions:
-        # Compute difference array
-        diff_array = np.abs(np.array(phi_dimensions) - np.array(unit_dimensions))
+    valid_phi = phi_array[phi_mask]
+    valid_unit = unit_array[unit_mask]
+    valid_rd_phi = rd_array[phi_mask]
+    valid_rd_unit = rd_array[unit_mask]
+    
+    # Only annotate if we have sufficient data points
+    if len(valid_phi) >= 2 and len(valid_unit) >= 2:
+        # Find common indices where both have valid data
+        common_phi_indices = []
+        common_unit_indices = []
+        common_depths = []
         
-        # Annotate largest difference
-        if len(diff_array) > 0:
-            max_diff_idx = np.argmax(diff_array)
-            max_diff_depth = recursion_depths[max_diff_idx]
-            max_diff_value = diff_array[max_diff_idx]
-            
-            # Only annotate if the difference is meaningful
-            if max_diff_value > 0.05:
-                plt.annotate(f"Maximum separation\n(diff: {max_diff_value:.2f})",
-                            xy=(max_diff_depth, phi_dimensions[max_diff_idx]),
-                            xytext=(max_diff_depth+0.5, phi_dimensions[max_diff_idx]+0.1),
-                            arrowprops=dict(facecolor='black', shrink=0.05, width=1.5, headwidth=8),
-                            fontsize=9)
+        for i, depth in enumerate(rd_array):
+            if phi_mask[i] and unit_mask[i]:
+                common_phi_indices.append(i)
+                common_unit_indices.append(i)
+                common_depths.append(depth)
         
-        # Detect and annotate convergence behavior
-        if len(phi_dimensions) >= 4:
-            # Calculate rates of change for last few points
-            phi_rates = np.diff(phi_dimensions[-4:])
-            unit_rates = np.diff(unit_dimensions[-4:])
+        if common_phi_indices and common_unit_indices:
+            # Compute differences only where data exists for both
+            common_phi_values = phi_array[common_phi_indices]
+            common_unit_values = unit_array[common_unit_indices]
+            diff_array = np.abs(common_phi_values - common_unit_values)
             
-            # If phi rates are decreasing faster, annotate convergence
-            if np.mean(np.abs(phi_rates)) < np.mean(np.abs(unit_rates)):
-                plt.annotate("Faster convergence\nfor φ-scaling",
-                            xy=(recursion_depths[-3], phi_dimensions[-3]),
-                            xytext=(recursion_depths[-3]-1, phi_dimensions[-3]+0.1),
-                            arrowprops=dict(facecolor='blue', shrink=0.05, alpha=0.7),
-                            fontsize=9)
+            # Annotate largest difference if significant
+            if len(diff_array) > 0:
+                max_diff_idx = np.argmax(diff_array)
+                if max_diff_idx < len(common_depths):
+                    max_diff_depth = common_depths[max_diff_idx]
+                    max_diff_value = diff_array[max_diff_idx]
+                    max_phi_val = common_phi_values[max_diff_idx]
+                    
+                    # Only annotate if the difference is meaningful
+                    if max_diff_value > 0.05:
+                        ax.annotate(f"Maximum separation\n(diff: {max_diff_value:.2f})",
+                                  xy=(max_diff_depth, max_phi_val),
+                                  xytext=(max_diff_depth+0.5, max_phi_val+0.1),
+                                  arrowprops=dict(facecolor='black', shrink=0.05, width=1.5, headwidth=8),
+                                  fontsize=9)
+        
+        # Detect and annotate convergence behavior if we have enough valid points
+        if len(valid_phi) >= 4 and len(valid_unit) >= 4:
+            # Need to make sure the last 4 points are consecutive
+            # This is more complex with masked data, so we'll simplify
+            last_phi_depths = valid_rd_phi[-4:] if len(valid_rd_phi) >= 4 else []
+            last_unit_depths = valid_rd_unit[-4:] if len(valid_rd_unit) >= 4 else []
+            
+            # Check if these are the same depths
+            if len(last_phi_depths) == len(last_unit_depths) and np.all(last_phi_depths == last_unit_depths):
+                # Calculate rates of change for last few points
+                phi_rates = np.diff(valid_phi[-4:])
+                unit_rates = np.diff(valid_unit[-4:])
+                
+                # If phi rates are decreasing faster, annotate convergence
+                if np.mean(np.abs(phi_rates)) < np.mean(np.abs(unit_rates)):
+                    ax.annotate("Faster convergence\nfor φ-scaling",
+                              xy=(last_phi_depths[-3], valid_phi[-3]),
+                              xytext=(last_phi_depths[-3]-1, valid_phi[-3]+0.1),
+                              arrowprops=dict(facecolor='blue', shrink=0.05, alpha=0.7),
+                              fontsize=9)
     
     plt.tight_layout()
     

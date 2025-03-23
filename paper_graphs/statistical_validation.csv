@@ -1,6 +1,6 @@
 Metric,p-value,Adjusted p-value,Effect Size,Effect Category,Significant (raw),Significant (adjusted)
-entanglement_rate,0.017183172504264214,,-0.4269678433677047,small,True,True
+entanglement_rate,0.009847557430196963,,-0.41608397894673643,small,True,True
 topological_robustness,3.973791254167199e-21,,0.8929008500172982,large,True,True
 fractal_dimension,,,,large,False,False
-energy_gap,0.33809135364833887,,0.06770456541143356,negligible,False,False
+energy_gap,0.42559642893680805,,0.056861716062988524,negligible,False,False
 stability,1.3513959008475188e-28,,-0.8683210303255366,large,True,True
