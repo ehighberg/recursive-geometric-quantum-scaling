@@ -743,70 +743,99 @@ def generate_topological_invariants_graph(output_dir):
     winding_numbers = []
     berry_phases = []
     fractal_dims = []
+    error_log = []
     
     # Use proper topological invariant calculations from fixed implementation
     for f_s in tqdm(scaling_factors, desc="Computing topological invariants"):
-        # Create a consistent Hamiltonian for this scaling factor
-        H0 = create_system_hamiltonian(num_qubits=2, hamiltonian_type="ising")
-        H = f_s * H0  # Scale only once
-        
-        # Run quantum evolution with the scaling factor
-        result = run_state_evolution_fixed(
-            num_qubits=2,  # Need at least 2 qubits for meaningful topology
-            state_label="bell",
-            hamiltonian_type="ising",
-            n_steps=50,
-            scaling_factor=f_s
-        )
-        
-        # Extract final state
-        final_state = result.states[-1]
-        
-        # Calculate fractal dimension using fixed implementation
-        from analyses.fractal_analysis_fixed import fractal_dimension
-        
-        # Convert to a format suitable for fractal dimension calculation
-        state_data = np.abs(final_state.full().flatten())**2
-        fd = fractal_dimension(state_data)
-        fractal_dims.append(fd)
-        
-        # Create a parameter space for topological invariant calculation
-        k_points = np.linspace(0, 2*np.pi, 50)
-        
-        # Create eigenstates for different k-points
-        eigenstates = []
-        for k in k_points:
-            # Create parameterized Hamiltonian with proper scaling
-            H_k = f_s * H0 + f_s * 0.1 * k * tensor(sigmax(), sigmax())
+        try:
+            # Create a consistent Hamiltonian for this scaling factor
+            H0 = create_system_hamiltonian(num_qubits=2, hamiltonian_type="ising")
+            H = f_s * H0  # Scale only once
             
-            # Get eigenstates (ground state)
-            eigenvalues, states = H_k.eigenstates()
-            eigenstates.append(states[0])
-        
-        # Calculate winding number (topological invariant)
-        from analyses.topological_invariants import compute_standard_winding
-        winding = compute_standard_winding(eigenstates, k_points, f_s)
-        
-        # Extract winding number from result (handles both float and dict returns)
-        if isinstance(winding, dict) and 'winding' in winding:
-            winding_value = winding['winding']
-        else:
-            winding_value = winding
+            # Run quantum evolution with the scaling factor
+            result = run_state_evolution_fixed(
+                num_qubits=2,  # Need at least 2 qubits for meaningful topology
+                state_label="bell",
+                hamiltonian_type="ising",
+                n_steps=50,
+                scaling_factor=f_s
+            )
             
-        winding_numbers.append(np.round(winding_value))  # Round to nearest integer
-        
-        # Calculate Berry phase
-        from analyses.topological_invariants import compute_berry_phase_standard
-        berry_phase = compute_berry_phase_standard(eigenstates, f_s)
-        
-        # Extract berry phase from result (handles both float and dict returns)
-        if isinstance(berry_phase, dict) and 'berry_phase' in berry_phase:
-            berry_phase_value = berry_phase['berry_phase']
-        else:
-            berry_phase_value = berry_phase
+            # Extract final state
+            final_state = result.states[-1]
             
-        berry_phases.append(berry_phase_value)
+            # Calculate fractal dimension using fixed implementation - no need to reimport
+            # since it's already imported at the top level
+            
+            # Convert to a format suitable for fractal dimension calculation
+            state_data = np.abs(final_state.full().flatten())**2
+            
+            try:
+                fd = fractal_dimension(state_data)
+                if not np.isfinite(fd) or abs(fd) > 100 or fd < 0:
+                    error_log.append(f"Invalid fractal dimension {fd} for f_s={f_s}")
+                    fd = np.nan
+            except Exception as e1:
+                error_log.append(f"Fractal dimension calculation failed for f_s={f_s}: {str(e1)}")
+                fd = np.nan
+                
+            fractal_dims.append(fd)
+            
+            # Create a parameter space for topological invariant calculation
+            k_points = np.linspace(0, 2*np.pi, 50)
+            
+            # Create eigenstates for different k-points
+            eigenstates = []
+            for k in k_points:
+                # Create parameterized Hamiltonian with proper scaling
+                H_k = f_s * H0 + f_s * 0.1 * k * tensor(sigmax(), sigmax())
+                
+                # Get eigenstates (ground state)
+                eigenvalues, states = H_k.eigenstates()
+                eigenstates.append(states[0])
+            
+            # Calculate winding number (topological invariant)
+            from analyses.topological_invariants import compute_standard_winding
+            winding = compute_standard_winding(eigenstates, k_points, f_s)
+            
+            # Extract winding number from result (handles both float and dict returns)
+            if isinstance(winding, dict) and 'winding' in winding:
+                winding_value = winding['winding']
+            else:
+                winding_value = winding
+                
+            winding_numbers.append(np.round(winding_value))  # Round to nearest integer
+            
+            # Calculate Berry phase
+            from analyses.topological_invariants import compute_berry_phase_standard, compute_berry_phase
+            try:
+                # First try to use the standard implementation
+                berry_phase = compute_berry_phase_standard(eigenstates, f_s)
+                
+                # Extract berry phase from result (handles both float and dict returns)
+                if isinstance(berry_phase, dict) and 'berry_phase' in berry_phase:
+                    berry_phase_value = berry_phase['berry_phase']
+                else:
+                    berry_phase_value = berry_phase
+            except (ImportError, AttributeError) as e:
+                # Fall back to the regular berry phase if standard version is not available
+                error_log.append(f"Using fallback berry phase calculation for f_s={f_s}: {str(e)}")
+                berry_phase_value = compute_berry_phase(eigenstates)
+                
+            berry_phases.append(berry_phase_value)
+        
+        except Exception as e:
+            error_log.append(f"Failed to calculate topological invariants for f_s={f_s}: {str(e)}")
+            winding_numbers.append(np.nan)
+            berry_phases.append(np.nan)
+            fractal_dims.append(np.nan)
     
+    # Print error summary
+    if error_log:
+        print("\nError log for topological invariants calculations:")
+        for err in error_log:
+            print(f"  - {err}")
+            
     # Convert to numpy arrays
     winding_numbers = np.array(winding_numbers, dtype=float)
     berry_phases = np.array(berry_phases, dtype=float)
@@ -815,22 +844,33 @@ def generate_topological_invariants_graph(output_dir):
     # Calculate normalized Berry phase (0 to 1 scale)
     normalized_berry = np.abs(berry_phases) / np.pi
     
-    # Create plot with two subplots with improved proportions
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10), 
-                                 gridspec_kw={'height_ratios': [1, 1.5], 'hspace': 0.3})
+    # Create better-proportioned figure - use side-by-side layout instead of stacked
+    fig = plt.figure(figsize=(14, 7))
+    gs = GridSpec(1, 2, width_ratios=[1, 1], wspace=0.3)
+    
+    # Create subplots with the improved layout
+    ax1 = fig.add_subplot(gs[0])
+    ax2 = fig.add_subplot(gs[1])
     
     # First subplot: Winding numbers and Berry phase vs. scaling factor
-    ax1.plot(scaling_factors, winding_numbers, 'o-', label='Winding Number (W)', color='#1f77b4')
+    # Create masks for valid data points
+    valid_sf = ~np.isnan(winding_numbers)
+    valid_sf_berry = ~np.isnan(normalized_berry)
+    
+    ax1.plot(scaling_factors[valid_sf], winding_numbers[valid_sf], 'o-', 
+             label='Winding Number (W)', color='#1f77b4')
     ax1.set_ylabel('Winding Number', color='#1f77b4')
     ax1.tick_params(axis='y', labelcolor='#1f77b4')
     
     ax1_twin = ax1.twinx()
-    ax1_twin.plot(scaling_factors, normalized_berry, 's-', label='Normalized Berry Phase', color='#ff7f0e')
+    ax1_twin.plot(scaling_factors[valid_sf_berry], normalized_berry[valid_sf_berry], 's-', 
+                 label='Normalized Berry Phase', color='#ff7f0e')
     ax1_twin.set_ylabel('|Berry Phase|/π', color='#ff7f0e')
     ax1_twin.tick_params(axis='y', labelcolor='#ff7f0e')
     
     # Highlight phi value
-    ax1.axvline(x=PHI, color='g', linestyle='--', alpha=0.7, label=f'φ ≈ {PHI:.6f}')
+    ax1.axvline(x=PHI, color='g', linestyle='--', alpha=0.7, 
+               label=f'φ ≈ {PHI:.6f}')
     
     # Create custom legend for first subplot
     lines1, labels1 = ax1.get_legend_handles_labels()
@@ -839,78 +879,114 @@ def generate_topological_invariants_graph(output_dir):
     
     ax1.set_title('Topological Invariants vs. Scaling Factor')
     ax1.grid(True, alpha=0.3)
+    ax1.set_xlabel('Scale Factor (f_s)')
     
     # Second subplot: Phase diagram (Fractal Dimension vs. Topological Invariant)
-    scatter = ax2.scatter(fractal_dims, normalized_berry, c=scaling_factors, 
-                         cmap='viridis', s=100, alpha=0.7, edgecolors='k', linewidths=0.5)
+    # Create masks for valid data
+    valid_dim = ~np.isnan(fractal_dims)
+    valid_berry = ~np.isnan(normalized_berry)
+    valid_both = valid_dim & valid_berry
     
-    # Identify and label different topological phases
-    trivial_phase = (winding_numbers == 0)
-    topological_phase = (winding_numbers != 0)
-    
-    # Add phase annotations
-    if np.any(trivial_phase):
-        trivial_x = np.median(fractal_dims[trivial_phase])
-        trivial_y = np.median(normalized_berry[trivial_phase])
-        ax2.annotate('Trivial Phase (W=0)',
-                    xy=(trivial_x, trivial_y),
-                    xytext=(trivial_x - 0.2, trivial_y + 0.2),
-                    arrowprops=dict(facecolor='black', shrink=0.05, width=1),
-                    fontsize=10, fontweight='bold')
-    
-    if np.any(topological_phase):
-        topo_x = np.median(fractal_dims[topological_phase])
-        topo_y = np.median(normalized_berry[topological_phase])
-        ax2.annotate('Topological Phase (W≠0)',
-                    xy=(topo_x, topo_y),
-                    xytext=(topo_x + 0.1, topo_y - 0.2),
-                    arrowprops=dict(facecolor='black', shrink=0.05, width=1),
-                    fontsize=10, fontweight='bold')
-    
-    # Highlight phi point with more prominence
-    phi_idx = np.argmin(np.abs(scaling_factors - PHI))
-    ax2.scatter([fractal_dims[phi_idx]], [normalized_berry[phi_idx]], 
-               c='red', s=200, marker='*', edgecolors='white', linewidths=2,
-               zorder=10, label=f'φ ≈ {PHI:.6f}')
-    
-    # Add colorbar for scaling factors
-    cbar = fig.colorbar(scatter, ax=ax2)
-    cbar.set_label('Scale Factor (f_s)')
-    
-    # Draw boundary lines between phases if they exist with improved error handling
-    if np.any(trivial_phase) and np.any(topological_phase):
-        try:
-            # Find approximate phase boundary
-            sorted_indices = np.argsort(scaling_factors)
-            phase_changes = np.where(np.diff(winding_numbers[sorted_indices]) != 0)[0]
+    if np.any(valid_both):
+        scatter = ax2.scatter(fractal_dims[valid_both], normalized_berry[valid_both], 
+                             c=scaling_factors[valid_both], 
+                             cmap='viridis', s=100, alpha=0.7, edgecolors='k', linewidths=0.5)
+        
+        # Add colorbar for scaling factors
+        cbar = fig.colorbar(scatter, ax=ax2)
+        cbar.set_label('Scale Factor (f_s)')
+        
+        # Identify and label different topological phases
+        trivial_phase = (winding_numbers == 0) & valid_both
+        topological_phase = (winding_numbers != 0) & valid_both
+        
+        # Add phase annotations if we have valid data
+        if np.any(trivial_phase):
+            trivial_x = np.median(fractal_dims[trivial_phase])
+            trivial_y = np.median(normalized_berry[trivial_phase])
+            ax2.annotate('Trivial Phase (W=0)',
+                        xy=(trivial_x, trivial_y),
+                        xytext=(trivial_x - 0.2, trivial_y + 0.2),
+                        arrowprops=dict(facecolor='black', shrink=0.05, width=1),
+                        fontsize=10, fontweight='bold')
+        
+        if np.any(topological_phase):
+            topo_x = np.median(fractal_dims[topological_phase])
+            topo_y = np.median(normalized_berry[topological_phase])
+            ax2.annotate('Topological Phase (W≠0)',
+                        xy=(topo_x, topo_y),
+                        xytext=(topo_x + 0.1, topo_y - 0.2),
+                        arrowprops=dict(facecolor='black', shrink=0.05, width=1),
+                        fontsize=10, fontweight='bold')
+        
+        # Highlight phi point with more prominence
+        phi_idx = np.argmin(np.abs(scaling_factors - PHI))
+        if valid_both[phi_idx]:
+            ax2.scatter([fractal_dims[phi_idx]], [normalized_berry[phi_idx]], 
+                       c='red', s=200, marker='*', edgecolors='white', linewidths=2,
+                       zorder=10, label=f'φ ≈ {PHI:.6f}')
             
-            # Only proceed if phase changes detected
-            if len(phase_changes) > 0:
-                for idx in phase_changes:
-                    if idx < len(sorted_indices)-1:  # Ensure valid index
-                        boundary_fs = (scaling_factors[sorted_indices[idx]] + 
-                                     scaling_factors[sorted_indices[idx+1]]) / 2
-                        
-                        # Add vertical line at phase boundary
-                        ax2.axvline(x=fractal_dims[sorted_indices[idx+1]], 
-                                   color='r', linestyle='--', alpha=0.5)
-                        
-                        # Add clearer annotation with white background
-                        ax2.annotate(f'Phase Boundary\nf_s ≈ {boundary_fs:.2f}',
-                                    xy=(fractal_dims[sorted_indices[idx+1]], 0.5),
-                                    xytext=(fractal_dims[sorted_indices[idx+1]] + 0.1, 0.5),
-                                    arrowprops=dict(facecolor='red', shrink=0.05, width=2),
-                                    fontsize=10, 
-                                    bbox=dict(facecolor='white', alpha=0.7))
-        except Exception as e:
-            print(f"Warning: Phase boundary detection failed: {e}")
+            # Draw boundary lines between phases if they exist with improved error handling
+            if np.any(trivial_phase) and np.any(topological_phase):
+                try:
+                    # Find approximate phase boundary using only valid data points
+                    valid_indices = np.where(valid_both)[0]
+                    valid_sf = scaling_factors[valid_indices]
+                    valid_wn = winding_numbers[valid_indices]
+                    
+                    # Sort by scaling factor
+                    sorted_order = np.argsort(valid_sf)
+                    sorted_sf = valid_sf[sorted_order]
+                    sorted_wn = valid_wn[sorted_order]
+                    
+                    # Find phase changes
+                    phase_changes = np.where(np.diff(sorted_wn) != 0)[0]
+                    
+                    # Only proceed if phase changes detected
+                    if len(phase_changes) > 0:
+                        for idx in phase_changes:
+                            if idx < len(sorted_order)-1:  # Ensure valid index
+                                # Get original indices
+                                orig_idx1 = valid_indices[sorted_order[idx]]
+                                orig_idx2 = valid_indices[sorted_order[idx+1]]
+                                
+                                boundary_fs = (scaling_factors[orig_idx1] + 
+                                             scaling_factors[orig_idx2]) / 2
+                                
+                                # Get fractal dimension for line position
+                                boundary_fd = fractal_dims[orig_idx2]
+                                
+                                # Add vertical line at phase boundary
+                                ax2.axvline(x=boundary_fd, color='r', linestyle='--', alpha=0.5)
+                                
+                                # Add annotation at an appropriate vertical position
+                                y_pos = 0.5  # Use middle of plot
+                                
+                                # Add clearer annotation with white background
+                                ax2.annotate(f'Phase Boundary\nf_s ≈ {boundary_fs:.2f}',
+                                            xy=(boundary_fd, y_pos),
+                                            xytext=(boundary_fd + 0.05, y_pos),
+                                            arrowprops=dict(facecolor='red', shrink=0.05, width=1.5),
+                                            fontsize=9, 
+                                            bbox=dict(facecolor='white', alpha=0.7))
+                except Exception as e:
+                    print(f"Warning: Phase boundary detection failed: {e}")
+    else:
+        # If no valid data, display a message
+        ax2.text(0.5, 0.5, "Insufficient data for phase diagram",
+                ha='center', va='center', transform=ax2.transAxes,
+                fontsize=14, fontweight='bold', color='red',
+                bbox=dict(facecolor='white', alpha=0.8))
     
     # Add labels and title
     ax2.set_xlabel('Fractal Dimension (D)')
     ax2.set_ylabel('Topological Invariant (|Berry Phase|/π)')
     ax2.set_title('Phase Diagram: Fractal Dimension vs. Topological Invariant')
     ax2.grid(True, alpha=0.3)
-    ax2.legend(loc='lower right')
+    
+    # Only add legend if phi point is valid
+    if np.any(valid_both) and valid_both[phi_idx]:
+        ax2.legend(loc='lower right')
     
     # Tight layout to avoid overlapping
     plt.tight_layout()
