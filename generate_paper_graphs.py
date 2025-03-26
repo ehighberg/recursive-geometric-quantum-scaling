@@ -1122,15 +1122,7 @@ def generate_robustness_under_perturbations(output_dir):
                     arrowprops=dict(facecolor='red', shrink=0.05),
                     fontsize=9)
     
-    # Annotate phi advantage region
-    max_diff_idx = np.argmax(phi_protection - unit_protection)
-    max_diff_strength = perturbation_strengths[max_diff_idx]
-    max_diff = phi_protection[max_diff_idx] - unit_protection[max_diff_idx]
-    plt.annotate(f"φ advantage: +{max_diff:.2f}",
-                xy=(max_diff_strength, phi_protection[max_diff_idx]),
-                xytext=(max_diff_strength-0.1, phi_protection[max_diff_idx]+0.1),
-                arrowprops=dict(facecolor='blue', shrink=0.05),
-                fontsize=9)
+    # Removed phi advantage annotation as requested
     
     plt.tight_layout()
     
@@ -1491,31 +1483,9 @@ def generate_entanglement_entropy(output_dir):
     plt.axhline(y=max_entropy, color='red', linestyle='--', alpha=0.7, 
                label='Maximum Entropy (1 bit)')
     
-    # Highlight regions of significant difference
-    diff = np.array(S_phi) - np.array(S_unit)
-    sig_diff_indices = np.where(np.abs(diff) > 0.1)[0]
-    if len(sig_diff_indices) > 0:
-        # Group consecutive indices
-        from itertools import groupby
-        from operator import itemgetter
-        
-        for k, g in groupby(enumerate(sig_diff_indices), lambda ix: ix[0] - ix[1]):
-            indices = list(map(itemgetter(1), g))
-            if len(indices) > 5:  # Only highlight substantial regions
-                start_idx, end_idx = indices[0], indices[-1]
-                plt.axvspan(times[start_idx], times[end_idx], 
-                           alpha=0.2, color='green', 
-                           label='Significant Difference' if start_idx == indices[0] else "")
+    # Removed significant difference highlight as requested
     
-    # Add annotations
-    # Find maximum entropy difference
-    max_diff_idx = np.argmax(np.abs(diff))
-    if max_diff_idx > 0:
-        plt.annotate(f"Max difference: {diff[max_diff_idx]:.3f}",
-                    xy=(times[max_diff_idx], max(S_phi[max_diff_idx], S_unit[max_diff_idx])),
-                    xytext=(times[max_diff_idx] + 1, max(S_phi[max_diff_idx], S_unit[max_diff_idx]) + 0.1),
-                    arrowprops=dict(facecolor='black', shrink=0.05, width=1.5),
-                    fontsize=10, bbox=dict(facecolor='white', alpha=0.7))
+    # Removed maximum difference annotation as requested
     
     # Calculate oscillation frequencies
     if len(S_phi) > 20:
@@ -1540,7 +1510,7 @@ def generate_entanglement_entropy(output_dir):
     
     # Improve plot aesthetics
     plt.grid(True, alpha=0.3)
-    plt.xlabel('Time', fontsize=12)
+    plt.xlabel('Time (arb. units)', fontsize=12)
     plt.ylabel('Entanglement Entropy (bits)', fontsize=12)
     plt.title('Comparative Entanglement Entropy Evolution', fontsize=14, fontweight='bold')
     plt.legend(loc='best')
@@ -2236,15 +2206,30 @@ def generate_statistical_validation_graphs(output_dir):
     p_values = [results['individual_results'][m]['p_value'] for m in sorted_metrics]
     adjusted_p = [results['individual_results'][m]['adjusted_p_value'] for m in sorted_metrics]
     
+    # Filter out fractal_dimension if present
+    filtered_metrics = [m for m in sorted_metrics if m != 'fractal_dimension']
+    
+    # Get p-values for filtered metrics
+    p_values = [results['individual_results'][m]['p_value'] for m in filtered_metrics]
+    adjusted_p = [results['individual_results'][m]['adjusted_p_value'] for m in filtered_metrics]
+    
     # Create bar chart of p-values
-    x = np.arange(len(sorted_metrics))
+    x = np.arange(len(filtered_metrics))
     width = 0.35
     
     # Plot raw p-values
     plt.bar(x - width/2, p_values, width, label='Raw p-value', color='skyblue')
     
     # Plot adjusted p-values
-    plt.bar(x + width/2, adjusted_p, width, label='Adjusted p-value', color='salmon')
+    adj_bars = plt.bar(x + width/2, adjusted_p, width, 
+                     label='P-value adjusted for multiple tests', color='salmon')
+    
+    # Add adjusted p-value annotations
+    for i, bar in enumerate(adj_bars):
+        height = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                f'{adjusted_p[i]:.3f}', ha='center', va='bottom', 
+                rotation=0, size=8)
     
     # Add significance threshold line
     plt.axhline(y=0.05, color='r', linestyle='--', label='Significance level (α=0.05)')
@@ -2253,7 +2238,7 @@ def generate_statistical_validation_graphs(output_dir):
     plt.xlabel('Metrics')
     plt.ylabel('p-value')
     plt.title('Statistical Significance of Phi Effect Across Metrics')
-    plt.xticks(x, sorted_metrics, rotation=45, ha='right')
+    plt.xticks(x, filtered_metrics, rotation=45, ha='right')
     plt.legend()
     plt.tight_layout()
     
@@ -2264,36 +2249,30 @@ def generate_statistical_validation_graphs(output_dir):
     # Create effect size comparison
     plt.figure(figsize=(12, 6))
     
-    # Sort metrics by effect size
-    effect_sizes = [abs(results['individual_results'][m]['effect_size']) for m in sorted_metrics]
-    effect_categories = [results['individual_results'][m]['effect_size_category'] for m in sorted_metrics]
+    # Filter out fractal_dimension if present
+    filtered_metrics = [m for m in sorted_metrics if m != 'fractal_dimension']
     
-    # Create color map based on effect size category
-    colors = []
-    for category in effect_categories:
-        if category == 'large':
-            colors.append('#1a9850')  # green
-        elif category == 'medium':
-            colors.append('#91cf60')  # light green
-        elif category == 'small':
-            colors.append('#d9ef8b')  # very light green
-        else:
-            colors.append('#bbbbbb')  # gray
+    # Use actual effect sizes, not absolute values
+    effect_sizes = [results['individual_results'][m]['effect_size'] for m in filtered_metrics]
     
-    # Plot effect sizes
-    bars = plt.bar(sorted_metrics, effect_sizes, color=colors)
+    # Create colors based on effect direction (positive = green, negative = red)
+    bar_colors = ['#1a9850' if es >= 0 else '#d73027' for es in effect_sizes]
     
-    # Add reference lines for effect size categories
-    plt.axhline(y=0.2, color='gray', linestyle='--', alpha=0.5, label='Small effect')
-    plt.axhline(y=0.5, color='gray', linestyle='--', alpha=0.7, label='Medium effect')
-    plt.axhline(y=0.8, color='gray', linestyle='--', alpha=0.9, label='Large effect')
+    # Plot effect sizes with appropriate coloring
+    bars = plt.bar(filtered_metrics, effect_sizes, color=bar_colors)
+    
+    # Add a zero line instead of effect size category lines
+    plt.axhline(y=0, color='black', linestyle='-', alpha=0.3, linewidth=1)
+    
+    # Adjust y-limits to be symmetric around zero for better interpretation
+    max_abs_effect = max(abs(np.array(effect_sizes)))
+    plt.ylim(-max_abs_effect * 1.1, max_abs_effect * 1.1)
     
     # Configure plot
     plt.xlabel('Metrics')
-    plt.ylabel('Effect Size (absolute value)')
-    plt.title('Effect Size of Phi Across Metrics')
+    plt.ylabel('Effect Size (Cohen\'s d)')
+    plt.title('Effect size of scaling factor phi compared to unit scaling')
     plt.xticks(rotation=45, ha='right')
-    plt.legend()
     plt.tight_layout()
     
     # Save figure
