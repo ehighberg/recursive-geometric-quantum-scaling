@@ -2279,11 +2279,14 @@ def generate_statistical_validation_graphs(output_dir):
     plt.savefig(output_dir / "effect_size_comparison.png", dpi=300, bbox_inches='tight')
     plt.close()
     
-    # Create comparison of means plot
+    # Create boxplot comparison between different scaling factors
     plt.figure(figsize=(14, 8))
     
     # For each metric, plot phi vs average of others
     for i, metric_name in enumerate(sorted_metrics):
+        if metric_name == 'fractal_dimension':
+            continue  # Skip fractal dimension as requested
+            
         plt.subplot(3, 2, i+1 if i < 5 else 5)
         
         # Extract data
@@ -2294,22 +2297,24 @@ def generate_statistical_validation_graphs(output_dir):
                 other_data.extend(metrics_data[metric_name][factor])
         other_data = np.array(other_data)
         
-        # Create boxplot
+        # Create boxplot with consistent coloring
         bp = plt.boxplot([phi_data, other_data], labels=['φ', 'Other'], patch_artist=True)
         
-        # Color boxes based on significance
-        if results['individual_results'][metric_name]['significant_after_correction']:
-            bp['boxes'][0].set_facecolor('#c6dbef')
-            plt.title(f"{metric_name} (p={results['individual_results'][metric_name]['adjusted_p_value']:.4f})*")
-        else:
-            bp['boxes'][0].set_facecolor('#f0f0f0')
-            plt.title(f"{metric_name} (p={results['individual_results'][metric_name]['adjusted_p_value']:.4f})")
+        # Use consistent neutral coloring regardless of significance
+        bp['boxes'][0].set_facecolor('#d9d9d9')  # Light gray for all boxes
+        bp['boxes'][1].set_facecolor('#d9d9d9')
+        
+        # Title includes p-value but without asterisk to avoid implying significance
+        plt.title(f"{metric_name} (adjusted p={results['individual_results'][metric_name]['adjusted_p_value']:.4f})")
             
-        # Add individual points
+        # Add individual data points with neutral colors
         plt.scatter(np.random.normal(1, 0.1, len(phi_data)), phi_data, alpha=0.4, 
-                   color='blue', edgecolor='none')
+                   color='dimgray', edgecolor='none')
         plt.scatter(np.random.normal(2, 0.1, len(other_data)), other_data, alpha=0.2, 
-                   color='gray', edgecolor='none')
+                   color='dimgray', edgecolor='none')
+                   
+        # Add y-label for clarity
+        plt.ylabel('Value')
     
     plt.tight_layout()
     plt.savefig(output_dir / "phi_comparison_boxplots.png", dpi=300, bbox_inches='tight')
