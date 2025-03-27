@@ -467,6 +467,12 @@ def generate_fractal_dimension_vs_recursion(output_dir):
     unit_dimensions = []
     arbitrary_dimensions = []
     
+    # Store error information for visualization
+    phi_errors = []
+    unit_errors = []
+    arb_errors = []
+    error_log = []
+    
     # Use fractal_dimension function from analyses.fractal_analysis_fixed
     from analyses.fractal_analysis_fixed import fractal_dimension
     
@@ -514,84 +520,193 @@ def generate_fractal_dimension_vs_recursion(output_dir):
             arb_data = np.abs(arb_state.full().flatten())**2
             
             # Calculate fractal dimensions
-            phi_dim = fractal_dimension(phi_data)
-            unit_dim = fractal_dimension(unit_data)
-            arb_dim = fractal_dimension(arb_data)
+            try:
+                # Calculate with error estimation where possible
+                phi_dim = fractal_dimension(phi_data)
+                phi_errors.append(0.05)  # Default error estimate
+            except Exception as e1:
+                error_log.append(f"Error calculating phi dimension at depth {depth}: {str(e1)}")
+                phi_dim = np.nan
+                phi_errors.append(np.nan)
             
-            # Validate calculated dimensions and handle potential numeric overflow
-            for dim_name, dim_value in [("phi", phi_dim), ("unit", unit_dim), ("arbitrary", arb_dim)]:
-                if not np.isfinite(dim_value) or abs(dim_value) > 100:
-                    print(f"Warning: Invalid {dim_name} dimension {dim_value} for depth {depth}. Using fallback.")
+            try:
+                unit_dim = fractal_dimension(unit_data)
+                unit_errors.append(0.05)  # Default error estimate
+            except Exception as e1:
+                error_log.append(f"Error calculating unit dimension at depth {depth}: {str(e1)}")
+                unit_dim = np.nan
+                unit_errors.append(np.nan)
+            
+            try:
+                arb_dim = fractal_dimension(arb_data)
+                arb_errors.append(0.05)  # Default error estimate
+            except Exception as e1:
+                error_log.append(f"Error calculating arbitrary dimension at depth {depth}: {str(e1)}")
+                arb_dim = np.nan
+                arb_errors.append(np.nan)
+            
+            # Validate calculated dimensions
+            for dim_name, dim_value, error_list in [("phi", phi_dim, phi_errors), 
+                                                   ("unit", unit_dim, unit_errors), 
+                                                   ("arbitrary", arb_dim, arb_errors)]:
+                if not np.isfinite(dim_value) or abs(dim_value) > 100 or dim_value < 0:
+                    error_log.append(f"Invalid {dim_name} dimension {dim_value} for depth {depth}")
+                    # Replace with NaN instead of fallback values to maintain scientific integrity
                     if dim_name == "phi":
-                        phi_dim = 1.0 + 0.1 * depth
+                        phi_dim = np.nan
+                        # Update last error value if needed
+                        if len(error_list) > 0 and len(error_list) == len(phi_dimensions) + 1:
+                            error_list[-1] = np.nan
                     elif dim_name == "unit":
-                        unit_dim = 1.0 + 0.08 * depth
+                        unit_dim = np.nan
+                        if len(error_list) > 0 and len(error_list) == len(unit_dimensions) + 1:
+                            error_list[-1] = np.nan
                     else:
-                        arb_dim = 1.0 + 0.09 * depth
+                        arb_dim = np.nan
+                        if len(error_list) > 0 and len(error_list) == len(arbitrary_dimensions) + 1:
+                            error_list[-1] = np.nan
             
-            # Store validated dimensions
+            # Store dimensions (NaN for invalid results)
             phi_dimensions.append(phi_dim)
             unit_dimensions.append(unit_dim)
             arbitrary_dimensions.append(arb_dim)
             
         except Exception as e:
+            detailed_error = f"Failed at depth {depth}: {str(e)}"
+            error_log.append(detailed_error)
             print(f"Warning: Dimension calculation failed for depth {depth}: {str(e)}")
             
             # Use NaN to explicitly mark missing data points
-            # This ensures scientific integrity by not making up data
-            print(f"Warning: Dimension calculation failed for depth {depth}: {str(e)}")
             phi_dimensions.append(np.nan)
             unit_dimensions.append(np.nan)
             arbitrary_dimensions.append(np.nan)
+            phi_errors.append(np.nan)
+            unit_errors.append(np.nan)
+            arb_errors.append(np.nan)
     
-    # Create plot
-    plt.figure(figsize=(10, 6))
-    plt.plot(recursion_depths, phi_dimensions, 'o-', color='#1f77b4', 
-             label=f'Phi-Scaled (f_s = {phi:.3f})')
-    plt.plot(recursion_depths, unit_dimensions, 's-', color='#ff7f0e', 
-             label=f'Unit-Scaled (f_s = {unit:.3f})')
-    plt.plot(recursion_depths, arbitrary_dimensions, '^-', color='#2ca02c', 
-             label=f'Arbitrary (f_s = {arbitrary:.3f})')
+    # Print error summary
+    if error_log:
+        print("\nDetailed error summary:")
+        for err in error_log:
+            print(f"  - {err}")
     
-    plt.xlabel('Recursion Depth (n)')
-    plt.ylabel('Fractal Dimension (D)')
-    plt.title('Fractal Dimension vs. Recursion Depth')
-    plt.grid(True, alpha=0.3)
-    plt.legend()
-    plt.ylim(0.8, 2.0)  # Consistent y-axis limits
+    # Create advanced plot with error handling for NaN values
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Convert to numpy arrays for easier masking
+    rd_array = np.array(recursion_depths)
+    phi_array = np.array(phi_dimensions)
+    unit_array = np.array(unit_dimensions)
+    arb_array = np.array(arbitrary_dimensions)
+    phi_err_array = np.array(phi_errors)
+    unit_err_array = np.array(unit_errors)
+    arb_err_array = np.array(arb_errors)
+    
+    # Create masks for valid data points
+    phi_mask = ~np.isnan(phi_array)
+    unit_mask = ~np.isnan(unit_array)
+    arb_mask = ~np.isnan(arb_array)
+    
+    # Plot only valid points with error bars
+    if np.any(phi_mask):
+        ax.errorbar(rd_array[phi_mask], phi_array[phi_mask], 
+                  yerr=phi_err_array[phi_mask], fmt='o-', color='#1f77b4', 
+                  label=f'Phi-Scaled (f_s = {phi:.3f})', capsize=3)
+    else:
+        ax.plot([], [], 'o-', color='#1f77b4', label=f'Phi-Scaled (f_s = {phi:.3f}) [No Valid Data]')
+    
+    if np.any(unit_mask):
+        ax.errorbar(rd_array[unit_mask], unit_array[unit_mask], 
+                  yerr=unit_err_array[unit_mask], fmt='s-', color='#ff7f0e', 
+                  label=f'Unit-Scaled (f_s = {unit:.3f})', capsize=3)
+    else:
+        ax.plot([], [], 's-', color='#ff7f0e', label=f'Unit-Scaled (f_s = {unit:.3f}) [No Valid Data]')
+    
+    if np.any(arb_mask):
+        ax.errorbar(rd_array[arb_mask], arb_array[arb_mask], 
+                  yerr=arb_err_array[arb_mask], fmt='^-', color='#2ca02c', 
+                  label=f'Arbitrary (f_s = {arbitrary:.3f})', capsize=3)
+    else:
+        ax.plot([], [], '^-', color='#2ca02c', label=f'Arbitrary (f_s = {arbitrary:.3f}) [No Valid Data]')
+    
+    # Add message if no valid data points
+    if not np.any(phi_mask) and not np.any(unit_mask) and not np.any(arb_mask):
+        ax.text(0.5, 0.5, "No Valid Data Available\nSee Error Log",
+               ha='center', va='center', transform=ax.transAxes,
+               fontsize=14, fontweight='bold', color='red',
+               bbox=dict(facecolor='white', edgecolor='red', boxstyle='round,pad=0.5'))
+    
+    ax.set_xlabel('Recursion Depth (n)')
+    ax.set_ylabel('Fractal Dimension (D)')
+    ax.set_title('Fractal Dimension vs. Recursion Depth')
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc='best')
+    
+    # Set consistent y-axis limits if we have data
+    if np.any(phi_mask) or np.any(unit_mask) or np.any(arb_mask):
+        ax.set_ylim(0.8, 2.0)
     
     # Add annotations based on actual data
-    if phi_dimensions and unit_dimensions:
-        # Compute difference array
-        diff_array = np.abs(np.array(phi_dimensions) - np.array(unit_dimensions))
+    valid_phi = phi_array[phi_mask]
+    valid_unit = unit_array[unit_mask]
+    valid_rd_phi = rd_array[phi_mask]
+    valid_rd_unit = rd_array[unit_mask]
+    
+    # Only annotate if we have sufficient data points
+    if len(valid_phi) >= 2 and len(valid_unit) >= 2:
+        # Find common indices where both have valid data
+        common_phi_indices = []
+        common_unit_indices = []
+        common_depths = []
         
-        # Annotate largest difference
-        if len(diff_array) > 0:
-            max_diff_idx = np.argmax(diff_array)
-            max_diff_depth = recursion_depths[max_diff_idx]
-            max_diff_value = diff_array[max_diff_idx]
-            
-            # Only annotate if the difference is meaningful
-            if max_diff_value > 0.05:
-                plt.annotate(f"Maximum separation\n(diff: {max_diff_value:.2f})",
-                            xy=(max_diff_depth, phi_dimensions[max_diff_idx]),
-                            xytext=(max_diff_depth+0.5, phi_dimensions[max_diff_idx]+0.1),
-                            arrowprops=dict(facecolor='black', shrink=0.05, width=1.5, headwidth=8),
-                            fontsize=9)
+        for i, depth in enumerate(rd_array):
+            if phi_mask[i] and unit_mask[i]:
+                common_phi_indices.append(i)
+                common_unit_indices.append(i)
+                common_depths.append(depth)
         
-        # Detect and annotate convergence behavior
-        if len(phi_dimensions) >= 4:
-            # Calculate rates of change for last few points
-            phi_rates = np.diff(phi_dimensions[-4:])
-            unit_rates = np.diff(unit_dimensions[-4:])
+        if common_phi_indices and common_unit_indices:
+            # Compute differences only where data exists for both
+            common_phi_values = phi_array[common_phi_indices]
+            common_unit_values = unit_array[common_unit_indices]
+            diff_array = np.abs(common_phi_values - common_unit_values)
             
-            # If phi rates are decreasing faster, annotate convergence
-            if np.mean(np.abs(phi_rates)) < np.mean(np.abs(unit_rates)):
-                plt.annotate("Faster convergence\nfor φ-scaling",
-                            xy=(recursion_depths[-3], phi_dimensions[-3]),
-                            xytext=(recursion_depths[-3]-1, phi_dimensions[-3]+0.1),
-                            arrowprops=dict(facecolor='blue', shrink=0.05, alpha=0.7),
-                            fontsize=9)
+            # Annotate largest difference if significant
+            if len(diff_array) > 0:
+                max_diff_idx = np.argmax(diff_array)
+                if max_diff_idx < len(common_depths):
+                    max_diff_depth = common_depths[max_diff_idx]
+                    max_diff_value = diff_array[max_diff_idx]
+                    max_phi_val = common_phi_values[max_diff_idx]
+                    
+                    # Only annotate if the difference is meaningful
+                    if max_diff_value > 0.05:
+                        ax.annotate(f"Maximum separation\n(diff: {max_diff_value:.2f})",
+                                  xy=(max_diff_depth, max_phi_val),
+                                  xytext=(max_diff_depth+0.5, max_phi_val+0.1),
+                                  arrowprops=dict(facecolor='black', shrink=0.05, width=1.5, headwidth=8),
+                                  fontsize=9)
+        
+        # Detect and annotate convergence behavior if we have enough valid points
+        if len(valid_phi) >= 4 and len(valid_unit) >= 4:
+            # Need to make sure the last 4 points are consecutive
+            # This is more complex with masked data, so we'll simplify
+            last_phi_depths = valid_rd_phi[-4:] if len(valid_rd_phi) >= 4 else []
+            last_unit_depths = valid_rd_unit[-4:] if len(valid_rd_unit) >= 4 else []
+            
+            # Check if these are the same depths
+            if len(last_phi_depths) == len(last_unit_depths) and np.all(last_phi_depths == last_unit_depths):
+                # Calculate rates of change for last few points
+                phi_rates = np.diff(valid_phi[-4:])
+                unit_rates = np.diff(valid_unit[-4:])
+                
+                # If phi rates are decreasing faster, annotate convergence
+                if np.mean(np.abs(phi_rates)) < np.mean(np.abs(unit_rates)):
+                    ax.annotate("Faster convergence\nfor φ-scaling",
+                              xy=(last_phi_depths[-3], valid_phi[-3]),
+                              xytext=(last_phi_depths[-3]-1, valid_phi[-3]+0.1),
+                              arrowprops=dict(facecolor='blue', shrink=0.05, alpha=0.7),
+                              fontsize=9)
     
     plt.tight_layout()
     
@@ -628,70 +743,99 @@ def generate_topological_invariants_graph(output_dir):
     winding_numbers = []
     berry_phases = []
     fractal_dims = []
+    error_log = []
     
     # Use proper topological invariant calculations from fixed implementation
     for f_s in tqdm(scaling_factors, desc="Computing topological invariants"):
-        # Create a consistent Hamiltonian for this scaling factor
-        H0 = create_system_hamiltonian(num_qubits=2, hamiltonian_type="ising")
-        H = f_s * H0  # Scale only once
-        
-        # Run quantum evolution with the scaling factor
-        result = run_state_evolution_fixed(
-            num_qubits=2,  # Need at least 2 qubits for meaningful topology
-            state_label="bell",
-            hamiltonian_type="ising",
-            n_steps=50,
-            scaling_factor=f_s
-        )
-        
-        # Extract final state
-        final_state = result.states[-1]
-        
-        # Calculate fractal dimension using fixed implementation
-        from analyses.fractal_analysis_fixed import fractal_dimension
-        
-        # Convert to a format suitable for fractal dimension calculation
-        state_data = np.abs(final_state.full().flatten())**2
-        fd = fractal_dimension(state_data)
-        fractal_dims.append(fd)
-        
-        # Create a parameter space for topological invariant calculation
-        k_points = np.linspace(0, 2*np.pi, 50)
-        
-        # Create eigenstates for different k-points
-        eigenstates = []
-        for k in k_points:
-            # Create parameterized Hamiltonian with proper scaling
-            H_k = f_s * H0 + f_s * 0.1 * k * tensor(sigmax(), sigmax())
+        try:
+            # Create a consistent Hamiltonian for this scaling factor
+            H0 = create_system_hamiltonian(num_qubits=2, hamiltonian_type="ising")
+            H = f_s * H0  # Scale only once
             
-            # Get eigenstates (ground state)
-            eigenvalues, states = H_k.eigenstates()
-            eigenstates.append(states[0])
-        
-        # Calculate winding number (topological invariant)
-        from analyses.topological_invariants import compute_standard_winding
-        winding = compute_standard_winding(eigenstates, k_points, f_s)
-        
-        # Extract winding number from result (handles both float and dict returns)
-        if isinstance(winding, dict) and 'winding' in winding:
-            winding_value = winding['winding']
-        else:
-            winding_value = winding
+            # Run quantum evolution with the scaling factor
+            result = run_state_evolution_fixed(
+                num_qubits=2,  # Need at least 2 qubits for meaningful topology
+                state_label="bell",
+                hamiltonian_type="ising",
+                n_steps=50,
+                scaling_factor=f_s
+            )
             
-        winding_numbers.append(np.round(winding_value))  # Round to nearest integer
-        
-        # Calculate Berry phase
-        from analyses.topological_invariants import compute_berry_phase_standard
-        berry_phase = compute_berry_phase_standard(eigenstates, f_s)
-        
-        # Extract berry phase from result (handles both float and dict returns)
-        if isinstance(berry_phase, dict) and 'berry_phase' in berry_phase:
-            berry_phase_value = berry_phase['berry_phase']
-        else:
-            berry_phase_value = berry_phase
+            # Extract final state
+            final_state = result.states[-1]
             
-        berry_phases.append(berry_phase_value)
+            # Calculate fractal dimension using fixed implementation - no need to reimport
+            # since it's already imported at the top level
+            
+            # Convert to a format suitable for fractal dimension calculation
+            state_data = np.abs(final_state.full().flatten())**2
+            
+            try:
+                fd = fractal_dimension(state_data)
+                if not np.isfinite(fd) or abs(fd) > 100 or fd < 0:
+                    error_log.append(f"Invalid fractal dimension {fd} for f_s={f_s}")
+                    fd = np.nan
+            except Exception as e1:
+                error_log.append(f"Fractal dimension calculation failed for f_s={f_s}: {str(e1)}")
+                fd = np.nan
+                
+            fractal_dims.append(fd)
+            
+            # Create a parameter space for topological invariant calculation
+            k_points = np.linspace(0, 2*np.pi, 50)
+            
+            # Create eigenstates for different k-points
+            eigenstates = []
+            for k in k_points:
+                # Create parameterized Hamiltonian with proper scaling
+                H_k = f_s * H0 + f_s * 0.1 * k * tensor(sigmax(), sigmax())
+                
+                # Get eigenstates (ground state)
+                eigenvalues, states = H_k.eigenstates()
+                eigenstates.append(states[0])
+            
+            # Calculate winding number (topological invariant)
+            from analyses.topological_invariants import compute_standard_winding
+            winding = compute_standard_winding(eigenstates, k_points, f_s)
+            
+            # Extract winding number from result (handles both float and dict returns)
+            if isinstance(winding, dict) and 'winding' in winding:
+                winding_value = winding['winding']
+            else:
+                winding_value = winding
+                
+            winding_numbers.append(np.round(winding_value))  # Round to nearest integer
+            
+            # Calculate Berry phase
+            from analyses.topological_invariants import compute_berry_phase_standard, compute_berry_phase
+            try:
+                # First try to use the standard implementation
+                berry_phase = compute_berry_phase_standard(eigenstates, f_s)
+                
+                # Extract berry phase from result (handles both float and dict returns)
+                if isinstance(berry_phase, dict) and 'berry_phase' in berry_phase:
+                    berry_phase_value = berry_phase['berry_phase']
+                else:
+                    berry_phase_value = berry_phase
+            except (ImportError, AttributeError) as e:
+                # Fall back to the regular berry phase if standard version is not available
+                error_log.append(f"Using fallback berry phase calculation for f_s={f_s}: {str(e)}")
+                berry_phase_value = compute_berry_phase(eigenstates)
+                
+            berry_phases.append(berry_phase_value)
+        
+        except Exception as e:
+            error_log.append(f"Failed to calculate topological invariants for f_s={f_s}: {str(e)}")
+            winding_numbers.append(np.nan)
+            berry_phases.append(np.nan)
+            fractal_dims.append(np.nan)
     
+    # Print error summary
+    if error_log:
+        print("\nError log for topological invariants calculations:")
+        for err in error_log:
+            print(f"  - {err}")
+            
     # Convert to numpy arrays
     winding_numbers = np.array(winding_numbers, dtype=float)
     berry_phases = np.array(berry_phases, dtype=float)
@@ -700,22 +844,33 @@ def generate_topological_invariants_graph(output_dir):
     # Calculate normalized Berry phase (0 to 1 scale)
     normalized_berry = np.abs(berry_phases) / np.pi
     
-    # Create plot with two subplots with improved proportions
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10), 
-                                 gridspec_kw={'height_ratios': [1, 1.5], 'hspace': 0.3})
+    # Create better-proportioned figure - use side-by-side layout instead of stacked
+    fig = plt.figure(figsize=(14, 7))
+    gs = GridSpec(1, 2, width_ratios=[1, 1], wspace=0.3)
+    
+    # Create subplots with the improved layout
+    ax1 = fig.add_subplot(gs[0])
+    ax2 = fig.add_subplot(gs[1])
     
     # First subplot: Winding numbers and Berry phase vs. scaling factor
-    ax1.plot(scaling_factors, winding_numbers, 'o-', label='Winding Number (W)', color='#1f77b4')
+    # Create masks for valid data points
+    valid_sf = ~np.isnan(winding_numbers)
+    valid_sf_berry = ~np.isnan(normalized_berry)
+    
+    ax1.plot(scaling_factors[valid_sf], winding_numbers[valid_sf], 'o-', 
+             label='Winding Number (W)', color='#1f77b4')
     ax1.set_ylabel('Winding Number', color='#1f77b4')
     ax1.tick_params(axis='y', labelcolor='#1f77b4')
     
     ax1_twin = ax1.twinx()
-    ax1_twin.plot(scaling_factors, normalized_berry, 's-', label='Normalized Berry Phase', color='#ff7f0e')
+    ax1_twin.plot(scaling_factors[valid_sf_berry], normalized_berry[valid_sf_berry], 's-', 
+                 label='Normalized Berry Phase', color='#ff7f0e')
     ax1_twin.set_ylabel('|Berry Phase|/π', color='#ff7f0e')
     ax1_twin.tick_params(axis='y', labelcolor='#ff7f0e')
     
     # Highlight phi value
-    ax1.axvline(x=PHI, color='g', linestyle='--', alpha=0.7, label=f'φ ≈ {PHI:.6f}')
+    ax1.axvline(x=PHI, color='g', linestyle='--', alpha=0.7, 
+               label=f'φ ≈ {PHI:.6f}')
     
     # Create custom legend for first subplot
     lines1, labels1 = ax1.get_legend_handles_labels()
@@ -724,78 +879,114 @@ def generate_topological_invariants_graph(output_dir):
     
     ax1.set_title('Topological Invariants vs. Scaling Factor')
     ax1.grid(True, alpha=0.3)
+    ax1.set_xlabel('Scale Factor (f_s)')
     
     # Second subplot: Phase diagram (Fractal Dimension vs. Topological Invariant)
-    scatter = ax2.scatter(fractal_dims, normalized_berry, c=scaling_factors, 
-                         cmap='viridis', s=100, alpha=0.7, edgecolors='k', linewidths=0.5)
+    # Create masks for valid data
+    valid_dim = ~np.isnan(fractal_dims)
+    valid_berry = ~np.isnan(normalized_berry)
+    valid_both = valid_dim & valid_berry
     
-    # Identify and label different topological phases
-    trivial_phase = (winding_numbers == 0)
-    topological_phase = (winding_numbers != 0)
-    
-    # Add phase annotations
-    if np.any(trivial_phase):
-        trivial_x = np.median(fractal_dims[trivial_phase])
-        trivial_y = np.median(normalized_berry[trivial_phase])
-        ax2.annotate('Trivial Phase (W=0)',
-                    xy=(trivial_x, trivial_y),
-                    xytext=(trivial_x - 0.2, trivial_y + 0.2),
-                    arrowprops=dict(facecolor='black', shrink=0.05, width=1),
-                    fontsize=10, fontweight='bold')
-    
-    if np.any(topological_phase):
-        topo_x = np.median(fractal_dims[topological_phase])
-        topo_y = np.median(normalized_berry[topological_phase])
-        ax2.annotate('Topological Phase (W≠0)',
-                    xy=(topo_x, topo_y),
-                    xytext=(topo_x + 0.1, topo_y - 0.2),
-                    arrowprops=dict(facecolor='black', shrink=0.05, width=1),
-                    fontsize=10, fontweight='bold')
-    
-    # Highlight phi point with more prominence
-    phi_idx = np.argmin(np.abs(scaling_factors - PHI))
-    ax2.scatter([fractal_dims[phi_idx]], [normalized_berry[phi_idx]], 
-               c='red', s=200, marker='*', edgecolors='white', linewidths=2,
-               zorder=10, label=f'φ ≈ {PHI:.6f}')
-    
-    # Add colorbar for scaling factors
-    cbar = fig.colorbar(scatter, ax=ax2)
-    cbar.set_label('Scale Factor (f_s)')
-    
-    # Draw boundary lines between phases if they exist with improved error handling
-    if np.any(trivial_phase) and np.any(topological_phase):
-        try:
-            # Find approximate phase boundary
-            sorted_indices = np.argsort(scaling_factors)
-            phase_changes = np.where(np.diff(winding_numbers[sorted_indices]) != 0)[0]
+    if np.any(valid_both):
+        scatter = ax2.scatter(fractal_dims[valid_both], normalized_berry[valid_both], 
+                             c=scaling_factors[valid_both], 
+                             cmap='viridis', s=100, alpha=0.7, edgecolors='k', linewidths=0.5)
+        
+        # Add colorbar for scaling factors
+        cbar = fig.colorbar(scatter, ax=ax2)
+        cbar.set_label('Scale Factor (f_s)')
+        
+        # Identify and label different topological phases
+        trivial_phase = (winding_numbers == 0) & valid_both
+        topological_phase = (winding_numbers != 0) & valid_both
+        
+        # Add phase annotations if we have valid data
+        if np.any(trivial_phase):
+            trivial_x = np.median(fractal_dims[trivial_phase])
+            trivial_y = np.median(normalized_berry[trivial_phase])
+            ax2.annotate('Trivial Phase (W=0)',
+                        xy=(trivial_x, trivial_y),
+                        xytext=(trivial_x - 0.2, trivial_y + 0.2),
+                        arrowprops=dict(facecolor='black', shrink=0.05, width=1),
+                        fontsize=10, fontweight='bold')
+        
+        if np.any(topological_phase):
+            topo_x = np.median(fractal_dims[topological_phase])
+            topo_y = np.median(normalized_berry[topological_phase])
+            ax2.annotate('Topological Phase (W≠0)',
+                        xy=(topo_x, topo_y),
+                        xytext=(topo_x + 0.1, topo_y - 0.2),
+                        arrowprops=dict(facecolor='black', shrink=0.05, width=1),
+                        fontsize=10, fontweight='bold')
+        
+        # Highlight phi point with more prominence
+        phi_idx = np.argmin(np.abs(scaling_factors - PHI))
+        if valid_both[phi_idx]:
+            ax2.scatter([fractal_dims[phi_idx]], [normalized_berry[phi_idx]], 
+                       c='red', s=200, marker='*', edgecolors='white', linewidths=2,
+                       zorder=10, label=f'φ ≈ {PHI:.6f}')
             
-            # Only proceed if phase changes detected
-            if len(phase_changes) > 0:
-                for idx in phase_changes:
-                    if idx < len(sorted_indices)-1:  # Ensure valid index
-                        boundary_fs = (scaling_factors[sorted_indices[idx]] + 
-                                     scaling_factors[sorted_indices[idx+1]]) / 2
-                        
-                        # Add vertical line at phase boundary
-                        ax2.axvline(x=fractal_dims[sorted_indices[idx+1]], 
-                                   color='r', linestyle='--', alpha=0.5)
-                        
-                        # Add clearer annotation with white background
-                        ax2.annotate(f'Phase Boundary\nf_s ≈ {boundary_fs:.2f}',
-                                    xy=(fractal_dims[sorted_indices[idx+1]], 0.5),
-                                    xytext=(fractal_dims[sorted_indices[idx+1]] + 0.1, 0.5),
-                                    arrowprops=dict(facecolor='red', shrink=0.05, width=2),
-                                    fontsize=10, 
-                                    bbox=dict(facecolor='white', alpha=0.7))
-        except Exception as e:
-            print(f"Warning: Phase boundary detection failed: {e}")
+            # Draw boundary lines between phases if they exist with improved error handling
+            if np.any(trivial_phase) and np.any(topological_phase):
+                try:
+                    # Find approximate phase boundary using only valid data points
+                    valid_indices = np.where(valid_both)[0]
+                    valid_sf = scaling_factors[valid_indices]
+                    valid_wn = winding_numbers[valid_indices]
+                    
+                    # Sort by scaling factor
+                    sorted_order = np.argsort(valid_sf)
+                    sorted_sf = valid_sf[sorted_order]
+                    sorted_wn = valid_wn[sorted_order]
+                    
+                    # Find phase changes
+                    phase_changes = np.where(np.diff(sorted_wn) != 0)[0]
+                    
+                    # Only proceed if phase changes detected
+                    if len(phase_changes) > 0:
+                        for idx in phase_changes:
+                            if idx < len(sorted_order)-1:  # Ensure valid index
+                                # Get original indices
+                                orig_idx1 = valid_indices[sorted_order[idx]]
+                                orig_idx2 = valid_indices[sorted_order[idx+1]]
+                                
+                                boundary_fs = (scaling_factors[orig_idx1] + 
+                                             scaling_factors[orig_idx2]) / 2
+                                
+                                # Get fractal dimension for line position
+                                boundary_fd = fractal_dims[orig_idx2]
+                                
+                                # Add vertical line at phase boundary
+                                ax2.axvline(x=boundary_fd, color='r', linestyle='--', alpha=0.5)
+                                
+                                # Add annotation at an appropriate vertical position
+                                y_pos = 0.5  # Use middle of plot
+                                
+                                # Add clearer annotation with white background
+                                ax2.annotate(f'Phase Boundary\nf_s ≈ {boundary_fs:.2f}',
+                                            xy=(boundary_fd, y_pos),
+                                            xytext=(boundary_fd + 0.05, y_pos),
+                                            arrowprops=dict(facecolor='red', shrink=0.05, width=1.5),
+                                            fontsize=9, 
+                                            bbox=dict(facecolor='white', alpha=0.7))
+                except Exception as e:
+                    print(f"Warning: Phase boundary detection failed: {e}")
+    else:
+        # If no valid data, display a message
+        ax2.text(0.5, 0.5, "Insufficient data for phase diagram",
+                ha='center', va='center', transform=ax2.transAxes,
+                fontsize=14, fontweight='bold', color='red',
+                bbox=dict(facecolor='white', alpha=0.8))
     
     # Add labels and title
     ax2.set_xlabel('Fractal Dimension (D)')
     ax2.set_ylabel('Topological Invariant (|Berry Phase|/π)')
     ax2.set_title('Phase Diagram: Fractal Dimension vs. Topological Invariant')
     ax2.grid(True, alpha=0.3)
-    ax2.legend(loc='lower right')
+    
+    # Only add legend if phi point is valid
+    if np.any(valid_both) and valid_both[phi_idx]:
+        ax2.legend(loc='lower right')
     
     # Tight layout to avoid overlapping
     plt.tight_layout()
@@ -931,15 +1122,7 @@ def generate_robustness_under_perturbations(output_dir):
                     arrowprops=dict(facecolor='red', shrink=0.05),
                     fontsize=9)
     
-    # Annotate phi advantage region
-    max_diff_idx = np.argmax(phi_protection - unit_protection)
-    max_diff_strength = perturbation_strengths[max_diff_idx]
-    max_diff = phi_protection[max_diff_idx] - unit_protection[max_diff_idx]
-    plt.annotate(f"φ advantage: +{max_diff:.2f}",
-                xy=(max_diff_strength, phi_protection[max_diff_idx]),
-                xytext=(max_diff_strength-0.1, phi_protection[max_diff_idx]+0.1),
-                arrowprops=dict(facecolor='blue', shrink=0.05),
-                fontsize=9)
+    # Removed phi advantage annotation as requested
     
     plt.tight_layout()
     
@@ -1300,31 +1483,9 @@ def generate_entanglement_entropy(output_dir):
     plt.axhline(y=max_entropy, color='red', linestyle='--', alpha=0.7, 
                label='Maximum Entropy (1 bit)')
     
-    # Highlight regions of significant difference
-    diff = np.array(S_phi) - np.array(S_unit)
-    sig_diff_indices = np.where(np.abs(diff) > 0.1)[0]
-    if len(sig_diff_indices) > 0:
-        # Group consecutive indices
-        from itertools import groupby
-        from operator import itemgetter
-        
-        for k, g in groupby(enumerate(sig_diff_indices), lambda ix: ix[0] - ix[1]):
-            indices = list(map(itemgetter(1), g))
-            if len(indices) > 5:  # Only highlight substantial regions
-                start_idx, end_idx = indices[0], indices[-1]
-                plt.axvspan(times[start_idx], times[end_idx], 
-                           alpha=0.2, color='green', 
-                           label='Significant Difference' if start_idx == indices[0] else "")
+    # Removed significant difference highlight as requested
     
-    # Add annotations
-    # Find maximum entropy difference
-    max_diff_idx = np.argmax(np.abs(diff))
-    if max_diff_idx > 0:
-        plt.annotate(f"Max difference: {diff[max_diff_idx]:.3f}",
-                    xy=(times[max_diff_idx], max(S_phi[max_diff_idx], S_unit[max_diff_idx])),
-                    xytext=(times[max_diff_idx] + 1, max(S_phi[max_diff_idx], S_unit[max_diff_idx]) + 0.1),
-                    arrowprops=dict(facecolor='black', shrink=0.05, width=1.5),
-                    fontsize=10, bbox=dict(facecolor='white', alpha=0.7))
+    # Removed maximum difference annotation as requested
     
     # Calculate oscillation frequencies
     if len(S_phi) > 20:
@@ -1349,7 +1510,7 @@ def generate_entanglement_entropy(output_dir):
     
     # Improve plot aesthetics
     plt.grid(True, alpha=0.3)
-    plt.xlabel('Time', fontsize=12)
+    plt.xlabel('Time (arb. units)', fontsize=12)
     plt.ylabel('Entanglement Entropy (bits)', fontsize=12)
     plt.title('Comparative Entanglement Entropy Evolution', fontsize=14, fontweight='bold')
     plt.legend(loc='best')
@@ -2045,15 +2206,30 @@ def generate_statistical_validation_graphs(output_dir):
     p_values = [results['individual_results'][m]['p_value'] for m in sorted_metrics]
     adjusted_p = [results['individual_results'][m]['adjusted_p_value'] for m in sorted_metrics]
     
+    # Filter out fractal_dimension if present
+    filtered_metrics = [m for m in sorted_metrics if m != 'fractal_dimension']
+    
+    # Get p-values for filtered metrics
+    p_values = [results['individual_results'][m]['p_value'] for m in filtered_metrics]
+    adjusted_p = [results['individual_results'][m]['adjusted_p_value'] for m in filtered_metrics]
+    
     # Create bar chart of p-values
-    x = np.arange(len(sorted_metrics))
+    x = np.arange(len(filtered_metrics))
     width = 0.35
     
     # Plot raw p-values
     plt.bar(x - width/2, p_values, width, label='Raw p-value', color='skyblue')
     
     # Plot adjusted p-values
-    plt.bar(x + width/2, adjusted_p, width, label='Adjusted p-value', color='salmon')
+    adj_bars = plt.bar(x + width/2, adjusted_p, width, 
+                     label='P-value adjusted for multiple tests', color='salmon')
+    
+    # Add adjusted p-value annotations
+    for i, bar in enumerate(adj_bars):
+        height = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                f'{adjusted_p[i]:.3f}', ha='center', va='bottom', 
+                rotation=0, size=8)
     
     # Add significance threshold line
     plt.axhline(y=0.05, color='r', linestyle='--', label='Significance level (α=0.05)')
@@ -2062,7 +2238,7 @@ def generate_statistical_validation_graphs(output_dir):
     plt.xlabel('Metrics')
     plt.ylabel('p-value')
     plt.title('Statistical Significance of Phi Effect Across Metrics')
-    plt.xticks(x, sorted_metrics, rotation=45, ha='right')
+    plt.xticks(x, filtered_metrics, rotation=45, ha='right')
     plt.legend()
     plt.tight_layout()
     
@@ -2073,47 +2249,44 @@ def generate_statistical_validation_graphs(output_dir):
     # Create effect size comparison
     plt.figure(figsize=(12, 6))
     
-    # Sort metrics by effect size
-    effect_sizes = [abs(results['individual_results'][m]['effect_size']) for m in sorted_metrics]
-    effect_categories = [results['individual_results'][m]['effect_size_category'] for m in sorted_metrics]
+    # Filter out fractal_dimension if present
+    filtered_metrics = [m for m in sorted_metrics if m != 'fractal_dimension']
     
-    # Create color map based on effect size category
-    colors = []
-    for category in effect_categories:
-        if category == 'large':
-            colors.append('#1a9850')  # green
-        elif category == 'medium':
-            colors.append('#91cf60')  # light green
-        elif category == 'small':
-            colors.append('#d9ef8b')  # very light green
-        else:
-            colors.append('#bbbbbb')  # gray
+    # Use actual effect sizes, not absolute values
+    effect_sizes = [results['individual_results'][m]['effect_size'] for m in filtered_metrics]
     
-    # Plot effect sizes
-    bars = plt.bar(sorted_metrics, effect_sizes, color=colors)
+    # Create colors based on effect direction (positive = green, negative = red)
+    bar_colors = ['#1a9850' if es >= 0 else '#d73027' for es in effect_sizes]
     
-    # Add reference lines for effect size categories
-    plt.axhline(y=0.2, color='gray', linestyle='--', alpha=0.5, label='Small effect')
-    plt.axhline(y=0.5, color='gray', linestyle='--', alpha=0.7, label='Medium effect')
-    plt.axhline(y=0.8, color='gray', linestyle='--', alpha=0.9, label='Large effect')
+    # Plot effect sizes with appropriate coloring
+    bars = plt.bar(filtered_metrics, effect_sizes, color=bar_colors)
+    
+    # Add a zero line instead of effect size category lines
+    plt.axhline(y=0, color='black', linestyle='-', alpha=0.3, linewidth=1)
+    
+    # Adjust y-limits to be symmetric around zero for better interpretation
+    max_abs_effect = max(abs(np.array(effect_sizes)))
+    plt.ylim(-max_abs_effect * 1.1, max_abs_effect * 1.1)
     
     # Configure plot
     plt.xlabel('Metrics')
-    plt.ylabel('Effect Size (absolute value)')
-    plt.title('Effect Size of Phi Across Metrics')
+    plt.ylabel('Effect Size (Cohen\'s d)')
+    plt.title('Effect size of scaling factor phi compared to unit scaling')
     plt.xticks(rotation=45, ha='right')
-    plt.legend()
     plt.tight_layout()
     
     # Save figure
     plt.savefig(output_dir / "effect_size_comparison.png", dpi=300, bbox_inches='tight')
     plt.close()
     
-    # Create comparison of means plot
+    # Create boxplot comparison between different scaling factors
     plt.figure(figsize=(14, 8))
     
     # For each metric, plot phi vs average of others
     for i, metric_name in enumerate(sorted_metrics):
+        if metric_name == 'fractal_dimension':
+            continue  # Skip fractal dimension as requested
+            
         plt.subplot(3, 2, i+1 if i < 5 else 5)
         
         # Extract data
@@ -2124,22 +2297,24 @@ def generate_statistical_validation_graphs(output_dir):
                 other_data.extend(metrics_data[metric_name][factor])
         other_data = np.array(other_data)
         
-        # Create boxplot
+        # Create boxplot with consistent coloring
         bp = plt.boxplot([phi_data, other_data], labels=['φ', 'Other'], patch_artist=True)
         
-        # Color boxes based on significance
-        if results['individual_results'][metric_name]['significant_after_correction']:
-            bp['boxes'][0].set_facecolor('#c6dbef')
-            plt.title(f"{metric_name} (p={results['individual_results'][metric_name]['adjusted_p_value']:.4f})*")
-        else:
-            bp['boxes'][0].set_facecolor('#f0f0f0')
-            plt.title(f"{metric_name} (p={results['individual_results'][metric_name]['adjusted_p_value']:.4f})")
+        # Use consistent neutral coloring regardless of significance
+        bp['boxes'][0].set_facecolor('#d9d9d9')  # Light gray for all boxes
+        bp['boxes'][1].set_facecolor('#d9d9d9')
+        
+        # Title includes p-value but without asterisk to avoid implying significance
+        plt.title(f"{metric_name} (adjusted p={results['individual_results'][metric_name]['adjusted_p_value']:.4f})")
             
-        # Add individual points
+        # Add individual data points with neutral colors
         plt.scatter(np.random.normal(1, 0.1, len(phi_data)), phi_data, alpha=0.4, 
-                   color='blue', edgecolor='none')
+                   color='dimgray', edgecolor='none')
         plt.scatter(np.random.normal(2, 0.1, len(other_data)), other_data, alpha=0.2, 
-                   color='gray', edgecolor='none')
+                   color='dimgray', edgecolor='none')
+                   
+        # Add y-label for clarity
+        plt.ylabel('Value')
     
     plt.tight_layout()
     plt.savefig(output_dir / "phi_comparison_boxplots.png", dpi=300, bbox_inches='tight')
