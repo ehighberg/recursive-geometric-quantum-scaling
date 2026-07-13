@@ -342,9 +342,17 @@ def run_comparative_analysis_fixed(
             np.linspace(0.5, 3.0, 25),
             [phi]
         ])))
+    else:
+        scaling_factors = np.asarray(scaling_factors, dtype=float)
+
+    if scaling_factors.ndim != 1 or scaling_factors.size == 0:
+        raise ValueError("scaling_factors must be a non-empty one-dimensional sequence")
+    if not np.all(np.isfinite(scaling_factors)) or np.any(scaling_factors <= 0):
+        raise ValueError("scaling_factors must contain only finite values greater than zero")
     
     # Initialize results
     results = {
+        'scaling_factors': scaling_factors.tolist(),
         'standard_results': {},
         'phi_recursive_results': {},
         'comparative_metrics': {},
@@ -388,9 +396,6 @@ def run_comparative_analysis_fixed(
             if abs(state_overlap - 1.0) > 1e-6:
                 print(f"Warning: States should be identical at scaling_factor=1.0, but overlap = {state_overlap:.6f}")
         
-        # Calculate phi proximity (for reference only)
-        phi_proximity = np.exp(-(factor - phi)**2 / 0.1)
-        
         # Store results
         results['standard_results'][factor] = std_result
         results['phi_recursive_results'][factor] = phi_result
@@ -398,7 +403,8 @@ def run_comparative_analysis_fixed(
         # Store metrics
         metrics = {
             'state_overlap': state_overlap,
-            'phi_proximity': phi_proximity
+            'dimension_difference': np.nan,
+            'distance_to_phi': abs(float(factor) - phi),
         }
         
         # Add fractal dimension comparison if possible

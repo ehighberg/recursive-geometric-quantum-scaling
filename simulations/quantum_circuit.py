@@ -73,9 +73,7 @@ class StandardCircuit(QuantumCircuit):
     """
     Standard circuit evolution using qutip's solvers.
     
-    Note:
-    This class is now a thin wrapper around ScaledCircuit with scaling_factor=1.0
-    For new code, use ScaledCircuit directly.
+    Retained for compatibility with callers that require solver-style time grids.
     """
     def __init__(self, base_hamiltonian, total_time=None, n_steps=None, c_ops=None):
         # Initialize parent class
@@ -112,26 +110,40 @@ class StandardCircuit(QuantumCircuit):
     def evolve_closed(self, initial_state, n_steps=None):
         """
         Evolution using qutip's sesolve for closed systems.
-        
-        This now delegates to ScaledCircuit.evolve_closed with scaling_factor=1.0
         """
-        # Forward to the ScaledCircuit implementation
         steps = int(n_steps if n_steps is not None else self.n_steps)
-        result = self._scaled_circuit.evolve_closed(initial_state, steps)
-        
-        # Add eigenvalues for compatibility with old code that may expect it
+        times = np.linspace(0, self.total_time, steps + 1)
+        state = ket2dm(initial_state) if initial_state.isket else initial_state
+        solved = mesolve(
+            self.base_hamiltonian,
+            state,
+            times,
+            c_ops=[],
+            options={"store_states": True},
+        )
+        result = EvolutionResult(solved.states, times)
         result.eigenvalues = self.base_hamiltonian.eigenenergies()
-        
+        result.e_ops = []
+        result.options = {}
         return result
 
     def evolve_open(self, initial_state, c_ops=None):
         """
         Evolution using qutip's mesolve for open systems.
-        
-        This now delegates to ScaledCircuit.evolve_open with scaling_factor=1.0
         """
-        # Forward to the ScaledCircuit implementation
-        return self._scaled_circuit.evolve_open(initial_state, c_ops, self.n_steps)
+        times = np.linspace(0, self.total_time, self.n_steps + 1)
+        state = ket2dm(initial_state) if initial_state.isket else initial_state
+        solved = mesolve(
+            self.base_hamiltonian,
+            state,
+            times,
+            c_ops if c_ops is not None else self.c_ops,
+            options={"store_states": True},
+        )
+        result = EvolutionResult(solved.states, times)
+        result.e_ops = []
+        result.options = {}
+        return result
 
 class CustomCircuit(QuantumCircuit):
     """
@@ -312,6 +324,8 @@ class ScaledCircuit(QuantumCircuit):
         
         # Use provided value or default from config
         self.scale_factor = float(scaling_factor if scaling_factor is not None else config_scale_factor)
+        if not np.isfinite(self.scale_factor) or self.scale_factor <= 0:
+            raise ValueError("scaling_factor must be finite and greater than zero")
         self.recursion_depth = int(recursion_depth if recursion_depth is not None else config_recursion_depth)
         
         # Initialize noise channels
@@ -419,7 +433,11 @@ class ScaledCircuit(QuantumCircuit):
 
     def evolve_open(self, initial_state, c_ops=None, n_steps=None):
         """
-        Phi-scaled evolution for open systems using qutip's master equation solver.
+        Scaled open-system evolution using qutip's master equation solver.
+
+        For this time-independent Hamiltonian, the documented phi recurrence is
+        algebraically identical to standard evolution and must not add a
+        phi-centered correction.
         """
         steps = int(n_steps if n_steps is not None else self.config.get('n_steps', 10))
         tlist = np.linspace(0, steps, steps + 1)
@@ -432,38 +450,7 @@ class ScaledCircuit(QuantumCircuit):
         # Use provided c_ops or default to instance c_ops
         collapse_ops = c_ops if c_ops is not None else self.c_ops
         
-        # Build effective Hamiltonian based on the evolution type
-        if self.use_phi_recursive:
-            # For phi-recursive evolution, use a simpler approximation 
-            # We can't directly simulate the recursive unitary with mesolve
-            # So we'll use a modified scaled Hamiltonian that approximates it
-            # This is less accurate than the closed system approach
-            
-            # Create a weighted sum of scaled Hamiltonians
-            H_eff = 0
-            phi = PHI
-            
-            for idx in range(steps):
-                # Base scaling with adjustment for phi proximity
-                scale = (self.scale_factor ** idx)
-                phi_proximity = np.exp(-((self.scale_factor - phi) ** 2) / 0.1)
-                
-                # Modify scaling based on phi proximity
-                if phi_proximity > 0.8:
-                    # For values close to phi, add recursive terms
-                    primary_scale = scale * (1 + 0.1 * phi_proximity)
-                    H_eff += primary_scale * self.base_hamiltonian
-                    
-                    # Add secondary scale terms if enough recursion depth
-                    if self.recursion_depth > 1 and idx < steps - 1:
-                        secondary_scale = scale/phi * 0.2 * phi_proximity
-                        H_eff += secondary_scale * self.base_hamiltonian
-                else:
-                    # For values not close to phi, just use regular scaling
-                    H_eff += scale * self.base_hamiltonian
-        else:
-            # For standard scaling, simply sum the scaled Hamiltonians
-            H_eff = sum(self.get_scaled_hamiltonian(idx) for idx in range(steps))
+        H_eff = sum(self.get_scaled_hamiltonian(idx) for idx in range(steps))
         
         # Use the effective Hamiltonian for time evolution
         H_terms = H_eff

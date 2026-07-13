@@ -5,6 +5,8 @@ Unit tests for the visualization components of the Quantum Simulation Codebase.
 """
 
 import unittest
+import tempfile
+from pathlib import Path
 from qutip import Qobj, basis
 import matplotlib.pyplot as plt
 
@@ -94,8 +96,10 @@ class TestVisualizationComponents(unittest.TestCase):
     def test_export_circuit_diagram(self):
         try:
             fig = plot_circuit_diagram(self.components, self.connections, title="Test Export Circuit Diagram")
-            export_circuit_diagram(fig, "tests/test_circuit_diagram", format="png")
-            # Check if file exists (requires filesystem access; skipped here)
+            with tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "circuit_diagram"
+                export_circuit_diagram(fig, str(output), format="png")
+                self.assertTrue(output.with_suffix(".png").exists())
             plt.close(fig)
         except Exception as e:
             self.fail(f"export_circuit_diagram raised an exception {e}")

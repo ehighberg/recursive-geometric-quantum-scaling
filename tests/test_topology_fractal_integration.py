@@ -255,8 +255,8 @@ def test_performance_scaling():
     assert all(t2/t1 < 8.0 for t1, t2 in zip(times_fractal[:-1], times_fractal[1:]))
     assert all(t2/t1 < 8.0 for t1, t2 in zip(times_topo[:-1], times_topo[1:]))
 
-def test_combined_metrics():
-    """Test combined metrics from both analyses"""
+def test_generic_analyzer_does_not_duplicate_topological_metrics():
+    """The dedicated app tab, not the generic analyzer, owns these metrics."""
     result = MockHybridResult()
     
     # Add combined metrics
@@ -266,6 +266,9 @@ def test_combined_metrics():
     with patch('app.analyze_results.st.metric') as mock_metric:
         analyze_simulation_results(result, mode="Topological Braiding")
         
-        # Verify metrics were displayed
-        mock_metric.assert_any_call("Fractal-Chern Correlation", 0.80)
-        mock_metric.assert_any_call("Protection Dimension", 1.50)
+        assert not any(
+            call.args and call.args[0] in {
+                "Fractal-Chern Correlation", "Protection Dimension"
+            }
+            for call in mock_metric.call_args_list
+        )

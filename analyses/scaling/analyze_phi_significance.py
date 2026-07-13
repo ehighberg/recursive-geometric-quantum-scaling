@@ -162,7 +162,9 @@ def analyze_phi_significance(fine_resolution=True, save_results=True):
         z2_index = compute_standard_z2_index(eigenstates, k_points, fs)
         
         # Calculate proper Berry phase for the path through k-space
-        berry_phase = compute_berry_phase_standard(eigenstates, fs)
+        berry_phase = compute_berry_phase_standard(
+            eigenstates, scaling_factor=fs, method="standard"
+        )
         
         # Estimate correlation length
         if band_gap > 1e-10:

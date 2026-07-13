@@ -348,7 +348,7 @@ def unwrap_phases_by_method(phases, method='standard'):
         # Default to standard unwrap
         return np.unwrap(phases)
 
-def compute_standard_winding(eigenstates, k_points, scaling_factor=None, method='consensus'):
+def compute_standard_winding(eigenstates, k_points, scaling_factor=None, method='standard'):
     """
     Compute winding number using enhanced topological definition.
     

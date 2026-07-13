@@ -1,5 +1,21 @@
 # Recursive Geometric Quantum Scaling (RGQS)
 
+## Release status
+
+This repository is a research source snapshot, not a Python package. Use the
+canonical `main` branch, install `requirements.txt` into a virtual environment,
+and run the complete gate before relying on a revision:
+
+```bash
+python -m venv .venv
+python -m pip install -r requirements.txt
+python -m pytest tests -q
+```
+
+Generated plots and statistical conclusions are exploratory research outputs,
+not independent scientific validation. No wheel, PyPI distribution, stable API,
+or production-service support is claimed.
+
 This repository contains an implementation of Recursive Geometric Quantum Scaling, a framework for exploring how geometric scaling factors, particularly the golden ratio (φ ≈ 1.618), affect quantum evolution and properties.
 
 ## Overview
@@ -130,16 +146,17 @@ Detailed documentation is available in the `docs/` directory:
 - `RGQS_Fixed_Implementation_Guide.md`: Guide to using the fixed implementations
 - `TABLE_OF_CONTENTS.md`: Complete documentation index
 
-## Key Conclusions
+## Research hypotheses
 
-The improved implementation confirms several key findings:
+The implementation is intended to test these hypotheses:
 
 1. The golden ratio (φ) exhibits unique properties in quantum evolution, particularly in:
    - Fractal dimension of evolved states
    - Topological protection against perturbations
    - Entanglement growth dynamics
 
-2. These findings have been validated through rigorous statistical analysis, ensuring their scientific validity.
+2. Statistical analyses in this repository require independent reproduction
+   before they can support a scientific claim.
 
 ## Requirements
 
@@ -154,4 +171,5 @@ See `requirements.txt` for a complete list of dependencies. Core dependencies in
 
 ## License
 
-This project is available for academic and research purposes.
+No license file is currently provided. Copyright remains with the contributors;
+contact the repository owner before redistribution or publication.

@@ -151,7 +151,7 @@ def analyze_phi_resonance(result, analyze_phi=True):
         return {}
         
     from analyses.fractal_analysis import phi_sensitive_dimension, compute_multifractal_spectrum
-    from analyses.topological_invariants import compute_phi_sensitive_winding, compute_phi_resonant_berry_phase
+    from analyses.topological_invariants import compute_standard_winding, compute_berry_phase_standard
     from constants import PHI
     
     analysis_results = {}
@@ -198,12 +198,14 @@ def analyze_phi_resonance(result, analyze_phi=True):
     
     # Compute phi-sensitive winding number
     print("Computing phi-sensitive winding number...")
-    winding = compute_phi_sensitive_winding(eigenstates, k_points, scaling_factor=scaling_factor)
+    winding = compute_standard_winding(eigenstates, k_points, scaling_factor=scaling_factor)
     analysis_results['phi_winding'] = float(winding)  # Convert to float for serialization
     
     # Compute phi-resonant Berry phase
     print("Computing phi-resonant Berry phase...")
-    berry_phase = compute_phi_resonant_berry_phase(eigenstates, scaling_factor)
+    berry_phase = compute_berry_phase_standard(
+        eigenstates, scaling_factor=scaling_factor, method="standard"
+    )
     analysis_results['phi_berry_phase'] = float(berry_phase)  # Convert to float for serialization
     
     return analysis_results

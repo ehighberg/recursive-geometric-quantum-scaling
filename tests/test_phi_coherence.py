@@ -456,14 +456,14 @@ def save_results_to_csv(results, output_path):
 import pytest
 from constants import PHI
 
-def test_coherence_enhancement():
-    """Test that phi-scaling provides coherence enhancement."""
+def test_coherence_exploration_smoke(tmp_path):
+    """Exercise the exploratory comparison without claiming enhancement."""
     # Test with minimal parameters for quick execution
     results = run_coherence_comparison(
         qubit_counts=[1],
         n_steps=20,
         noise_levels=[0.05],
-        output_dir="test_results/coherence_test"
+        output_dir=tmp_path
     )
     
     # Check that results were generated

@@ -448,20 +448,6 @@ def main():
                         localization = 0.0
                     localization_measures.append(localization)
                 
-                # Handle phi-resonant enhancement
-                from constants import PHI
-                phi_proximity = np.exp(-(x - PHI)**2 / 0.5)  # Wider Gaussian for visual clarity
-                phi_resonant_index = np.argmax(phi_proximity)
-                
-                # Enhance protection near phi (showing how phi creates special topological properties)
-                if phi_resonant_index > 0 and phi_resonant_index < len(energy_gaps):
-                    # Create a phi-centered enhancement
-                    for i in range(len(energy_gaps)):
-                        # Apply phi-resonant enhancement to protection metrics
-                        weight = phi_proximity[i] * 0.5
-                        energy_gaps[i] *= (1 + weight)
-                        localization_measures[i] *= (1 + weight)
-                
                 fig_protection = plot_protection_metrics(control_range, energy_gaps, localization_measures)
                 st.pyplot(fig_protection)
                 
@@ -470,8 +456,8 @@ def main():
                     These plots show how topological protection varies with the control parameter.
                     Energy gaps indicate the robustness against perturbations, while edge localization
                     shows how well the edge states are protected from bulk states.
-                    Note the enhanced protection near the golden ratio φ ≈ 1.618, demonstrating the
-                    special role of φ in creating stable topological phases.
+                    This exploratory proxy does not establish special behavior at any
+                    particular control value.
                 """)
             
             # Second section - specific topological metrics for braiding experiments

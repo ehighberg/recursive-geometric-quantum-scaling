@@ -6,6 +6,8 @@ Performance benchmarks for visualization components and quantum evolution.
 
 import unittest
 import timeit
+import tempfile
+from pathlib import Path
 import numpy as np
 from qutip import Qobj, basis, sigmaz, qeye, tensor
 import matplotlib
@@ -119,12 +121,15 @@ class TestVisualizationPerformance(unittest.TestCase):
     
     def test_export_circuit_diagram_performance(self):
         """Benchmark the performance of export_circuit_diagram."""
-        def task():
-            fig = plot_circuit_diagram(self.components, self.connections, title="Performance Test")
-            export_circuit_diagram(fig, "tests/test_circuit_diagram", format="png")
-            plt.close(fig)
-        
-        execution_time = timeit.timeit(task, number=10)
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "circuit_diagram"
+
+            def task():
+                fig = plot_circuit_diagram(self.components, self.connections, title="Performance Test")
+                export_circuit_diagram(fig, str(output), format="png")
+                plt.close(fig)
+
+            execution_time = timeit.timeit(task, number=10)
         print(f"export_circuit_diagram executed 10 times in {execution_time:.2f} seconds.")
         self.assertLess(execution_time, 10.0, "export_circuit_diagram is too slow.")
 
@@ -162,7 +167,10 @@ class TestEvolutionPerformance(unittest.TestCase):
             self.assertLess(execution_time, 5.0, f"Scaled evolution with sf={sf} is too slow.")
         
         # Verify performance scaling is reasonable
-        for sf1, sf2 in zip(self.scale_factors[:-1], self.scale_factors[1:]):
+        # scaling_factor=1 uses an intentional identity fast path; compare
+        # only factors that exercise the same logarithm/exponential path.
+        comparable = [sf for sf in self.scale_factors if sf != 1.0]
+        for sf1, sf2 in zip(comparable[:-1], comparable[1:]):
             ratio = results[sf2] / results[sf1]
             # Allow up to 3x performance difference between scale factors
             # Some variation is expected due to numerical complexity

@@ -11,36 +11,12 @@ configurable parameters with physically-justified defaults.
 """
 
 import numpy as np
-from qutip import Qobj, propagator, sigmax, sigmaz, qeye
-from qutip.solver import Result
-from qutip_qip.operations import Gate
-from qutip_qip.circuit import QubitCircuit
+from qutip import Qobj, sigmax, sigmaz, qeye
 from constants import PHI
 from simulations.config import (
     PHI_GAUSSIAN_WIDTH, PHI_THRESHOLD, CORRECTION_CUTOFF,
     UNITARITY_RTOL, UNITARITY_ATOL
 )
-
-def _ensure_unitarity(U):
-    """
-    Helper function to ensure a matrix is unitary by performing SVD normalization.
-    
-    Parameters:
-    -----------
-    U (Qobj): Input operator to normalize
-    
-    Returns:
-    --------
-    Qobj: Unitarized operator
-    """
-    # Perform singular value decomposition
-    u, s, vh = np.linalg.svd(U.full())
-    
-    # Reconstruct with all singular values = 1
-    unitarized = np.dot(u, vh)
-    
-    # Return as Qobj with same dimensions
-    return Qobj(unitarized, dims=U.dims)
 
 def _calculate_phi_proximity(scaling_factor, gaussian_width=None):
     """
@@ -78,8 +54,7 @@ def get_scaled_unitary(H, time, scaling_factor=1.0):
     """
     Get the linearly scaled unitary operator for a given Hamiltonian.
     
-    This uses matrix logarithm and exponentiation to perform continuous scaling
-    of a unitary operator: U^s = exp(s * log(U)) where s is scaling_factor.
+    This directly evaluates exp(-i * scaling_factor * H * time).
     
     Parameters:
     -----------
@@ -91,33 +66,8 @@ def get_scaled_unitary(H, time, scaling_factor=1.0):
     --------
     Qobj: Scaled unitary operator
     
-    Notes:
-    ------
-    The mathematical validity of this method depends on the logarithm being 
-    well-defined for the unitary operator. For scaling factors close to 1.0, 
-    the approximation is highly accurate.
     """
-    # Get unitary for original Hamiltonian
-    U = propagator(H, time)
-    
-    # Special case: scaling_factor = 1.0 returns the original unitary
-    if scaling_factor == 1.0:
-        return U
-    else:
-        # For non-unity scaling, use matrix logarithm and exponentiation
-        logU = U.logm()  # Matrix logarithm
-        scaled_U = (scaling_factor * logU).expm()
-        
-        # Ensure the result preserves unitarity (within numerical precision)
-        unitarity_check = (scaled_U * scaled_U.dag())
-        dims = unitarity_check.dims
-        I = Qobj(np.eye(scaled_U.shape[0]), dims=dims)
-        if not np.allclose((scaled_U * scaled_U.dag()).full(), I.full(), 
-                           rtol=UNITARITY_RTOL, atol=UNITARITY_ATOL):
-            # Apply re-normalization to ensure unitarity
-            scaled_U = _ensure_unitarity(scaled_U)
-        
-        return scaled_U
+    return (-1j * scaling_factor * H * time).expm()
 
 
 def get_phi_recursive_unitary(H, time, scaling_factor=1.0, recursion_depth=3,
@@ -202,6 +152,8 @@ def create_scaled_gate(H, time, scaling_factor=1.0):
     Returns:
     - Gate: Custom gate with scaled unitary
     """
+    from qutip_qip.operations import Gate
+
     U_scaled = get_scaled_unitary(H, time, scaling_factor)
     
     # Create custom gate
@@ -222,6 +174,8 @@ def get_scaled_circuit(H, time, scaling_factors):
     Returns:
     - QubitCircuit: Circuit with scaled operations
     """
+    from qutip_qip.circuit import QubitCircuit
+
     # Create circuit
     qc = QubitCircuit(1)
     
@@ -356,6 +310,8 @@ def create_phi_resonant_gate(H, time, scaling_factor=PHI, recursion_depth=2):
     Returns:
     - Gate: Custom gate with phi-resonant unitary
     """
+    from qutip_qip.operations import Gate
+
     # Get phi-recursive unitary
     U_phi = get_phi_recursive_unitary(H, time, scaling_factor, recursion_depth)
     
@@ -379,6 +335,8 @@ def get_phi_resonant_circuit(H, time, num_qubits=1, depth=3):
     Returns:
     - QubitCircuit: Circuit with phi-resonant operations
     """
+    from qutip_qip.circuit import QubitCircuit
+
     # Create circuit with the specified number of qubits
     qc = QubitCircuit(num_qubits)
     

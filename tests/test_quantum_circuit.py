@@ -20,7 +20,7 @@ def test_standard_circuit_init():
 def test_scaled_circuit_init():
     """Test scaled circuit initialization with different scale factors"""
     H0 = sigmaz()
-    # Test default scale_factor=1
+    # The project-wide default is the neutral, unscaled value.
     circuit1 = ScaledCircuit(H0)
     assert circuit1.scale_factor == 1.0
     
