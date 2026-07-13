@@ -48,9 +48,10 @@ class TestPhiResonantFeatures(unittest.TestCase):
         from simulations.scaled_unitary import get_scaled_unitary
         U_std = get_scaled_unitary(self.H, 1.0, self.phi)
         
-        # Verify that phi-recursive unitary is different from standard unitary
-        self.assertFalse(np.allclose(U_phi.full(), U_std.full()),
-                         "Phi-recursive unitary should differ from standard unitary")
+        # 1/phi + 1/phi^2 == 1, so this commuting-H composition must equal
+        # the standard unitary; asserting a difference would fabricate an effect.
+        self.assertTrue(np.allclose(U_phi.full(), U_std.full()),
+                        "Phi recursion identity drifted from its definition")
         
         # Verify that phi-recursive unitary is still unitary
         U_dag_U = U_phi.dag() * U_phi
@@ -113,7 +114,7 @@ class TestPhiResonantFeatures(unittest.TestCase):
             _, states = H_k.eigenstates()
             eigenstates.append(states[0])
         
-        # Compute phi-sensitive winding at phi
+        # The legacy scaling argument must not bias the standard invariant.
         winding_phi = compute_standard_winding(eigenstates, k_points, self.phi)
         
         # Compute phi-sensitive winding away from phi
@@ -125,8 +126,7 @@ class TestPhiResonantFeatures(unittest.TestCase):
         self.assertTrue(isinstance(winding_other, float),
                        "Phi-sensitive winding should be a float")
         
-        # Compute phi-resonant Berry phase
-        berry_phi = compute_berry_phase(eigenstates, self.phi)
+        berry_phi = compute_berry_phase(eigenstates, closed_path=True)
         
         # Verify Berry phase is valid
         self.assertTrue(-np.pi <= berry_phi <= np.pi,
@@ -140,6 +140,7 @@ class TestPhiResonantFeatures(unittest.TestCase):
             state_label="plus",
             n_steps=5,
             scaling_factor=self.phi,
+            evolution_type="phi-recursive",
             recursion_depth=2,
         )
         
@@ -148,16 +149,10 @@ class TestPhiResonantFeatures(unittest.TestCase):
                        "Result should have states attribute")
         self.assertTrue(hasattr(result, 'times'),
                        "Result should have times attribute")
-        self.assertTrue(hasattr(result, 'expect'),
-                       "Result should have expect attribute")
-        
-        # Verify phi-sensitive analysis results
-        self.assertTrue(hasattr(result, 'phi_dimension'),
-                       "Result should have phi_dimension attribute")
-        self.assertTrue(hasattr(result, 'phi_winding'),
-                       "Result should have phi_winding attribute")
-        self.assertTrue(hasattr(result, 'phi_berry_phase'),
-                       "Result should have phi_berry_phase attribute")
+        self.assertEqual(len(result.states), len(result.times))
+        self.assertEqual(result.params['evolution_type'], 'phi-recursive')
+        for state in result.states:
+            self.assertAlmostEqual(state.norm(), 1.0)
     
     def test_comparative_analysis(self):
         """Test comparative analysis."""
@@ -185,8 +180,8 @@ class TestPhiResonantFeatures(unittest.TestCase):
                          "Comparative metrics should include state_overlap")
             self.assertIn('dimension_difference', results['comparative_metrics'][factor],
                          "Comparative metrics should include dimension_difference")
-            self.assertIn('phi_proximity', results['comparative_metrics'][factor],
-                         "Comparative metrics should include phi_proximity")
+            self.assertIn('distance_to_phi', results['comparative_metrics'][factor],
+                         "Comparative metrics should label distance as reference metadata")
 
 if __name__ == '__main__':
     unittest.main()

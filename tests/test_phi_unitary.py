@@ -47,8 +47,7 @@ def test_scaled_unitary_maintains_unitarity(test_hamiltonians, scaling_factors):
             U = get_scaled_unitary(H, time, factor)
             
             # Check that U is unitary: U * U^† = I
-            dim = H.shape[0]
-            I = qeye(dim)
+            I = qeye(H.dims[0])
             U_product = U * U.dag()
             
             # Calculate error
@@ -72,8 +71,7 @@ def test_phi_recursive_unitary_maintains_unitarity(test_hamiltonians, scaling_fa
                 U = get_phi_recursive_unitary(H, time, factor, depth)
                 
                 # Check that U is unitary: U * U^† = I
-                dim = H.shape[0]
-                I = qeye(dim)
+                I = qeye(H.dims[0])
                 U_product = U * U.dag()
                 
                 # Calculate error with detailed reporting
@@ -99,26 +97,20 @@ def test_eigenvalues_have_unit_modulus(test_hamiltonians, scaling_factors):
             # Check eigenvalues for standard unitary
             eigvals_standard = U_standard.eigenenergies()
             for val in eigvals_standard:
-                # Extract complex eigenvalue
-                z = np.exp(1j * val)
-                # Check |z| = 1
-                assert abs(abs(z) - 1.0) < 1e-10, (
-                    f"Standard unitary eigenvalue {z} has modulus {abs(z)} ≠ 1"
+                assert abs(abs(val) - 1.0) < 1e-10, (
+                    f"Standard unitary eigenvalue {val} has modulus {abs(val)} ≠ 1"
                 )
             
             # Check eigenvalues for phi recursive unitary
             eigvals_phi = U_phi.eigenenergies()
             for val in eigvals_phi:
-                # Extract complex eigenvalue
-                z = np.exp(1j * val)
-                # Check |z| = 1
-                assert abs(abs(z) - 1.0) < 1e-10, (
-                    f"Phi recursive unitary eigenvalue {z} has modulus {abs(z)} ≠ 1"
+                assert abs(abs(val) - 1.0) < 1e-10, (
+                    f"Phi recursive unitary eigenvalue {val} has modulus {abs(val)} ≠ 1"
                 )
 
 # Test consistency between scaled unitaries and recursive unitaries
-def test_consistency_at_phi(test_hamiltonians):
-    """Test that phi-recursive unitaries have special properties at phi."""
+def test_recursive_identity(test_hamiltonians):
+    """The documented recurrence is algebraically equal to standard evolution."""
     time = 1.0
     
     # Define scaling factors including phi and non-phi values
@@ -133,27 +125,12 @@ def test_consistency_at_phi(test_hamiltonians):
             phi_recursive_unitaries[factor] = get_phi_recursive_unitary(H, time, factor, recursion_depth=3)
             standard_unitaries[factor] = get_scaled_unitary(H, time, factor)
         
-        # Check that there's a difference between phi recursive and standard at phi
-        phi_difference = (
-            phi_recursive_unitaries[PHI] - standard_unitaries[PHI]
-        ).norm()
-        
-        # Assert the difference is meaningful (but not extreme)
-        assert phi_difference > 1e-6, (
-            f"Phi recursive unitary should differ from standard scaling at phi"
-        )
-        
-        # Check that the difference is largest at phi
+        # 1/phi + 1/phi^2 == 1. Every factor is a function of the same
+        # Hamiltonian, so the recursive exponentials commute and compose to U(t).
         for factor in scaling_factors:
-            if factor == PHI:
-                continue
-            
-            other_difference = (
+            difference = (
                 phi_recursive_unitaries[factor] - standard_unitaries[factor]
             ).norm()
-            
-            # This isn't a strict requirement but tests the hypothesis
-            # that the difference is more pronounced near phi
-            # We log rather than assert because it's a tendency, not a requirement
-            if other_difference > phi_difference:
-                print(f"Note: Difference at f_s={factor} ({other_difference}) > difference at phi ({phi_difference})")
+            assert difference < 1e-10, (
+                f"Recursive identity drifted at f_s={factor}: {difference}"
+            )

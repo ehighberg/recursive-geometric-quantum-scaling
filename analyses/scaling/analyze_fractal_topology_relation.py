@@ -119,7 +119,9 @@ def analyze_fractal_topology_relation(fs_values=None, save_results=True):
         z2_index = compute_standard_z2_index(eigenstates, k_points, fs)
         
         # Calculate Berry phase using proper mathematical definition
-        berry_phase = compute_berry_phase_standard(eigenstates, fs)
+        berry_phase = compute_berry_phase_standard(
+            eigenstates, scaling_factor=fs, method="standard"
+        )
         
         # Estimate correlation length
         if band_gap > 1e-10:

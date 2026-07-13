@@ -34,7 +34,7 @@ def plot_invariants(control_range):
         compute_chern_number,
         compute_winding_number,
         compute_z2_index,
-        compute_phi_sensitive_winding
+        compute_standard_winding
     )
     from constants import PHI
     
@@ -103,7 +103,7 @@ def plot_invariants(control_range):
         chern_values[i] = compute_chern_number(eigenstates_2d[i*stride], k_mesh)
         
         # Compute phi-sensitive winding number
-        phi_winding_values[i] = compute_phi_sensitive_winding(
+        phi_winding_values[i] = compute_standard_winding(
             sparse_states, k_points, PHI)
     
     # Interpolate to get smooth curves for all points

@@ -103,9 +103,9 @@ def analyze_simulation_results(result, mode: str = "Evolution"):
         
         # Metric distributions
         st.subheader("Metric Distributions")
-        fig_dist = plot_metric_distribution(metrics, title="Metric Distributions")
+        fig_dist = plot_metric_distribution(states, title="Metric Distributions")
         st.pyplot(fig_dist)
-        
+
         # Add noise analysis section if noise is detected
         if has_noise:
             st.subheader("Noise Analysis")

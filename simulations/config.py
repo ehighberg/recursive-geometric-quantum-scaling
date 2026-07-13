@@ -69,7 +69,7 @@ UNITARITY_ATOL = 1e-10  # Absolute tolerance for unitarity checks
 _DEFAULT_CONFIG = {
     'total_time': 10.0,
     'n_steps': 50,
-    'scale_factor': PHI,
+    'scale_factor': 1.0,
     'recursion_depth': 3,
     'noise': {
         'dephasing': {

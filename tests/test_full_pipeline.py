@@ -161,8 +161,8 @@ def test_export_functionality(mock_streamlit):
         # Verify export options were created
         mock_download.assert_not_called()  # Feature coming soon
 
-def test_performance_monitoring(mock_streamlit):
-    """Test performance monitoring in the pipeline"""
+def test_generic_analyzer_does_not_duplicate_performance_ui(mock_streamlit):
+    """Performance monitoring belongs to the dedicated topological tab."""
     result = MockSimulationResult()
     
     # Add performance metrics
@@ -174,8 +174,10 @@ def test_performance_monitoring(mock_streamlit):
     
     analyze_simulation_results(result, mode="Topological Braiding")
     
-    # Verify performance data was displayed
-    assert any('Performance' in str(call) for call in mock_streamlit['subheader'].call_args_list)
+    assert not any(
+        'Performance' in str(call)
+        for call in mock_streamlit['subheader'].call_args_list
+    )
 
 def test_state_persistence(mock_streamlit):
     """Test state persistence between analyses"""

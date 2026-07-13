@@ -13,7 +13,7 @@ This module includes implementations for:
 """
 
 import numpy as np
-from qutip import sigmaz, tensor, qeye, sesolve, mesolve, sigmax, Options, expect
+from qutip import Qobj, sigmaz, tensor, qeye, sesolve, mesolve, sigmax, Options, expect
 from constants import PHI
 from simulations.scaled_unitary import get_phi_recursive_unitary
 from tqdm import tqdm
@@ -220,7 +220,7 @@ def run_state_evolution(num_qubits, state_label, n_steps, scaling_factor=1, nois
     
     # For simplicity, let's just use a static Hamiltonian for all cases
     # This avoids the issues with time-dependent Hamiltonians
-    if callable(H_effective):
+    if not isinstance(H_effective, Qobj):
         # If it's a time-dependent Hamiltonian, convert it to a static one
         # by evaluating it at t=0 with empty args
         # FIXED: Added comma between arguments
